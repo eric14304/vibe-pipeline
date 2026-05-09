@@ -33,6 +33,8 @@ export async function runTurn({
   isFirstTurn,
 }: RunOpts): Promise<QAReply> {
   const args = ["claude", "-p", "--output-format", "json"];
+  // QA 階段:鎖會改檔 / 跑 sub-agent / 上網的工具,其他(Bash / Read / Grep / Glob / MCP)放行讓 AI 收斂時可查專案。
+  args.push("--disallowedTools", "Edit Write Task");
   if (isFirstTurn) {
     args.push("--session-id", sessionId);
     args.push("--system-prompt", QA_BEHAVIOR_PROMPT);
@@ -40,7 +42,7 @@ export async function runTurn({
     args.push("--resume", sessionId);
     args.push(
       "--append-system-prompt",
-      "提醒:回覆永遠用單一 JSON 物件 {message, options, complete, spec},不要解釋、不要 markdown 包裝。"
+      "提醒:你只負責對話收斂 ticket 需求,不要實際執行任何工具(Bash/Read/Edit/Grep/...)。回覆永遠用單一 JSON 物件 {message, options, complete, spec},不要解釋、不要 markdown 包裝。"
     );
   }
   args.push(userMessage);
@@ -73,7 +75,49 @@ export async function runTurn({
   }
   const inner = outerJson.result ?? outerJson.text ?? outerJson;
   const innerStr = typeof inner === "string" ? inner : JSON.stringify(inner);
-  return parseReply(innerStr);
+  return enforceContract(parseReply(innerStr));
+}
+
+function normalizeMode(v: unknown): "step" | "iter" | undefined {
+  if (typeof v !== "string") return undefined;
+  const s = v.toLowerCase();
+  if (s === "step" || s === "one-shot" || s === "oneshot" || s === "single") return "step";
+  if (s === "iter" || s === "iterative" || s === "loop" || s === "iterate") return "iter";
+  return undefined;
+}
+
+function coerceSpec(spec: unknown): unknown {
+  if (!spec || typeof spec !== "object") return spec;
+  const o = { ...(spec as Record<string, unknown>) };
+  const mode = normalizeMode(o.mode);
+  if (mode) o.mode = mode;
+  return o;
+}
+
+function specHasAllFields(s: unknown): boolean {
+  if (!s || typeof s !== "object") return false;
+  const o = s as Record<string, unknown>;
+  return (
+    typeof o.title === "string" &&
+    o.title.length > 0 &&
+    typeof o.goal === "string" &&
+    o.goal.length > 0 &&
+    Array.isArray(o.acceptance) &&
+    o.acceptance.length > 0 &&
+    typeof o.prompt === "string" &&
+    o.prompt.length > 0 &&
+    (o.mode === "step" || o.mode === "iter")
+  );
+}
+
+function enforceContract(reply: QAReply): QAReply {
+  // 1. Coerce common mode synonyms (iterative → iter, one-shot → step etc).
+  const coerced = { ...reply, spec: coerceSpec(reply.spec) as QAReply["spec"] };
+  // 2. Even if AI declares complete=true, override to false when spec is incomplete.
+  if (coerced.complete && !specHasAllFields(coerced.spec)) {
+    return { ...coerced, complete: false };
+  }
+  return coerced;
 }
 
 function parseReply(raw: string): QAReply {
@@ -106,3 +150,4 @@ function parseReply(raw: string): QAReply {
     spec: null,
   };
 }
+

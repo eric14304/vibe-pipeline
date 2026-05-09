@@ -9,6 +9,62 @@ export type Project = {
   lastOpenedAt: number; // unix ms
 };
 
+// ─── QA / Ticket spec ─────────────────────────────────────────────
+export type TicketSpec = {
+  title: string;
+  goal: string;
+  acceptance: string[];
+  prompt: string;
+  mode: "step" | "iter";
+};
+
+export type PartialSpec = Partial<TicketSpec>;
+
+export type QAReply = {
+  message: string;
+  options: string[];
+  optionsMode?: "single" | "multi";
+  complete: boolean;
+  spec: PartialSpec | null;
+};
+
+export type Turn = {
+  role: "user" | "ai";
+  message: string;
+  options?: string[];
+  optionsMode?: "single" | "multi";
+  ts: number;
+};
+
+export type Draft = {
+  draftId: string;
+  pipelineId: string;
+  sessionId: string;
+  sessionStarted: boolean;
+  complete: boolean;
+  createdAt: number;
+  updatedAt: number;
+  turns: Turn[];
+  spec: PartialSpec | null;
+};
+
+export function isCompleteSpec(s: unknown): s is TicketSpec {
+  if (!s || typeof s !== "object") return false;
+  const o = s as Record<string, unknown>;
+  return (
+    typeof o.title === "string" &&
+    o.title.length > 0 &&
+    typeof o.goal === "string" &&
+    o.goal.length > 0 &&
+    Array.isArray(o.acceptance) &&
+    o.acceptance.length > 0 &&
+    o.acceptance.every((x) => typeof x === "string") &&
+    typeof o.prompt === "string" &&
+    o.prompt.length > 0 &&
+    (o.mode === "step" || o.mode === "iter")
+  );
+}
+
 export type ApiOk<T> = { ok: true; data: T };
 export type ApiErr = { ok: false; error: { code: ApiErrorCode; message: string } };
 export type ApiResponse<T> = ApiOk<T> | ApiErr;

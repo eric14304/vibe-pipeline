@@ -1,3 +1,6 @@
+export type { TicketSpec, PartialSpec, QAReply } from "../../../shared/types";
+export { isCompleteSpec } from "../../../shared/types";
+
 export const QA_REPLY_SCHEMA = {
   type: "object",
   properties: {
@@ -18,23 +21,3 @@ export const QA_REPLY_SCHEMA = {
   },
   required: ["message", "options", "complete"],
 } as const;
-
-export type TicketSpec = {
-  title: string;
-  goal: string;
-  acceptance: string[];
-  prompt: string;
-  mode: "step" | "iter";
-};
-
-// 對話中:spec 是目前已收齊的部分(可選欄位)
-// complete=true:spec 必須全 5 欄齊全
-export type PartialSpec = Partial<TicketSpec>;
-
-export type QAReply = {
-  message: string;
-  options: string[];
-  optionsMode?: "single" | "multi"; // 預設 single;多項可同時成立的問題用 multi
-  complete: boolean;
-  spec: PartialSpec | null;
-};

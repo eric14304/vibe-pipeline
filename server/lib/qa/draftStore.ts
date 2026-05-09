@@ -2,27 +2,10 @@ import { join } from "node:path";
 import { existsSync, mkdirSync, readdirSync, unlinkSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { ensureRuntime } from "../pipelineDir";
-import type { QAReply, TicketSpec, PartialSpec } from "./schema";
+import { writeJson } from "../jsonFile";
+import type { QAReply, Draft } from "../../../shared/types";
 
-export type Turn = {
-  role: "user" | "ai";
-  message: string;
-  options?: string[];
-  optionsMode?: "single" | "multi";
-  ts: number;
-};
-
-export type Draft = {
-  draftId: string;
-  pipelineId: string;
-  sessionId: string;
-  sessionStarted: boolean; // warm-up 完成 / 第一個 turn 跑過 → true
-  complete: boolean; // 最後一次 AI reply 的 complete flag
-  createdAt: number;
-  updatedAt: number;
-  turns: Turn[];
-  spec: PartialSpec | null;
-};
+export type { Draft, Turn } from "../../../shared/types";
 
 function dir(projectPath: string): string {
   return ensureRuntime(projectPath, "qa-drafts");
@@ -30,10 +13,6 @@ function dir(projectPath: string): string {
 
 function file(projectPath: string, draftId: string): string {
   return join(dir(projectPath), `${draftId}.json`);
-}
-
-function writeJson(path: string, data: unknown): Promise<number> {
-  return Bun.write(path, JSON.stringify(data, null, 2) + "\n");
 }
 
 export async function listDrafts(projectPath: string): Promise<Draft[]> {

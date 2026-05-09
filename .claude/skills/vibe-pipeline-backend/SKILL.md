@@ -1,32 +1,33 @@
 ---
 name: vibe-pipeline-backend
-description: vibe-pipeline 後端 / 執行層規格與計畫 — 目前 0 行 backend 程式碼,本 SKILL 是 spec 索引與架構記憶。實作 doer/critic runner、SQLite log、git branch / worktree、notification 通道、Q&A 收斂引擎、budget tracker、`vp` CLI 之前先讀。
+description: vibe-pipeline 後端 / 執行層規格與計畫 — Phase 1 (Project / Pipeline CRUD) + Phase 2 (QA-driven ticket 建立) 已落地。本 SKILL 是 spec 索引與架構記憶。實作 doer/critic runner、SQLite log、git branch / worktree、budget tracker、`vp` CLI、SKILL 蒸餾之前先讀。
 ---
 
-## 現況(2026-05-09)
+## 現況(2026-05-10)
 
-**目前 repo 內沒有任何 backend / runtime / persistence 程式碼。** 所有畫面跑在 mock 資料上。
+**Phase 1 + Phase 2 已落地**:
+- Phase 1:Project 偵測 / 開啟 / git-init / reveal、Pipeline CRUD(JSON,tickets 內嵌)、`.vibe-pipeline/` 自動建立
+- Phase 2:QA-driven ticket 建立(claude CLI 對話收斂、draft store、tool 限制、Spec finalize 寫進 pipeline.tickets[])
 
-**進入串接期** — 第一刀範圍見下節。本 SKILL 餘下章節是**完整規格與計畫**(MVP / P2 / P3),不是「現在就做」的清單。
+**還沒做(P2 / P3)**:doer/critic runner spawn、SQLite log、git branch/worktree、Q&A engine 進化版、budget tracker、notification 通道、SKILL 蒸餾、`vp` CLI。
 
 要開工 backend 前:
 
-1. 確認你做的事屬於「**第一刀串接(stub-first)**」還是「擴張到完整 MVP 規格」
-2. **第一刀** → 讀本 SKILL「stub-first 起手」段 + [refs/integration-plan-v1-2026-05-09.md](../vibe-pipeline/refs/integration-plan-v1-2026-05-09.md)
-3. **擴張 MVP** → 讀完整規格 [refs/spec-2026-05-09.md](../vibe-pipeline/refs/spec-2026-05-09.md)
-4. 開工前回報「我要做 X,屬 stub-first 哪步 / [M] / [P2] / [P3],預估 Y」
+1. 看你的事屬於「補 phase 1/2 細節」、「擴張到 P2 runner」、「P3+」哪一段
+2. **Phase 1/2 補丁** → 讀本 SKILL「Phase 1+2 已落地架構」段 + 對應 ref
+3. **P2 runner / git** → 讀「完整規格」段 + [refs/git-design-2026-05-09.md](../vibe-pipeline/refs/git-design-2026-05-09.md)
+4. **完整規格** → [refs/spec-2026-05-09.md](../vibe-pipeline/refs/spec-2026-05-09.md)
+5. 開工前回報「我要做 X,屬 Phase 1/2 補 / [P2] / [P3],預估 Y」
 
-## stub-first 起手(現在的範圍)
-
-第一條 vertical slice:**空狀態 → 選資料夾 → init popup → 後端紀錄**。
+## Phase 1+2 已落地架構
 
 ### 技術選型
 
 - **Bun** 跑 backend(`bun run server` 起 process,port 3001)
-- 內建用足:`Bun.serve`(HTTP)/`bun:sqlite`(暫不用)/`Bun.spawn`(後續)/`Bun.file`(fs)
+- 內建用足:`Bun.serve`(HTTP)/`Bun.spawn`(claude CLI)/`Bun.file`(fs)
 - 不裝 Express / Fastify / Hono(Bun.serve 夠用)
-- 不裝 ORM(這版只寫 JSON 檔,不碰 SQLite)
-- Schema 驗證:**這版不做**(直接信任 JSON 結構,壞了拋 error)
+- 不裝 ORM(JSON 檔即可,SQLite 等 P2 加 runner 才用)
+- Schema 驗證:目前信任 JSON 結構;`shared/types.ts` 的 `isCompleteSpec()` 是少數 runtime 驗證
 
 ### 資料夾職責邊界
 
@@ -35,33 +36,74 @@ description: vibe-pipeline 後端 / 執行層規格與計畫 — 目前 0 行 ba
 - **`server/index.ts`** 只做:啟 `Bun.serve`、解 URL、dispatch 到對應 route。**不寫業務邏輯**
 - **`server/routes/*`** 純 dispatch:解 body、call `lib/`、包 response envelope。**不直接 IO**
 - **`server/lib/*`** 純 IO + 邏輯,**不知道 HTTP**(可被 `vp` CLI 直接 import 用,不經 server)。每檔一個職責,別跨層
-- **`server/types.ts`** 只放 server 內部 type(routes ↔ lib 之間)。**持久化型別不放這**(那是 `shared/types.ts` 的事)
-- **`shared/types.ts`** 是**前後端共用持久化 schema** 的 single source of truth。前端 `import "../../shared/types"`,後端同樣 import。不要兩邊各定一份
+- **`server/lib/qa/*`** QA 子系統 — claude CLI 整合 / draft store / 系統 prompt / parsing。獨立子目錄,跟其他 lib 分開
+- **`shared/types.ts`** 是**前後端共用持久化 schema** 的 single source of truth。前端 import,後端 import,不要兩邊各定一份。`Pipeline / Ticket / TicketSpec / QAReply / Turn / Draft / NOTIF_EVENTS` 都在這
 - **`~/.vibe-pipeline/state.json`** 只存 global runtime(user 開過的 projects + last selected)。**不存 pipeline / ticket 細節**,那些都從各 project 的 `.vibe-pipeline/` 內讀
+- **`<target>/.vibe-pipeline/.runtime/`** gitignored 暫存。目前只有 `qa-drafts/<id>.json`
 
-### 第一版 API endpoint
+### API endpoints(Phase 1+2 全集)
 
 ```
-GET  /api/projects                           列最近開過的 project
-POST /api/projects/select                    開原生 dialog,回 {path}
-POST /api/projects/open                      body {path},加進 recents,標 last opened
-GET  /api/projects/:hash/status              回 {hasInit, name, path}
-POST /api/projects/:hash/init                建 .vibe-pipeline/ 結構
+# Phase 1
+GET  /api/health                                    health check
+GET  /api/projects                                  列最近開過 (sorted by lastOpenedAt desc)
+POST /api/projects/select                           開原生 dialog 選資料夾
+POST /api/projects/open                             body {path} → 加進 recents
+GET  /api/projects/:hash/status                     回 {path, hash, name, hasInit, hasGit, lastOpenedAt}
+POST /api/projects/:hash/init                       建 .vibe-pipeline/{config.json,pipelines/,.runtime/}
+POST /api/projects/:hash/git-init                   target 沒 git 時跑 git init -b main
+POST /api/projects/:hash/reveal                     OS 檔案總管打開該資料夾
 
-GET  /api/projects/:hash/pipelines           列所有 pipeline (掃 .vibe-pipeline/pipelines/*.json)
-POST /api/projects/:hash/pipelines           body {name, baseBranch, ...} → 自動產 id 寫檔
-GET  /api/projects/:hash/pipelines/:id       讀單條
-PUT  /api/projects/:hash/pipelines/:id       覆寫單條 (含 tickets 陣列)
+GET  /api/projects/:hash/pipelines                  掃 .vibe-pipeline/pipelines/*.json
+POST /api/projects/:hash/pipelines                  body {name,...} → 自動產 id (<12-hex-ms-ts>-<slug>) 寫檔
+GET  /api/projects/:hash/pipelines/:id              讀單條
+PUT  /api/projects/:hash/pipelines/:id              覆寫整條 (tickets 內嵌)
+
+# Phase 2 (QA)
+POST /api/projects/:hash/pipelines/:pid/qa/start    建 draft (不打 claude),回 {draft}
+GET  /api/projects/:hash/qa/drafts                  列當前所有 active draft
+GET  /api/projects/:hash/qa/:draftId                 讀單條 draft (resume 用)
+POST /api/projects/:hash/qa/:draftId/turn            送 user message → spawn claude → parse → 存 turn → 回 {draft, reply}
+POST /api/projects/:hash/qa/:draftId/finalize        把 spec 寫進 pipeline.tickets[] + 刪 draft
+POST /api/projects/:hash/qa/:draftId/cancel          刪 draft
 ```
 
 ### Response envelope
 
 統一 `{ ok: true, data }` 或 `{ ok: false, error: { code, message } }`。
-常見 error code:`not_found` / `permission_denied` / `dialog_cancelled` / `invalid_path` / `not_initialized` / `already_initialized`。
+常見 error code:`not_found` / `permission_denied` / `dialog_cancelled` / `invalid_path` / `not_initialized` / `already_initialized` / `internal_error`。
 
 ### Project hash 規則
 
-`hash = sha256(absolute_path).slice(0, 8)` — 跟 Composio AO 同 pattern(避免 absolute path 進 URL)。
+`hash = sha256(absolute_path).slice(0, 8)` — 跟 Composio AO 同 pattern。Pipeline id 規則 `<12-hex-ms-ts>-<slug>`(本機時間序、不撞)。
+
+### QA 子系統設計重點(Phase 2 落地)
+
+**Claude CLI 整合(`server/lib/qa/claudeCli.ts`)**
+- 第一輪:`claude -p --output-format json --session-id <uuid> --system-prompt <QA_BEHAVIOR_PROMPT> --disallowedTools "Edit Write Task" "<user message>"`
+- 後續輪:`claude -p --resume <sessionId> --output-format json --disallowedTools "Edit Write Task" --append-system-prompt "<reminder>" "<user message>"`
+- session-id 由我們生(`crypto.randomUUID()`),非 claude 給
+- 工具策略:**只擋 Edit / Write / Task**(改檔 + sub-agent),其他放行讓 AI 在收斂時可查專案 / 跑 read-only 命令(Bash + Read + Grep + Glob + WebFetch + MCP 都開)
+- output-format json wrap result in `{type:"result", result:"<text>", session_id, ...}`,我們抽 `.result` 再 parse
+
+**Reply parsing 4 層 fallback(`parseReply`)**
+1. fenced ` ```json {...} ``` ` block
+2. 直接 JSON object
+3. 文字中找第一個 `{...}`
+4. 都失敗 → 包成 `{message: <raw>, options: [], complete: false, spec: null}` — flow 不崩
+
+**Contract enforcement(`enforceContract`)**
+即使 AI 宣告 `complete=true`,如果 `spec` 不完整(5 欄缺一)→ **強制改回 `complete=false`**。AI 偷跑攔下,user 不會看到空白 SpecReview。
+
+**Draft store(`server/lib/qa/draftStore.ts`)**
+- `<target>/.vibe-pipeline/.runtime/qa-drafts/<draftId>.json`
+- Draft schema 含 `sessionId`(claude session)/ `sessionStarted`(已跑過第一輪)/ `complete`(最後一輪 reply.complete)/ `turns[]`(完整 history)/ `spec`(累進填)
+- `appendTurn` 同時加 user + ai turn,合併 `spec` 累積、更新 `complete`
+
+**System prompt(`server/lib/qa/systemPrompt.ts`)**
+- `QA_BEHAVIOR_PROMPT` 寫死契約(輸出格式 / 5 欄定義 / 收斂規則 / 工具使用原則 / 風格)— 不可改
+- `DEFAULT_OPENING_MESSAGE` 給 backend fallback;phase 2 frontend 寫死第一句,backend 路徑暫不用
+- 注意:**template literal 內絕對不能用 backtick**,backtick 會終止字串導致 backend crash(踩過兩次)
 
 ### Project state 持久化
 
@@ -74,24 +116,23 @@ PUT  /api/projects/:hash/pipelines/:id       覆寫單條 (含 tickets 陣列)
   ]
 }
 ```
-**不存 pipeline / ticket 細節**,那些都從各 project 的 `.vibe-pipeline/` 內讀。
 
 ### 安全 invariants(學 Symphony)
 
 - `POST /init` 必須 assert path 在合理範圍(防 user 拿 `/` / `~` 去 init)
-- json 寫入用 atomic rename(`writeFile tmp + rename`)避免半寫狀態
+- json 寫入 atomic(暫時直接寫,之後可加 tmp + rename)
 - 所有 fs 操作 normalize 路徑,防 `..` 跳出 project root
 
-### 不做的(留下階段)
+### 還沒做(留 P2+)
 
 - SQLite log(`runs.db`)— 沒 runner 不需要
-- git 操作 — 寫進 JSON 的 `branch` 欄位先當預期名,不真建
-- Schema migration — 直接 v1 schema,壞了再說
-- 認證 / CORS — 本機 server,信任 user
-- File watcher — 第一版 refresh 才更新
-- Init 後 `git init` — 留給 user 自行處理
+- git branch / merge / worktree — pipeline.branch 欄位是預期名,沒實際操作。Worktree 設計見 [refs/git-design](../vibe-pipeline/refs/git-design-2026-05-09.md)
+- Schema migration — 目前 v1,壞了 user 自己 fix
+- 認證 / CORS — 本機 server 信任 user
+- File watcher — refresh 才更新
+- Notification producer — 事件型別已定 (`NOTIF_EVENTS`),producer 等 runner 接
 
-走完這條,我們有「**檔案層的 ticket 編排器骨架**」,後續加 runner / SQLite 才有依託。
+走完這兩個 phase,我們有「**完整 ticket 建立 + 查看的骨架**」。後續 P2 加 doer/critic runner,ticket 從 `status: "draft"` 跑成 `done`。
 
 ---
 

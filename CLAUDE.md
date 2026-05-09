@@ -2,13 +2,24 @@
 
 多 AI agent(doer + critic)的 ticket / pipeline 編排器。Web 應用為主介面,將來配 `vp` CLI。每張 ticket 由 doer 跑、critic 審,iterative 模式自動迴圈到 critic pass;pipeline 是 ticket 的有序組合,每條跑在獨立 git branch,完成後 merge 回 base。
 
-## 當前 phase(2026-05-09)
+## 當前 phase(2026-05-10)
 
-**進入串接期**。前一階段完成 6 個 pixel-perfect 畫面 + 純 mock data。第一條 vertical slice:**空狀態 → 選資料夾 → init popup → 後端紀錄**。
+**Phase 2 收尾中**:QA-driven ticket 建立。pipeline focus 點「+ ticket」開 QA drawer,跟 claude CLI 對話收斂出 5 欄位 spec(title / goal / acceptance / prompt / mode),user 確認後寫進 pipeline.tickets[]。
 
-架構決策:**Bun local server + browser**(前端 Vite 5173 / 後端 Bun 3001 / `/api/*` 透過 Vite proxy)。第一刀 backend 範圍:Project + Init + Pipeline JSON CRUD(tickets 內嵌)。**不做** SQLite log / runner / git ops / Q&A / budget / notification(留下階段)。
+**已完成**
+- Phase 1 — Project / Pipeline CRUD + .vibe-pipeline/ JSON 持久化 + git init / reveal
+- Phase 2 — QA drawer + claude CLI 整合(`-p --output-format json --session-id` / `--resume`、自帶 `--disallowedTools "Edit Write Task"`)、Draft store 走 `.vibe-pipeline/.runtime/qa-drafts/`、Spec checklist / chip click / drawer title from spec.title、Multi-select option 模式
 
-完整計畫:[`.claude/skills/vibe-pipeline/refs/integration-plan-v1-2026-05-09.md`](.claude/skills/vibe-pipeline/refs/integration-plan-v1-2026-05-09.md)。phase 推進時主動更新本段。
+**架構決策**:Bun local server + browser(前端 Vite 5173 / 後端 Bun 3001 / `/api/*` 透過 Vite proxy)。
+
+**留下階段(P2 / P3)**:doer runner、SQLite log、git branch / worktree、budget tracker、notification 通道、SKILL 蒸餾。
+
+**計畫 ref**
+- [phase 1 plan(已落地)](.claude/skills/vibe-pipeline/refs/integration-plan-v1-2026-05-09.md)
+- [phase 2 QA plan](.claude/skills/vibe-pipeline/refs/integration-plan-v2-qa-2026-05-09.md)
+- [git design(P2)](.claude/skills/vibe-pipeline/refs/git-design-2026-05-09.md)
+
+phase 推進時主動更新本段。
 
 ## Repo 結構(物理路徑 single source of truth)
 
@@ -39,11 +50,11 @@ vibe-pipeline/
 │   │   └── PickerSelect.tsx
 │   ├── features/
 │   │   ├── notifications/     NotificationsScreen + InboxColumn + NotifBanner
-│   │   ├── pipeline/          BoardScreen + FocusColumn (TicketCard/IterStages/Verdicts)
+│   │   ├── pipeline/          BoardScreen + FocusColumn + EmptyProject
 │   │   ├── pipelineCreate/    CreateCard + CreatePlaceholder
-│   │   ├── init/              InitScreen (全屏);串接期會加 InitPopup (modal)
-│   │   ├── drawer/            DrawerStage + 4 個 state 元件
-│   │   └── qa/                QAScreen + 4 個 variant (drawer/chat/form/step)
+│   │   ├── init/              InitScreen (全屏 prototype) + InitPopup (modal,phase 1 用)
+│   │   ├── drawer/            DrawerStage + 4 個 state 元件 (prototype 用,還沒接資料)
+│   │   └── qa/                QADrawer + useQA (phase 2 — 真接 backend) + QAScreen (prototype 4 variant)
 │   ├── styles/                從 prototype 1:1 移植
 │   │   ├── tokens.css         設計 token (CSS 變數,顏色/字型/spacing)
 │   │   ├── board.css
@@ -51,28 +62,38 @@ vibe-pipeline/
 │   │   ├── init.css
 │   │   ├── drawer.css
 │   │   └── qa.css
-│   ├── data/                  目前 mock seed,串接期 PIPELINES/PROJECTS/NOTIFS_SEED 將從 backend fetch
-│   │   ├── pipelines.ts       PIPELINES + PROJECTS + STATE_COLOR/LABEL + fmtElapsed
+│   ├── data/                  mock seed (尚未全接 backend)
+│   │   ├── pipelines.ts       STATE_COLOR/LABEL + fmtElapsed (PROJECTS dead, 之後刪)
 │   │   └── notifications.ts   NOTIFS_SEED + SEV_COLOR + SECTION_LABEL
-│   ├── types/                 (過渡) 持久化欄位串接期搬 shared/types.ts
-│   │   ├── pipeline.ts
-│   │   └── notif.ts
-│   ├── api/                   (規劃) 每 endpoint 一個 fetchXxx() 函式
-│   └── router/                (規劃) buildPath helper 集中 route 構造
+│   ├── types/                 過渡型別 (UI-only)
+│   │   ├── pipeline.ts        UI 計算用 IterState / ChatMsg 等
+│   │   └── notif.ts           InboxState / InboxFilter / NotifItem (UI display)
+│   ├── api/                   每 endpoint 一個 fetchXxx() 函式
+│   │   ├── projects.ts        /api/projects/* 全部
+│   │   └── qa.ts              /api/.../qa/* (start/turn/finalize/cancel/drafts/getDraft)
+│   ├── hooks/
+│   │   └── useActiveProject.ts  URL ?project=hash + localStorage fallback
+│   └── router/                (規劃) buildPath helper
 │
-├── server/                    後端 (規劃)。職責邊界見 vibe-pipeline-backend SKILL
+├── server/                    後端。職責邊界見 vibe-pipeline-backend SKILL
 │   ├── index.ts               Bun.serve 入口,route 表
 │   ├── routes/                純 dispatch,不寫業務邏輯
-│   │   └── projects.ts        所有 /api/projects/* (含 pipelines)
-│   ├── lib/                   純 IO + 邏輯,不知道 HTTP
-│   │   ├── projectStore.ts    ~/.vibe-pipeline/state.json 讀寫
-│   │   ├── pipelineDir.ts     <target-repo>/.vibe-pipeline/ 偵測 / 建立 / json 讀寫
-│   │   ├── hash.ts            absolute path → 8-char sha256
-│   │   └── dialog.ts          OS native folder picker (osascript/powershell/zenity)
-│   └── types.ts               server-only 內部 type
+│   │   ├── projects.ts        /api/projects/* (含 pipelines CRUD + git-init + reveal)
+│   │   └── qa.ts              /api/.../qa/* (start / turn / finalize / cancel / drafts)
+│   └── lib/                   純 IO + 邏輯,不知道 HTTP
+│       ├── projectStore.ts    ~/.vibe-pipeline/state.json 讀寫
+│       ├── pipelineDir.ts     <target-repo>/.vibe-pipeline/ 偵測 / 建立 / json 讀寫
+│       ├── hash.ts            absolute path → 8-char sha256
+│       ├── dialog.ts          OS native folder picker (osascript/powershell/zenity) + revealFolder
+│       ├── git.ts             hasGit / gitInit
+│       └── qa/
+│           ├── claudeCli.ts   spawn `claude -p` + parseReply 4-fallback + enforceContract
+│           ├── draftStore.ts  qa-drafts/<id>.json fs CRUD + appendTurn + markStarted
+│           ├── systemPrompt.ts  QA_BEHAVIOR_PROMPT (鎖死) + DEFAULT_OPENING_MESSAGE
+│           └── schema.ts      QA_REPLY_SCHEMA + re-export TicketSpec / QAReply / isCompleteSpec
 │
-├── shared/                    跨 backend/frontend 持久化型別 (規劃)
-│   └── types.ts               Project / Pipeline / Ticket schema (backend 為 source of truth)
+├── shared/                    跨 backend/frontend 持久化型別
+│   └── types.ts               Project / TicketSpec / QAReply / Turn / Draft / NOTIF_EVENTS
 │
 ├── design/                    Claude Design 匯出的 handoff bundle
 │   └── vibe-pipeline/
