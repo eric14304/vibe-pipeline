@@ -15,6 +15,8 @@ const page = await ctx.newPage();
 const errors = [];
 page.on("pageerror", (e) => errors.push("pageerror: " + e.message));
 page.on("console", (m) => { if (m.type() === "error") errors.push("console.error: " + m.text()); });
+page.on("requestfailed", (req) => errors.push("requestfailed: " + req.url() + " " + req.failure()?.errorText));
+page.on("response", (res) => { if (res.status() >= 400) errors.push("response " + res.status() + ": " + res.url()); });
 
 async function probe(url, label) {
   await page.goto(url, { waitUntil: "networkidle", timeout: 8000 });

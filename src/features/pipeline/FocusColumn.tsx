@@ -58,6 +58,7 @@ export function FocusColumn({
   hasActiveDraft = false,
   onRun,
   onPause,
+  onTicketClick,
 }: {
   pipeline: Pipeline;
   tick: number;
@@ -65,6 +66,7 @@ export function FocusColumn({
   hasActiveDraft?: boolean;
   onRun?: (pipelineId: string) => void;
   onPause?: (pipelineId: string) => void;
+  onTicketClick?: (ticket: Ticket) => void;
 }) {
   const stateColor = STATE_COLOR[pipeline.state];
   const stateLabel = STATE_LABEL[pipeline.state];
@@ -108,7 +110,13 @@ export function FocusColumn({
 
       <div className="focus-list">
         {pipeline.tickets.map((t, i) => (
-          <TicketCard key={t.id} ticket={t} tick={tick} index={i} />
+          <TicketCard
+            key={t.id}
+            ticket={t}
+            tick={tick}
+            index={i}
+            onClick={onTicketClick ? () => onTicketClick(t) : undefined}
+          />
         ))}
       </div>
     </main>
@@ -133,7 +141,17 @@ export function ReadyBanner({ pipeline }: { pipeline: Pipeline }) {
   );
 }
 
-function TicketCard({ ticket, tick, index }: { ticket: Ticket; tick: number; index: number }) {
+function TicketCard({
+  ticket,
+  tick,
+  index,
+  onClick,
+}: {
+  ticket: Ticket;
+  tick: number;
+  index: number;
+  onClick?: () => void;
+}) {
   const isIter = ticket.mode === "iter";
   const isRunning = ticket.status === "running";
   const isPaused = ticket.status === "paused";
@@ -145,7 +163,20 @@ function TicketCard({ ticket, tick, index }: { ticket: Ticket; tick: number; ind
   return (
     <div
       className={"ticket" + (isDraft ? " is-draft" : "") + (isPaused ? " is-paused" : "")}
-      style={{ animationDelay: `${index * 40}ms` }}
+      style={{ animationDelay: `${index * 40}ms`, cursor: onClick ? "pointer" : undefined }}
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
     >
       <span className="ticket-band" style={{ background: accent }} />
 

@@ -3,6 +3,7 @@ import { AppShell } from "../../shell/AppShell";
 import { Rail } from "../../shell/Rail";
 import { TopBar } from "../../shell/TopBar";
 import { FocusColumn } from "./FocusColumn";
+import { TicketDrawer } from "./TicketDrawer";
 import { CreateCard, CreatePlaceholder } from "../pipelineCreate/CreateCard";
 import { EmptyProject } from "./EmptyProject";
 import { InitPopup } from "../init/InitPopup";
@@ -12,7 +13,7 @@ import { useQA } from "../qa/useQA";
 import type { NotifItem } from "../../types/notif";
 import { useActiveProjectHash } from "../../hooks/useActiveProject";
 import * as api from "../../api/projects";
-import type { Pipeline } from "../../types/pipeline";
+import type { Pipeline, Ticket } from "../../types/pipeline";
 import type { Project } from "../../../shared/types";
 import type { InboxFilter, InboxState } from "../../types/notif";
 
@@ -34,6 +35,7 @@ export function BoardScreen({
   const [popupDismissed, setPopupDismissed] = useState(false);
 
   const qa = useQA(hash);
+  const [openTicket, setOpenTicket] = useState<Ticket | null>(null);
 
   const [inboxState, setInboxState] = useState<InboxState>("collapsed");
   const toggleInbox = () =>
@@ -305,10 +307,24 @@ export function BoardScreen({
     />
   ) : null;
 
+  // Re-pick latest ticket data when pipelines update so drawer reflects polled changes
+  const liveTicket = openTicket && active
+    ? active.tickets.find((t) => t.id === openTicket.id) ?? openTicket
+    : null;
+  const ticketOverlay = liveTicket && active ? (
+    <TicketDrawer
+      ticket={liveTicket}
+      pipelineName={active.name}
+      pipelineBranch={active.branch}
+      onClose={() => setOpenTicket(null)}
+    />
+  ) : null;
+
   const overlay = (
     <>
       {initOverlay}
       {qaOverlay}
+      {ticketOverlay}
     </>
   );
 
@@ -358,6 +374,7 @@ export function BoardScreen({
             tick={tick}
             onAddTicket={(pid) => qa.open(pid)}
             hasActiveDraft={!!qa.draftFor(active.id)}
+            onTicketClick={(t) => setOpenTicket(t)}
             onRun={async (pid) => {
               if (!project) return;
               try {
