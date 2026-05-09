@@ -57,7 +57,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/notifications" replace />} />
+        <Route path="/" element={<Navigate to="/board" replace />} />
         <Route path="/notifications" element={<NotificationsRoute />} />
         <Route path="/board" element={<BoardRoute />} />
         <Route path="/init" element={<InitRoute />} />

@@ -37,13 +37,15 @@ async function writeState(state: State): Promise<void> {
 
 function toProject(path: string, lastOpenedAt: number): Project {
   const absolute = resolve(path);
-  const ticketsPath = join(absolute, ".tickets");
-  const hasTickets = existsSync(ticketsPath) && statSync(ticketsPath).isDirectory();
+  const dirPath = join(absolute, ".vibe-pipeline");
+  const hasInit = existsSync(dirPath) && statSync(dirPath).isDirectory();
+  const hasGit = existsSync(join(absolute, ".git"));
   return {
     path: absolute,
     hash: projectHash(absolute),
     name: basename(absolute),
-    hasTickets,
+    hasInit,
+    hasGit,
     lastOpenedAt,
   };
 }

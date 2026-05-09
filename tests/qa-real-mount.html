@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8">
+<title>QA real mount test</title>
+<script type="module">
+  // Intercept fetch BEFORE any module loads so useQA's listDrafts call gets fake data
+  const origFetch = window.fetch;
+  window.fetch = async (url, init) => {
+    const u = String(url);
+    if (u.includes("/qa/drafts")) {
+      return new Response(JSON.stringify({ ok: true, data: [] }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    return origFetch(url, init);
+  };
+</script>
+</head>
+<body>
+<div id="root"></div>
+<script type="module">
+  import { createRoot } from "react-dom/client";
+  import { createElement as h } from "react";
+  import { QADrawer } from "/src/features/qa/QADrawer.tsx";
+
+  const fakeDraft = {
+    draftId: "demo",
+    pipelineId: "abc",
+    sessionId: "sid",
+    createdAt: 0,
+    updatedAt: 0,
+    turns: [
+      { role: "ai", message: "這張 ticket 大概是哪一類?先給個方向我才知道怎麼往下問。", ts: 0 },
+      { role: "user", message: "自己描述", ts: 0 },
+      { role: "ai", message: "好,你描述一下要做的事。盡量包含:要改什麼、為什麼、預期結果。", ts: 0 },
+    ],
+    spec: null,
+  };
+
+  createRoot(document.getElementById("root")).render(
+    h(QADrawer, {
+      pipelineName: "test",
+      draft: fakeDraft,
+      busy: false,
+      error: null,
+      onSendTurn: () => {},
+      onFinalize: () => {},
+      onCancel: () => {},
+      onClose: () => {},
+    })
+  );
+
+  setTimeout(() => {
+    const ids = document.querySelectorAll(".qa-bubble");
+    const out = Array.from(ids).map((el, i) => {
+      const r = el.getBoundingClientRect();
+      return `bubble[${i}] ${el.className.replace("qa-bubble ", "")}: w=${Math.round(r.width)} h=${Math.round(r.height)}`;
+    }).join("\n");
+    const pre = document.createElement("pre");
+    pre.id = "metrics";
+    pre.style.cssText = "position:fixed; left:8px; top:8px; background:#fff; color:#000; padding:8px; font-size:11px; z-index:9999;";
+    pre.textContent = out;
+    document.body.appendChild(pre);
+  }, 300);
+</script>
+</body>
+</html>

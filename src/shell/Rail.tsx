@@ -9,6 +9,8 @@ export function Rail({
   creating = false,
   onStartCreate,
   createSlot,
+  addLabel = "新 pipeline",
+  draftPipelineIds,
 }: {
   pipelines: Pipeline[];
   activeId: string;
@@ -16,22 +18,31 @@ export function Rail({
   creating?: boolean;
   onStartCreate?: () => void;
   createSlot?: React.ReactNode;
+  addLabel?: string;
+  draftPipelineIds?: Set<string>;
 }) {
   return (
     <aside className={"rail" + (creating ? " is-creating" : "")}>
       <div className="rail-section-label mono">PIPELINES</div>
       <div className="rail-list">
-        {pipelines.map((p) => (
-          <RailItem key={p.id} p={p} active={p.id === activeId} onClick={() => onSelect(p.id)} muted={creating} />
-        ))}
-
         {creating ? (
           createSlot
         ) : (
           <button className="rail-add" onClick={onStartCreate}>
-            <PlusIcon /> <span>新 pipeline</span>
+            <PlusIcon /> <span>{addLabel}</span>
           </button>
         )}
+
+        {pipelines.map((p) => (
+          <RailItem
+            key={p.id}
+            p={p}
+            active={p.id === activeId}
+            onClick={() => onSelect(p.id)}
+            muted={creating}
+            hasDraft={draftPipelineIds?.has(p.id) ?? false}
+          />
+        ))}
       </div>
       <div className="rail-spacer" />
       <div className={"rail-archive" + (creating ? " is-muted" : "")}>
@@ -45,7 +56,7 @@ export function Rail({
   );
 }
 
-function RailItem({ p, active, onClick, muted }: { p: Pipeline; active: boolean; onClick: () => void; muted?: boolean }) {
+function RailItem({ p, active, onClick, muted, hasDraft }: { p: Pipeline; active: boolean; onClick: () => void; muted?: boolean; hasDraft?: boolean }) {
   const done = p.tickets.filter((t) => t.status === "done").length;
   const total = p.tickets.length;
   return (
@@ -53,6 +64,22 @@ function RailItem({ p, active, onClick, muted }: { p: Pipeline; active: boolean;
       <div className="rail-item-row">
         <span className="rail-state-dot" style={{ background: STATE_COLOR[p.state] }} />
         <span className="rail-item-name">{p.name}</span>
+        {hasDraft && (
+          <span
+            className="mono"
+            title="進行中 QA"
+            style={{
+              fontSize: 9,
+              padding: "1px 5px",
+              borderRadius: 3,
+              background: "var(--accent-soft)",
+              color: "var(--accent)",
+              letterSpacing: "0.04em",
+            }}
+          >
+            QA
+          </span>
+        )}
         <span className="rail-item-count mono">
           {done}/{total}
         </span>

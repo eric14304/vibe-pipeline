@@ -1,0 +1,8 @@
+{
+  "name": "test",
+  "branch": "pipeline/test",
+  "baseBranch": "main",
+  "state": "planning",
+  "tickets": [],
+  "id": "019e0d4dc78b-test"
+}

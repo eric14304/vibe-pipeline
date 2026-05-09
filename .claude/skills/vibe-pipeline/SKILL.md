@@ -47,8 +47,8 @@ vibe-pipeline 是 **多 AI agent(doer + critic)的 ticket / pipeline 編排器**
 主 spec 在 [refs/spec-2026-05-09.md](refs/spec-2026-05-09.md)(2026-05-09 版,使用者標示「不是最終結果,以後會更新」)。包含三層:
 
 - `[M]` MVP — 專案 init、Ticket/Pipeline schema CRUD、doer+critic、iterative loop、branch lifecycle、SQLite log、exclusive lock、CLI 命令集
-- `[P2]` Phase 2 — Q&A 收斂引擎、stall detection、intervention 五型、budget tracker、context retrieval、SKILL 蒸餾、worktree 並行、TUI dashboard
-- `[P3]` Phase 3 — SKILL 候選自動提議與審核、AI 輔助 merge 衝突、多 pipeline 並行 scheduler、plugin、第三方通知
+- `[P2]` Phase 2 — Q&A 收斂引擎、stall detection、intervention 五型、budget tracker、context retrieval、worktree 並行、TUI dashboard
+- `[P3]` Phase 3 — AI 輔助 merge 衝突、多 pipeline 並行 scheduler、plugin、第三方通知
 
 之後若有更新版 spec,新增 `refs/spec-YYYY-MM-DD.md` 並在這裡 update 索引。**不要直接覆蓋舊 ref**,留下歷史。
 

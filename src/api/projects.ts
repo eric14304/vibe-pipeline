@@ -40,10 +40,26 @@ export function init(hash: string): Promise<Project> {
   return call<Project>(`/api/projects/${hash}/init`, { method: "POST" });
 }
 
+export function gitInit(hash: string): Promise<Project> {
+  return call<Project>(`/api/projects/${hash}/git-init`, { method: "POST" });
+}
+
+export function reveal(hash: string): Promise<{ ok: true }> {
+  return call<{ ok: true }>(`/api/projects/${hash}/reveal`, { method: "POST" });
+}
+
 export function listPipelines(hash: string): Promise<unknown[]> {
   return call<unknown[]>(`/api/projects/${hash}/pipelines`);
 }
 
-export function listTickets(hash: string): Promise<unknown[]> {
-  return call<unknown[]>(`/api/projects/${hash}/tickets`);
+export function createPipeline(hash: string, body: unknown): Promise<unknown> {
+  return call<unknown>(`/api/projects/${hash}/pipelines`, { method: "POST", body });
+}
+
+export function getPipeline(hash: string, id: string): Promise<unknown> {
+  return call<unknown>(`/api/projects/${hash}/pipelines/${id}`);
+}
+
+export function savePipeline(hash: string, id: string, body: unknown): Promise<unknown> {
+  return call<unknown>(`/api/projects/${hash}/pipelines/${id}`, { method: "PUT", body });
 }

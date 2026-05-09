@@ -18,7 +18,7 @@ export function InitScreen({ onReady }: { onReady?: () => void }) {
 
   useEffect(() => {
     if (refreshing) return;
-    const phrases = ["scanning…", "checking .git", "looking for .tickets/"];
+    const phrases = ["scanning…", "checking .git", "looking for .vibe-pipeline/"];
     let i = 0;
     const id = setInterval(() => {
       i = (i + 1) % phrases.length;
@@ -61,7 +61,7 @@ export function InitScreen({ onReady }: { onReady?: () => void }) {
             <div className="init-scan-path">~/code/your-repo</div>
             <div className="init-scan-miss">
               <span style={{ color: "var(--accent)" }}>✕</span>{" "}
-              no <code className="init-inline-code">.tickets/</code> found
+              no <code className="init-inline-code">.vibe-pipeline/</code> found
             </div>
           </div>
         </div>
@@ -69,7 +69,7 @@ export function InitScreen({ onReady }: { onReady?: () => void }) {
         <div className="init-body">
           <h1 className="init-title">This repo isn't set up yet.</h1>
           <p className="init-desc">
-            vibe-pipeline 在這個 repo 裡找不到 <code className="init-inline-code">.tickets/</code> 資料夾。
+            vibe-pipeline 在這個 repo 裡找不到 <code className="init-inline-code">.vibe-pipeline/</code> 資料夾。
             到專案底下跑一次 <code className="init-inline-code">tt init</code>,它會建立資料夾、寫入預設的 SKILL.md,然後就可以開始建 pipeline 了。
           </p>
         </div>
@@ -99,7 +99,7 @@ export function InitScreen({ onReady }: { onReady?: () => void }) {
           <div className="init-section-label mono">It'll create</div>
           <div className="init-tree mono">
             <div>
-              <span className="init-tree-glyph">▸</span> .tickets/
+              <span className="init-tree-glyph">▸</span> .vibe-pipeline/
             </div>
             <div className="init-tree-row">
               <span className="init-tree-line">├──</span>
@@ -140,7 +140,7 @@ export function InitScreen({ onReady }: { onReady?: () => void }) {
       </div>
 
       <div className="init-hint mono">
-        所有看板與設定都被隱藏,直到偵測到 <code className="init-inline-code" style={{ fontSize: 10 }}>.tickets/</code>
+        所有看板與設定都被隱藏,直到偵測到 <code className="init-inline-code" style={{ fontSize: 10 }}>.vibe-pipeline/</code>
       </div>
     </div>
   );

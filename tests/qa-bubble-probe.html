@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8">
+<title>QA bubble probe — full drawer</title>
+<link rel="stylesheet" href="/src/styles/tokens.css">
+<link rel="stylesheet" href="/src/styles/drawer.css">
+<link rel="stylesheet" href="/src/features/qa/qa.css">
+<style>
+  body { margin: 0; height: 100vh; background: var(--bg); }
+  .qa-bubble { outline: 1px dashed red; }
+  .qa-bubble-role { outline: 1px dashed cyan; }
+  .qa-bubble-msg { outline: 1px dashed yellow; }
+</style>
+</head>
+<body>
+  <!-- Mirror QADrawer full structure -->
+  <div class="drawer-stage qa-stage">
+    <div class="drawer-scrim"></div>
+    <div class="drawer qa-drawer">
+      <div class="drawer-head">
+        <div class="drawer-crumb">
+          <span class="mono">test</span>
+          <span class="sep">/</span>
+          <span>新 ticket</span>
+        </div>
+        <div class="drawer-titlerow">
+          <div class="drawer-title">QA · 收斂 ticket 需求</div>
+        </div>
+      </div>
+      <div class="drawer-body qa-body">
+        <div class="qa-bubble qa-bubble-ai" id="ai1">
+          <div class="qa-bubble-role mono">ai</div>
+          <div class="qa-bubble-msg">這張 ticket 大概是哪一類?</div>
+        </div>
+        <div class="qa-bubble qa-bubble-user" id="user1">
+          <div class="qa-bubble-role mono">you</div>
+          <div class="qa-bubble-msg">自己描述</div>
+        </div>
+        <div class="qa-bubble qa-bubble-ai" id="ai2">
+          <div class="qa-bubble-role mono">ai</div>
+          <div class="qa-bubble-msg">好,你描述一下要做的事。</div>
+        </div>
+      </div>
+      <div class="drawer-foot qa-foot">
+        <div class="qa-composer">
+          <div class="qa-composer-row">
+            <input class="qa-input" placeholder="或自己打一句…" />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    setTimeout(() => {
+      const ids = ['ai1', 'user1', 'ai2'];
+      const out = ids.map(id => {
+        const el = document.getElementById(id);
+        const r = el.getBoundingClientRect();
+        return id + ': w=' + Math.round(r.width) + ' h=' + Math.round(r.height);
+      }).join('\n');
+      const pre = document.createElement('pre');
+      pre.style.cssText = 'position:fixed; left:8px; top:8px; background:#fff; color:#000; padding:8px; font-size:11px; z-index:9999;';
+      pre.id = 'metrics';
+      pre.textContent = out;
+      document.body.appendChild(pre);
+    }, 100);
+  </script>
+</body>
+</html>

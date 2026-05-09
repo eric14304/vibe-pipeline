@@ -5,7 +5,15 @@ import * as api from "../api/projects";
 import { useActiveProjectHash } from "../hooks/useActiveProject";
 import type { Project } from "../../shared/types";
 
-export function TopBar() {
+export function TopBar({
+  onBellClick,
+  notifActive = false,
+  unreadCount = 0,
+}: {
+  onBellClick?: () => void;
+  notifActive?: boolean;
+  unreadCount?: number;
+} = {}) {
   const { hash, setHash } = useActiveProjectHash();
   const [recents, setRecents] = useState<Project[]>([]);
   const [open, setOpen] = useState(false);
@@ -113,7 +121,7 @@ export function TopBar() {
                     <div className="proj-menu-item-path mono">{p.path}</div>
                   </div>
                   <span className="proj-menu-item-meta mono">
-                    {p.hasTickets ? "ready" : "no .tickets/"}
+                    {p.hasInit ? "已初始化" : "未初始化"}
                   </span>
                   {p.hash === hash && (
                     <span className="proj-menu-check">
@@ -147,18 +155,33 @@ export function TopBar() {
         </div>
 
         {active && (
-          <span className="chip mono">
-            <span style={{ color: "var(--fg-mute)" }}>⎇</span> main
-          </span>
+          <>
+            <span className="chip mono">
+              <span style={{ color: "var(--fg-mute)" }}>⎇</span> main
+            </span>
+            <button
+              className="chip"
+              title="在檔案總管中開啟"
+              onClick={() => api.reveal(active.hash).catch(() => {})}
+              style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}
+            >
+              <FolderIcon />
+              <span>開啟專案資料夾</span>
+            </button>
+          </>
         )}
       </div>
 
       <span style={{ flex: 1 }} />
 
       <div className="topbar-right">
-        <button className="icon-btn" title="通知">
+        <button
+          className={"icon-btn" + (notifActive ? " is-active" : "")}
+          title="通知"
+          onClick={onBellClick}
+        >
           <BellIcon />
-          <span className="bell-dot" />
+          {unreadCount > 0 && <span className="bell-dot" />}
         </button>
         <button className="icon-btn" title="設定">
           <GearIcon />

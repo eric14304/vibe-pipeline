@@ -1,0 +1,11 @@
+{
+  "defaults": {
+    "base_branch": "main",
+    "merge_strategy": "squash"
+  },
+  "scripts": {
+    "setup": "",
+    "dev": "",
+    "cleanup": ""
+  }
+}

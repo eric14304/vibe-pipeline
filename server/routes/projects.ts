@@ -1,8 +1,9 @@
 import { resolve } from "node:path";
 import { existsSync, statSync } from "node:fs";
 import * as projectStore from "../lib/projectStore";
-import * as ticketsDir from "../lib/ticketsDir";
-import { pickFolder } from "../lib/dialog";
+import * as pipelineDir from "../lib/pipelineDir";
+import * as git from "../lib/git";
+import { pickFolder, revealFolder } from "../lib/dialog";
 import { projectHash } from "../lib/hash";
 import type { ApiResponse, ApiErrorCode, Project } from "../../shared/types";
 
@@ -70,10 +71,10 @@ export async function init(hash: string): Promise<Response> {
   const project = await projectStore.findByHash(hash);
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);
   if (!validProjectPath(project.path)) return err("invalid_path", `Path missing: ${project.path}`);
-  if (ticketsDir.hasTickets(project.path))
-    return err("already_initialized", `.tickets/ already exists in ${project.path}`);
+  if (pipelineDir.hasInit(project.path))
+    return err("already_initialized", `.vibe-pipeline/ already exists in ${project.path}`);
   try {
-    await ticketsDir.init(project.path);
+    await pipelineDir.init(project.path);
   } catch (e) {
     return err("internal_error", String(e), 500);
   }
@@ -84,41 +85,71 @@ export async function init(hash: string): Promise<Response> {
 export async function listPipelines(hash: string): Promise<Response> {
   const project = await projectStore.findByHash(hash);
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);
-  if (!ticketsDir.hasTickets(project.path))
-    return err("tickets_not_initialized", `.tickets/ not found in ${project.path}`);
-  const items = await ticketsDir.listPipelines(project.path);
+  if (!pipelineDir.hasInit(project.path))
+    return err("not_initialized", `.vibe-pipeline/ not found in ${project.path}`);
+  const items = await pipelineDir.listPipelines(project.path);
   return ok(items);
 }
 
 export async function createPipeline(hash: string, req: Request): Promise<Response> {
   const project = await projectStore.findByHash(hash);
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);
-  if (!ticketsDir.hasTickets(project.path))
-    return err("tickets_not_initialized", `.tickets/ not found in ${project.path}`);
+  if (!pipelineDir.hasInit(project.path))
+    return err("not_initialized", `.vibe-pipeline/ not found in ${project.path}`);
   const body = await readJson(req);
-  const id = (body.id as string) || `pipeline-${Date.now()}`;
-  await ticketsDir.writePipeline(project.path, id, { ...body, id });
-  return ok({ id });
+  const name = (body.name as string) || "pipeline";
+  const id = (body.id as string) || pipelineDir.generatePipelineId(name);
+  const data = { ...body, id, tickets: Array.isArray(body.tickets) ? body.tickets : [] };
+  await pipelineDir.writePipeline(project.path, id, data);
+  return ok(data);
 }
 
-export async function listTickets(hash: string): Promise<Response> {
+export async function getPipeline(hash: string, id: string): Promise<Response> {
   const project = await projectStore.findByHash(hash);
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);
-  if (!ticketsDir.hasTickets(project.path))
-    return err("tickets_not_initialized", `.tickets/ not found in ${project.path}`);
-  const items = await ticketsDir.listTickets(project.path);
-  return ok(items);
+  if (!pipelineDir.hasInit(project.path))
+    return err("not_initialized", `.vibe-pipeline/ not found in ${project.path}`);
+  const data = await pipelineDir.readPipeline(project.path, id);
+  if (!data) return err("not_found", `Pipeline not found: ${id}`, 404);
+  return ok(data);
 }
 
-export async function createTicket(hash: string, req: Request): Promise<Response> {
+export async function savePipeline(hash: string, id: string, req: Request): Promise<Response> {
   const project = await projectStore.findByHash(hash);
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);
-  if (!ticketsDir.hasTickets(project.path))
-    return err("tickets_not_initialized", `.tickets/ not found in ${project.path}`);
+  if (!pipelineDir.hasInit(project.path))
+    return err("not_initialized", `.vibe-pipeline/ not found in ${project.path}`);
   const body = await readJson(req);
-  const id = (body.id as string) || `ticket-${Date.now()}`;
-  await ticketsDir.writeTicket(project.path, id, { ...body, id });
-  return ok({ id });
+  const data = { ...body, id };
+  await pipelineDir.writePipeline(project.path, id, data);
+  return ok(data);
+}
+
+export async function gitInit(hash: string): Promise<Response> {
+  const project = await projectStore.findByHash(hash);
+  if (!project) return err("not_found", `Project not found: ${hash}`, 404);
+  if (!validProjectPath(project.path)) return err("invalid_path", `Path missing: ${project.path}`);
+  if (git.hasGit(project.path))
+    return err("already_initialized", `.git already exists in ${project.path}`);
+  try {
+    await git.gitInit(project.path);
+  } catch (e) {
+    return err("internal_error", String(e), 500);
+  }
+  const refreshed = await projectStore.findByHash(hash);
+  return ok(refreshed);
+}
+
+export async function reveal(hash: string): Promise<Response> {
+  const project = await projectStore.findByHash(hash);
+  if (!project) return err("not_found", `Project not found: ${hash}`, 404);
+  if (!validProjectPath(project.path)) return err("invalid_path", `Path missing: ${project.path}`);
+  try {
+    await revealFolder(project.path);
+  } catch (e) {
+    return err("internal_error", String(e), 500);
+  }
+  return ok({ ok: true });
 }
 
 export { projectHash };

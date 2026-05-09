@@ -2,11 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { PickerSelect } from "../../ui/PickerSelect";
 
 const BASE_BRANCHES = ["main", "develop", "release/2.4"];
-const MERGE_STRATEGIES = [
-  { id: "squash", label: "squash", hint: "預設" },
-  { id: "merge", label: "merge", hint: "保留 commits" },
-  { id: "rebase", label: "rebase", hint: "線性歷史" },
-];
 
 export function CreateCard({
   onCancel,
@@ -14,20 +9,20 @@ export function CreateCard({
   existingNames = [],
 }: {
   onCancel: () => void;
-  onSubmit: (data: { name: string; baseBranch: string; mergeStrategy: string }) => void;
+  onSubmit: (data: { name: string; baseBranch: string }) => void;
   existingNames?: string[];
 }) {
-  const [stem, setStem] = useState("billing");
+  const [name, setName] = useState("");
   const [baseBranch, setBaseBranch] = useState("main");
-  const [mergeStrategy, setMergeStrategy] = useState("squash");
   const [baseOpen, setBaseOpen] = useState(false);
-  const [mergeOpen, setMergeOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const cardRef = useRef<HTMLFormElement>(null);
 
-  const name = "feat-" + stem;
-  const taken = existingNames.includes(name);
-  const valid = stem.trim().length > 0 && !taken && /^[a-z0-9-]+$/.test(stem);
+  const trimmed = name.trim();
+  const taken = existingNames.includes(trimmed);
+  const formatOk = /^[a-z0-9][a-z0-9-_]*$/.test(trimmed);
+  const valid = trimmed.length > 0 && !taken && formatOk;
+  const showFormatHint = trimmed.length > 0 && !formatOk;
 
   useEffect(() => {
     const t = setTimeout(() => inputRef.current?.focus(), 80);
@@ -37,14 +32,14 @@ export function CreateCard({
   function submit(e?: React.FormEvent) {
     e?.preventDefault();
     if (!valid) return;
-    onSubmit({ name, baseBranch, mergeStrategy });
+    onSubmit({ name: trimmed, baseBranch });
   }
 
   return (
     <form className="create-card fade-up" onSubmit={submit} ref={cardRef}>
       <div className="create-card-head">
         <span className="rail-state-dot" style={{ background: "var(--draft)" }} />
-        <span className="create-card-eyebrow mono">new pipeline</span>
+        <span className="create-card-eyebrow mono">新 pipeline</span>
         <span style={{ flex: 1 }} />
         <button type="button" className="create-x" onClick={onCancel} title="取消 (Esc)" aria-label="取消">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
@@ -53,23 +48,26 @@ export function CreateCard({
         </button>
       </div>
 
-      <label className={"create-input" + (taken ? " is-error" : "")}>
-        <span className="create-prefix mono">feat-</span>
+      <label className={"create-input" + (taken || showFormatHint ? " is-error" : "")}>
         <input
           ref={inputRef}
           className="mono"
           type="text"
-          value={stem}
-          onChange={(e) => setStem(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+          value={name}
+          placeholder="pipeline 名稱"
+          onChange={(e) => setName(e.target.value)}
           spellCheck={false}
           autoComplete="off"
         />
         <span className="create-input-hint mono">{taken ? "已存在" : "Tab ▶"}</span>
       </label>
       {taken && <div className="create-error mono">名稱已存在,改一個。</div>}
+      {showFormatHint && !taken && (
+        <div className="create-error mono">只能用 a-z / 0-9 / - / _,首字需英數。</div>
+      )}
 
       <div className="create-field">
-        <div className="create-field-label mono">base_branch</div>
+        <div className="create-field-label">基底分支</div>
         <PickerSelect
           open={baseOpen}
           setOpen={setBaseOpen}
@@ -77,17 +75,6 @@ export function CreateCard({
           onChange={setBaseBranch}
           icon={<span className="mono" style={{ color: "var(--fg-mute)" }}>⎇</span>}
           options={BASE_BRANCHES.map((b) => ({ id: b, label: b, mono: true }))}
-        />
-      </div>
-
-      <div className="create-field">
-        <div className="create-field-label mono">merge_strategy</div>
-        <PickerSelect
-          open={mergeOpen}
-          setOpen={setMergeOpen}
-          value={mergeStrategy}
-          onChange={setMergeStrategy}
-          options={MERGE_STRATEGIES.map((m) => ({ id: m.id, label: m.label, hint: m.hint }))}
         />
       </div>
 

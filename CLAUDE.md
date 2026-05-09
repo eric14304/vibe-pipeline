@@ -6,7 +6,7 @@
 
 **進入串接期**。前一階段完成 6 個 pixel-perfect 畫面 + 純 mock data。第一條 vertical slice:**空狀態 → 選資料夾 → init popup → 後端紀錄**。
 
-架構決策:**Bun local server + browser**(前端 Vite 5173 / 後端 Bun 3001 / `/api/*` 透過 Vite proxy)。第一刀 backend 範圍:Project + Init + YAML CRUD。**不做** SQLite log / runner / git ops / Q&A / budget / notification(留下階段)。
+架構決策:**Bun local server + browser**(前端 Vite 5173 / 後端 Bun 3001 / `/api/*` 透過 Vite proxy)。第一刀 backend 範圍:Project + Init + Pipeline JSON CRUD(tickets 內嵌)。**不做** SQLite log / runner / git ops / Q&A / budget / notification(留下階段)。
 
 完整計畫:[`.claude/skills/vibe-pipeline/refs/integration-plan-v1-2026-05-09.md`](.claude/skills/vibe-pipeline/refs/integration-plan-v1-2026-05-09.md)。phase 推進時主動更新本段。
 
@@ -63,12 +63,10 @@ vibe-pipeline/
 ├── server/                    後端 (規劃)。職責邊界見 vibe-pipeline-backend SKILL
 │   ├── index.ts               Bun.serve 入口,route 表
 │   ├── routes/                純 dispatch,不寫業務邏輯
-│   │   ├── projects.ts        /api/projects/*
-│   │   ├── pipelines.ts       /api/projects/:hash/pipelines/*
-│   │   └── tickets.ts         /api/projects/:hash/tickets/*
+│   │   └── projects.ts        所有 /api/projects/* (含 pipelines)
 │   ├── lib/                   純 IO + 邏輯,不知道 HTTP
 │   │   ├── projectStore.ts    ~/.vibe-pipeline/state.json 讀寫
-│   │   ├── ticketsDir.ts      .tickets/ 偵測 / 建立 / yaml 讀寫
+│   │   ├── pipelineDir.ts     <target-repo>/.vibe-pipeline/ 偵測 / 建立 / json 讀寫
 │   │   ├── hash.ts            absolute path → 8-char sha256
 │   │   └── dialog.ts          OS native folder picker (osascript/powershell/zenity)
 │   └── types.ts               server-only 內部 type
@@ -112,23 +110,18 @@ vibe-pipeline/
 ### Repo 外(runtime data,不在 repo 內)
 
 ```
-~/.vibe-pipeline/              global runtime,跨 project 共用
-└── state.json                 { lastProject, recentProjects: [{path, lastOpenedAt}] }
+~/.vibe-pipeline/              global runtime,跨 project 共用(在 user home,跟 target repo 內的 .vibe-pipeline/ 不衝突,只是同名)
+├── state.json                 { lastProject, recentProjects: [{path, lastOpenedAt}] }
+└── worktrees/<projHash>/<pipelineId>/   ([P2]) git worktree per pipeline,平行執行用,見 refs/git-design
 
-<target-repo>/.tickets/        每個 user target repo 內,由 vp init 建
-├── config.yaml                (git tracked) project-level 設定
-├── tickets/*.yaml             (git tracked) ticket 定義
-├── pipelines/*.yaml           (git tracked) pipeline 定義
-├── skills/                    (git tracked)
-│   ├── SKILL.md               主 SKILL
-│   ├── *.md                   額外 SKILL
-│   └── .candidates/*.md       (git tracked, [P3]) 待審 SKILL 候選
-└── .runtime/                  (gitignored) 執行狀態快取
-    ├── runs.db                SQLite ([P2]+,stub-first 不建)
-    └── locks/                 (TBD) exclusive lock 標記檔
+<target-repo>/.vibe-pipeline/  每個 user target repo 內,由 init 建
+├── config.json                (git tracked) project-level 設定
+├── pipelines/*.json           (git tracked) 一檔一條,內含 tickets 陣列 (id 格式: <12-hex-ms-ts>-<slug>)
+└── .runtime/                  (gitignored, [Phase 2]+) 執行期暫存
+    └── qa-drafts/<id>.json    QA 對話 draft (含 session_id,可 resume / 之後可當 memory)
 ```
 
-注意:`.tickets/` **不在這個 repo 內**(除非自我 dogfood),是 vibe-pipeline 操作的 target repo 才有。
+注意:`<target-repo>/.vibe-pipeline/` **不在這個 repo 內**(除非自我 dogfood),是 vibe-pipeline 操作的 target repo 才有。跟 user home 的 `~/.vibe-pipeline/`(global state)同名但位置不同,程式上不會撞。
 
 ## refs(設計與外部對照)
 
@@ -141,6 +134,8 @@ vibe-pipeline/
 | [`vibe-kanban-2026-05-09.md`](.claude/skills/vibe-pipeline/refs/vibe-kanban-2026-05-09.md) | BloopAI vibe-kanban 對照(已 sunset、26k stars、人為主編排) |
 | [`symphony-2026-05-09.md`](.claude/skills/vibe-pipeline/refs/symphony-2026-05-09.md) | OpenAI Symphony 對照(reference impl、22.7k stars、寄生 Linear、無 DB) |
 | [`composio-ao-2026-05-09.md`](.claude/skills/vibe-pipeline/refs/composio-ao-2026-05-09.md) | Composio agent-orchestrator 對照(production-ready、6.9k stars、橫向 fan-out) |
+| [`integration-plan-v2-qa-2026-05-09.md`](.claude/skills/vibe-pipeline/refs/integration-plan-v2-qa-2026-05-09.md) | Phase 2 計畫:QA-driven ticket 建立(claude CLI session、drawer UI、fenced JSON 約定) |
+| [`git-design-2026-05-09.md`](.claude/skills/vibe-pipeline/refs/git-design-2026-05-09.md) | 多 pipeline 平行的 git worktree 設計 — [P2] runner 階段才實作,phase 2 預留欄位 |
 
 新加 ref 規範見主 SKILL「外部對照 ref」段最後。
 

@@ -4,6 +4,10 @@ dist/
 .DS_Store
 tests/.snapshots/
 tests/.diffs/
+tests/*.png
+
+# vibe-pipeline runtime (session drafts etc, regenerated)
+.vibe-pipeline/.runtime/
 
 # logs
 *.log

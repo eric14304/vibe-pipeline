@@ -220,7 +220,7 @@ backend 是 schema authority。**不要前端 `src/types/` 跟 backend 各維護
 
 ### 錯誤處理
 
-backend 一律回 `{ ok: true, data }` 或 `{ ok: false, error: { code, message } }`。前端的 `fetchXxx()` 在 ok=false 時 throw,讓 useEffect 的 catch 接。**別把 4xx 當例外丟,正常流程也可能回 not_found**(例 init popup 偵測 .tickets/ 不存在是預期狀態,不是錯)。
+backend 一律回 `{ ok: true, data }` 或 `{ ok: false, error: { code, message } }`。前端的 `fetchXxx()` 在 ok=false 時 throw,讓 useEffect 的 catch 接。**別把 4xx 當例外丟,正常流程也可能回 not_found**(例 init popup 偵測 .vibe-pipeline/ 不存在是預期狀態,不是錯)。
 
 ## 跨畫面 navigation + state
 
@@ -258,13 +258,13 @@ backend 一律回 `{ ok: true, data }` 或 `{ ok: false, error: { code, message 
 
 四個空狀態:
 1. **沒選 project**: TopBar 顯示「點這選資料夾」,Rail / Focus 都空,中央放引導文字 + 大按鈕
-2. **有 project + 沒 .tickets/**: Modal `InitPopup` 蓋上,Board 在背後 dim
-3. **有 project + 有 .tickets/ 但沒 pipeline**: Rail 只有「+ 新 pipeline」,Focus 放 empty illustration
+2. **有 project + 沒 .vibe-pipeline/**: Modal `InitPopup` 蓋上,Board 在背後 dim
+3. **有 project + 有 .vibe-pipeline/ 但沒 pipeline**: Rail 只有「+ 新 pipeline」,Focus 放 empty illustration
 4. **有 pipeline 但沒 ticket**: Focus head 正常顯示,list 區放 empty illustration
 
 實作位置:
 - 「沒選 project」放 `src/features/pipeline/EmptyProject.tsx`
-- 「沒 .tickets/」彈 `src/features/init/InitPopup.tsx`(**新元件**,跟 InitScreen 共享 init.css 但走 modal 形式)
+- 「沒 .vibe-pipeline/」彈 `src/features/init/InitPopup.tsx`(**新元件**,跟 InitScreen 共享 init.css 但走 modal 形式)
 - 「沒 pipeline」與「沒 ticket」放 `src/features/pipeline/EmptyStates.tsx`(兩個小元件)
 
 **這些變體 pixel-diff 暫不跑**(沒 prototype 對照)。寫好後自己 review render OK 即可。後續若 prototype 補了空狀態設計,再加 diff variants。

@@ -2,7 +2,17 @@ import { CheckCircleIcon, MergeIcon, PlusIcon } from "../../ui/icons";
 import { STATE_COLOR, STATE_LABEL, fmtElapsed } from "../../data/pipelines";
 import type { IterStage, Pipeline, Ticket, TicketStatus } from "../../types/pipeline";
 
-export function FocusColumn({ pipeline, tick }: { pipeline: Pipeline; tick: number }) {
+export function FocusColumn({
+  pipeline,
+  tick,
+  onAddTicket,
+  hasActiveDraft = false,
+}: {
+  pipeline: Pipeline;
+  tick: number;
+  onAddTicket?: (pipelineId: string) => void;
+  hasActiveDraft?: boolean;
+}) {
   const stateColor = STATE_COLOR[pipeline.state];
   const stateLabel = STATE_LABEL[pipeline.state];
   const done = pipeline.tickets.filter((t) => t.status === "done").length;
@@ -31,11 +41,11 @@ export function FocusColumn({ pipeline, tick }: { pipeline: Pipeline; tick: numb
             {done} / {total} done
           </span>
 
-          <span style={{ flex: 1 }} />
-
-          <button className="btn">
-            <PlusIcon /> ticket
+          <button className="btn" onClick={() => onAddTicket?.(pipeline.id)}>
+            <PlusIcon /> {hasActiveDraft ? "接續 QA" : "ticket"}
           </button>
+
+          <span style={{ flex: 1 }} />
         </div>
 
         {allDone && <ReadyBanner pipeline={pipeline} />}

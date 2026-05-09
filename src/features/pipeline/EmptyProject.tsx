@@ -2,7 +2,7 @@ import { FolderQuestionIcon } from "../../ui/icons";
 
 export function EmptyProject({
   message = "還沒選資料夾",
-  hint = "從上方專案切換器選擇本地資料夾,vibe-pipeline 會自動偵測 .tickets/ 並引導你初始化。",
+  hint = "從上方專案切換器選擇本地資料夾,vibe-pipeline 會自動偵測 .vibe-pipeline/ 並引導你初始化。",
 }: {
   message?: string;
   hint?: string;

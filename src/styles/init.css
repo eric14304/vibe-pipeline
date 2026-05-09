@@ -140,6 +140,9 @@ html.light .init-cmd-text { color: #fbf8f1; }
   z-index: 100;
   backdrop-filter: blur(2px);
 }
+.init-popup-overlay .init-card {
+  width: 440px;
+}
 .init-popup-actions {
   display: flex; gap: 10px; align-items: center;
 }

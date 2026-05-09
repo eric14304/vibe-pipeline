@@ -15,13 +15,18 @@ export function InitPopup({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [alsoGitInit, setAlsoGitInit] = useState(true);
 
   async function autoInit() {
     if (busy) return;
     setBusy(true);
     setError(null);
     try {
-      const next = await api.init(project.hash);
+      let p = project;
+      if (!p.hasGit && alsoGitInit) {
+        p = await api.gitInit(p.hash);
+      }
+      const next = await api.init(p.hash);
       onInitialized(next);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -38,60 +43,77 @@ export function InitPopup({
           </div>
           <div className="init-scan-text mono">
             <div className="init-scan-status">
-              <span style={{ opacity: 0.65 }}>this repo isn't set up yet</span>
+              <span style={{ opacity: 0.65 }}>這個專案還沒初始化</span>
             </div>
             <div className="init-scan-path">{project.path}</div>
             <div className="init-scan-miss">
               <span style={{ color: "var(--accent)" }}>✕</span>{" "}
-              no <code className="init-inline-code">.tickets/</code> found
+              找不到 <code className="init-inline-code">.vibe-pipeline/</code>
             </div>
+            {!project.hasGit && (
+              <div className="init-scan-miss">
+                <span style={{ color: "var(--accent)" }}>✕</span>{" "}
+                找不到 <code className="init-inline-code">.git/</code>(runner 階段需要)
+              </div>
+            )}
           </div>
         </div>
 
         <div className="init-body">
-          <h1 className="init-title">Initialize this project?</h1>
+          <h1 className="init-title">要在這個專案初始化 vibe-pipeline 嗎?</h1>
           <p className="init-desc">
-            vibe-pipeline 將在 <code className="init-inline-code">{project.name}</code> 建立 <code className="init-inline-code">.tickets/</code> 結構,
-            包含 <code className="init-inline-code">config.yaml</code>、<code className="init-inline-code">tickets/</code>、<code className="init-inline-code">pipelines/</code>、<code className="init-inline-code">skills/</code>,
-            並把 <code className="init-inline-code">.tickets/.runtime/</code> 寫入 <code className="init-inline-code">.gitignore</code>。
+            在 <code className="init-inline-code">{project.name}</code> 底下建立 <code className="init-inline-code">.vibe-pipeline/</code> 和必須的專案層級設定。
           </p>
         </div>
 
         <div className="init-tree-wrap">
-          <div className="init-section-label mono">It'll create</div>
+          <div className="init-section-label mono">會建立</div>
           <div className="init-tree mono">
             <div>
-              <span className="init-tree-glyph">▸</span> .tickets/
+              <span className="init-tree-glyph">▸</span> .vibe-pipeline/
             </div>
             <div className="init-tree-row">
               <span className="init-tree-line">├──</span>
-              <span className="init-tree-name">config.yaml</span>
-              <span className="init-tree-cmt">project-level 設定</span>
-            </div>
-            <div className="init-tree-row">
-              <span className="init-tree-line">├──</span>
-              <span className="init-tree-name">tickets/</span>
-              <span className="init-tree-cmt">ticket 定義 (YAML)</span>
-            </div>
-            <div className="init-tree-row">
-              <span className="init-tree-line">├──</span>
-              <span className="init-tree-name">pipelines/</span>
-              <span className="init-tree-cmt">pipeline 定義 (YAML)</span>
+              <span className="init-tree-name">config.json</span>
+              <span className="init-tree-cmt">專案層級設定</span>
             </div>
             <div className="init-tree-row">
               <span className="init-tree-line">└──</span>
-              <span className="init-tree-name">skills/</span>
-              <span className="init-tree-cmt">SKILL.md 與候選</span>
+              <span className="init-tree-name">pipelines/</span>
+              <span className="init-tree-cmt">每條一檔,tickets 內嵌</span>
             </div>
           </div>
         </div>
 
+        {!project.hasGit && (
+          <div className="init-tree-wrap" style={{ paddingTop: 0 }}>
+            <label
+              className="mono"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 12,
+                color: "var(--fg-mute)",
+                cursor: "pointer",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={alsoGitInit}
+                onChange={(e) => setAlsoGitInit(e.target.checked)}
+                disabled={busy}
+              />
+              <span>順便跑 <code className="init-inline-code">git init</code>(產 main branch,空 repo)</span>
+            </label>
+          </div>
+        )}
+
         {error && <div className="init-popup-error">{error}</div>}
 
         <div className="init-foot">
-          <span className="init-foot-q">已經自己跑過 init?</span>
           <button className="btn" onClick={onDismiss} disabled={busy}>
-            稍後
+            稍後再說
           </button>
           <span className="init-foot-spacer" />
           <div className="init-popup-actions">
