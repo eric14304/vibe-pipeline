@@ -8,7 +8,7 @@ description: vibe-pipeline 專案總覽 — 產品定位、已實作畫面與功
 
 ## 一句話定位
 
-vibe-pipeline 是 **多 AI agent(doer + critic)的 ticket / pipeline 編排器**,以 Web 應用為主介面,將來會配 `vp` CLI。每張 ticket 由 doer 跑、critic 審,iterative 模式會自動迴圈到 critic pass;pipeline 是 ticket 的有序組合,每條跑在獨立 git branch 上,完成後 merge 回 base。
+vibe-pipeline 是 **多 AI agent(執行AI + 審核AI)的 ticket / pipeline 編排器**,以 Web 應用為主介面,將來會配 `vp` CLI。每張 ticket 由 執行AI 跑、審核AI 審,iterative 模式會自動迴圈到 審核AI pass;pipeline 是 ticket 的有序組合,每條跑在獨立 git branch 上,完成後 merge 回 base。
 
 ## 產品形態(2026-05-09 確認)
 
@@ -46,7 +46,7 @@ vibe-pipeline 是 **多 AI agent(doer + critic)的 ticket / pipeline 編排器**
 
 主 spec 在 [refs/spec-2026-05-09.md](refs/spec-2026-05-09.md)(2026-05-09 版,使用者標示「不是最終結果,以後會更新」)。包含三層:
 
-- `[M]` MVP — 專案 init、Ticket/Pipeline schema CRUD、doer+critic、iterative loop、branch lifecycle、SQLite log、exclusive lock、CLI 命令集
+- `[M]` MVP — 專案 init、Ticket/Pipeline schema CRUD、執行AI+審核AI、iterative loop、branch lifecycle、SQLite log、exclusive lock、CLI 命令集
 - `[P2]` Phase 2 — Q&A 收斂引擎、stall detection、intervention 五型、budget tracker、context retrieval、worktree 並行、TUI dashboard
 - `[P3]` Phase 3 — AI 輔助 merge 衝突、多 pipeline 並行 scheduler、plugin、第三方通知
 
@@ -82,7 +82,7 @@ Composio agent-orchestrator(**production-ready,actively maintained**,6.9k stars)
 - **Session state machine `(state, reason)` 雙欄**(我們 SQLite `runs.status` 應拆成這形)
 - **殭屍 session 偵測寫回 invariant**(每次 reconcile 都掃,不靠 process 自己 cleanup)
 - **把外部系統當訊息匯流排**(git branch + PR + CI status,不發明 IPC)
-- **Reaction 是 first-class 概念**(critic verdict / stall / budget warn / conflict 都是 reaction trigger)
+- **Reaction 是 first-class 概念**(審核AI verdict / stall / budget warn / conflict 都是 reaction trigger)
 - **結構化 JSON log + correlation id + `/api/observability`**(Web UI 不直讀 SQLite)
 - **hash-based 路徑命名空間**(同 user 多 checkout 不撞名)
 - 不抄:無 DB、橫向 fan-out 主流(我們是縱向 iterate)

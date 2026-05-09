@@ -1,6 +1,6 @@
 ---
 name: vibe-pipeline-backend
-description: vibe-pipeline 後端 / 執行層規格與計畫 — Phase 1 (Project / Pipeline CRUD) + Phase 2 (QA-driven ticket 建立) 已落地。本 SKILL 是 spec 索引與架構記憶。實作 doer/critic runner、SQLite log、git branch / worktree、budget tracker、`vp` CLI、SKILL 蒸餾之前先讀。
+description: vibe-pipeline 後端 / 執行層規格與計畫 — Phase 1 (Project / Pipeline CRUD) + Phase 2 (QA-driven ticket 建立) 已落地。本 SKILL 是 spec 索引與架構記憶。實作 執行AI / 審核AI runner、SQLite log、git branch / worktree、budget tracker、`vp` CLI、SKILL 蒸餾之前先讀。
 ---
 
 ## 現況(2026-05-10)
@@ -9,7 +9,7 @@ description: vibe-pipeline 後端 / 執行層規格與計畫 — Phase 1 (Projec
 - Phase 1:Project 偵測 / 開啟 / git-init / reveal、Pipeline CRUD(JSON,tickets 內嵌)、`.vibe-pipeline/` 自動建立
 - Phase 2:QA-driven ticket 建立(claude CLI 對話收斂、draft store、tool 限制、Spec finalize 寫進 pipeline.tickets[])
 
-**還沒做(P2 / P3)**:doer/critic runner spawn、SQLite log、git branch/worktree、Q&A engine 進化版、budget tracker、notification 通道、SKILL 蒸餾、`vp` CLI。
+**還沒做(P2 / P3)**:執行AI / 審核AI runner spawn、SQLite log、git branch/worktree、Q&A engine 進化版、budget tracker、notification 通道、SKILL 蒸餾、`vp` CLI。
 
 要開工 backend 前:
 
@@ -132,7 +132,7 @@ POST /api/projects/:hash/qa/:draftId/cancel          刪 draft
 - File watcher — refresh 才更新
 - Notification producer — 事件型別已定 (`NOTIF_EVENTS`),producer 等 runner 接
 
-走完這兩個 phase,我們有「**完整 ticket 建立 + 查看的骨架**」。後續 P2 加 doer/critic runner,ticket 從 `status: "draft"` 跑成 `done`。
+走完這兩個 phase,我們有「**完整 ticket 建立 + 查看的骨架**」。後續 P2 加 執行AI / 審核AI runner,ticket 從 `status: "draft"` 跑成 `done`。
 
 ---
 
@@ -151,7 +151,7 @@ POST /api/projects/:hash/qa/:draftId/cancel          刪 draft
 │  Core (TypeScript / Bun runtime)                 │
 │  ─────────────────────────────────────────────   │
 │  • Schema layer  (JSON loader / validator)       │
-│  • Executor      (doer + critic runner loop)     │
+│  • Executor      (執行AI + 審核AI runner loop)     │
 │  • Workspace     (git branch / merge / worktree) │
 │  • Storage       (.vibe-pipeline/ + SQLite runtime)    │
 │  • Q&A engine    (cross-cutting,六個 use sites) │
@@ -193,7 +193,7 @@ runs (
   exit_reason TEXT
 );
 
--- 一輪 doer→critic
+-- 一輪 執行AI→審核AI
 iterations (
   id         TEXT PRIMARY KEY,
   run_id     TEXT NOT NULL REFERENCES runs(id),
@@ -238,10 +238,10 @@ budget_ledger (
 ### Iterative ticket
 ```
 loop:
-  doer.run(prompt) → output, tokens
+  執行AI.run(prompt) → output, tokens
   log iteration(doer_out, tokens)
-  if no critic: break
-  critic.run(output, AC) → verdict, plan
+  if no 審核AI: break
+  審核AI.run(output, AC) → verdict, plan
   log iteration(critic_out, verdict, plan)
   if verdict == pass: break
   if stall_detector(): set ticket=paused; break  ([P2])
@@ -251,8 +251,8 @@ loop:
 
 ### Pipeline-step ticket
 ```
-doer.run(prompt) → output
-critic?.run(output, AC) → verdict
+執行AI.run(prompt) → output
+審核AI?.run(output, AC) → verdict
 if verdict == fail:
   match on_critic_fail:
     halt (default)         → set pipeline=paused, notify
@@ -316,12 +316,12 @@ MVP runners:`claude-cli`、`codex-cli`(其他依使用者環境動態列出)。
 Cross-cutting primitive,六個 use sites:
 1. Ticket 創建(模糊敘述 → goal/AC/prompt/mode)
 2. AC 定義(模糊目標 → 可驗證 AC checklist)
-3. Critic plan 精修(粗略缺失 → 精準下輪 doer prompt)
+3. Critic plan 精修(粗略缺失 → 精準下輪 執行AI prompt)
 4. Pipeline 編排(一坨想法 → ticket 序列)
 5. Stall intervention(卡住時引導使用者修)
 6. SKILL candidate 審核(AI 提議 → 引導決定納入)
 
-每個 session 紀錄到 SQLite(可 resume / replay)。Q&A 用的 CLI 可獨立指定(跟 doer/critic 不一定相同)。
+每個 session 紀錄到 SQLite(可 resume / replay)。Q&A 用的 CLI 可獨立指定(跟 執行AI / 審核AI 不一定相同)。
 
 UI 對應:`/qa` 畫面已實作 4 variants(`drawer` / `chat` / `form` / `step`)。串接時 backend 推 turn 給 UI,UI 收回答送回 backend。
 
@@ -378,7 +378,7 @@ CLI 與 Web UI 共用同一個 core lib;CLI 不重發明 — 只是 thin wrapper
 
 ## 觸發本 SKILL 的場景
 
-- 提到 `vp` CLI、`.vibe-pipeline/`、SQLite、git branch/worktree、doer/critic、Q&A 引擎、budget、notification、stall detection、intervention 任何一項
+- 提到 `vp` CLI、`.vibe-pipeline/`、SQLite、git branch/worktree、執行AI / 審核AI、Q&A 引擎、budget、notification、stall detection、intervention 任何一項
 - 開工新 backend 模組
 - Web UI 要從 mock 切真實後端
 

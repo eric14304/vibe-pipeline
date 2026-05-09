@@ -10,12 +10,22 @@ export type Project = {
 };
 
 // ─── QA / Ticket spec ─────────────────────────────────────────────
+// mode: "step" = 單次任務(跑一次就收) / "iter" = 迭代任務(執行AI ↔ 審核AI 來回到通過)
 export type TicketSpec = {
   title: string;
   goal: string;
   acceptance: string[];
   prompt: string;
   mode: "step" | "iter";
+  iterLimit?: number; // iter 模式上限輪數,預設 5
+  iterStopAtLimit?: boolean; // 達上限是否整條 pause(true),否則標 ticket failed 跳下一張(false),預設 true
+};
+
+export const DEFAULT_ITER_LIMIT = 5;
+export const DEFAULT_ITER_STOP_AT_LIMIT = true;
+export const MODE_LABELS: Record<TicketSpec["mode"], string> = {
+  iter: "迭代任務",
+  step: "單次任務",
 };
 
 export type PartialSpec = Partial<TicketSpec>;
@@ -96,6 +106,8 @@ export type NotifEventType =
   | "ticket_removed"
   | "ticket_status_changed"
   // P2(runner / budget 落地後)
+  | "pipeline_started"
+  | "pipeline_paused"
   | "ticket_started"
   | "iter_critic_pass"
   | "iter_critic_fail"
@@ -128,6 +140,8 @@ export const NOTIF_EVENTS: Record<NotifEventType, NotifEventMeta> = {
   ticket_removed: { sev: "muted", phase: "stub-first", label: "Ticket 移除" },
   ticket_status_changed: { sev: "muted", phase: "stub-first", label: "Ticket 狀態變更" },
 
+  pipeline_started: { sev: "muted", phase: "P2", label: "Pipeline 開始運行" },
+  pipeline_paused: { sev: "info", phase: "P2", label: "Pipeline 已暫停" },
   ticket_started: { sev: "muted", phase: "P2", label: "Ticket 開始跑" },
   iter_critic_pass: { sev: "info", phase: "P2", label: "Iteration critic pass" },
   iter_critic_fail: { sev: "muted", phase: "P2", label: "Iteration critic fail(連續 N 次升 block)" },

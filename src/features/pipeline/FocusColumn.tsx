@@ -2,16 +2,69 @@ import { CheckCircleIcon, MergeIcon, PlusIcon } from "../../ui/icons";
 import { STATE_COLOR, STATE_LABEL, fmtElapsed } from "../../data/pipelines";
 import type { IterStage, Pipeline, Ticket, TicketStatus } from "../../types/pipeline";
 
+function RunButton({
+  pipeline,
+  onRun,
+  onPause,
+}: {
+  pipeline: Pipeline;
+  onRun?: (id: string) => void;
+  onPause?: (id: string) => void;
+}) {
+  const s = pipeline.state;
+  const noTickets = pipeline.tickets.length === 0;
+  if (s === "running") {
+    return (
+      <button className="btn" onClick={() => onPause?.(pipeline.id)} title="暫停">
+        ⏸ 暫停
+      </button>
+    );
+  }
+  if (s === "stopping") {
+    return (
+      <button className="btn" disabled title="停止中…">
+        <span className="qadr-thinking-dots" style={{ display: "inline-flex", verticalAlign: "middle" }}>
+          <span /><span /><span />
+        </span>{" "}
+        停止中
+      </button>
+    );
+  }
+  if (s === "ready") {
+    return (
+      <button className="btn" disabled title="所有 ticket 已完成">
+        ✓ 全部完成
+      </button>
+    );
+  }
+  // planning / paused / failed → run / continue
+  return (
+    <button
+      className="btn btn-primary"
+      onClick={() => onRun?.(pipeline.id)}
+      disabled={noTickets}
+      title={noTickets ? "先建一張 ticket" : s === "paused" ? "繼續" : "開始運行"}
+    >
+      ▶ {s === "paused" ? "繼續" : "開始運行"}
+    </button>
+  );
+}
+
+
 export function FocusColumn({
   pipeline,
   tick,
   onAddTicket,
   hasActiveDraft = false,
+  onRun,
+  onPause,
 }: {
   pipeline: Pipeline;
   tick: number;
   onAddTicket?: (pipelineId: string) => void;
   hasActiveDraft?: boolean;
+  onRun?: (pipelineId: string) => void;
+  onPause?: (pipelineId: string) => void;
 }) {
   const stateColor = STATE_COLOR[pipeline.state];
   const stateLabel = STATE_LABEL[pipeline.state];
@@ -46,6 +99,8 @@ export function FocusColumn({
           </button>
 
           <span style={{ flex: 1 }} />
+
+          <RunButton pipeline={pipeline} onRun={onRun} onPause={onPause} />
         </div>
 
         {allDone && <ReadyBanner pipeline={pipeline} />}

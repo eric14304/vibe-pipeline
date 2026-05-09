@@ -1,23 +1,30 @@
 # vibe-pipeline
 
-多 AI agent(doer + critic)的 ticket / pipeline 編排器。Web 應用為主介面,將來配 `vp` CLI。每張 ticket 由 doer 跑、critic 審,iterative 模式自動迴圈到 critic pass;pipeline 是 ticket 的有序組合,每條跑在獨立 git branch,完成後 merge 回 base。
+多 AI agent(執行AI + 審核AI)的 ticket / pipeline 編排器。Web 應用為主介面,將來配 `vp` CLI。每張 ticket 由 執行AI 跑、審核AI 審,iterative 模式自動迴圈到 審核AI pass;pipeline 是 ticket 的有序組合,每條跑在獨立 git branch,完成後 merge 回 base。
 
 ## 當前 phase(2026-05-10)
 
-**Phase 2 收尾中**:QA-driven ticket 建立。pipeline focus 點「+ ticket」開 QA drawer,跟 claude CLI 對話收斂出 5 欄位 spec(title / goal / acceptance / prompt / mode),user 確認後寫進 pipeline.tickets[]。
+**Phase 3 第一刀已落地**:Pipeline runner — 主 agent (claude CLI session) 執行 ticket、worktree per pipeline、run/pause UX、notif emit on pipeline events。
 
 **已完成**
 - Phase 1 — Project / Pipeline CRUD + .vibe-pipeline/ JSON 持久化 + git init / reveal
-- Phase 2 — QA drawer + claude CLI 整合(`-p --output-format json --session-id` / `--resume`、自帶 `--disallowedTools "Edit Write Task"`)、Draft store 走 `.vibe-pipeline/.runtime/qa-drafts/`、Spec checklist / chip click / drawer title from spec.title、Multi-select option 模式
+- Phase 2 — QA drawer + claude CLI 整合 + Draft store + Spec checklist + Multi-select option
+- Phase 3 第一刀 — git worktree per pipeline、runner orchestrator (claude CLI session as 主 agent + Task tool 派 sub-agent)、Pipeline state machine 加 stopping、Ticket 加 failed_iter_limit / failed_transient、Run/Pause endpoints + Frontend RunButton + polling、Crash recovery on startup、Notif store (`.runtime/notifs.jsonl`) + emit on pipeline_started/ready/paused/failed + frontend inbox 接 backend
 
 **架構決策**:Bun local server + browser(前端 Vite 5173 / 後端 Bun 3001 / `/api/*` 透過 Vite proxy)。
 
-**留下階段(P2 / P3)**:doer runner、SQLite log、git branch / worktree、budget tracker、notification 通道、SKILL 蒸餾。
+**還沒做(下個 iteration)**
+- 實際 spawn claude 跑一張 step ticket end-to-end(需要燒 API)
+- iter 迴圈實測(主 agent 可能要再調 prompt)
+- Transient retry 真正觸發(orchestrator hook 在,要邏輯)
+- Ticket 顆粒度 notif emit(目前只 pipeline 級,主 agent 內變化沒推上來)
+- Budget tracker / SQLite log / SKILL 蒸餾(P2+/P3)
 
 **計畫 ref**
 - [phase 1 plan(已落地)](.claude/skills/vibe-pipeline/refs/integration-plan-v1-2026-05-09.md)
-- [phase 2 QA plan](.claude/skills/vibe-pipeline/refs/integration-plan-v2-qa-2026-05-09.md)
-- [git design(P2)](.claude/skills/vibe-pipeline/refs/git-design-2026-05-09.md)
+- [phase 2 QA plan(已落地)](.claude/skills/vibe-pipeline/refs/integration-plan-v2-qa-2026-05-09.md)
+- [phase 3 runner plan(進行中)](.claude/skills/vibe-pipeline/refs/integration-plan-v3-runner-2026-05-10.md)
+- [git design](.claude/skills/vibe-pipeline/refs/git-design-2026-05-09.md)
 
 phase 推進時主動更新本段。
 
@@ -86,6 +93,13 @@ vibe-pipeline/
 │       ├── hash.ts            absolute path → 8-char sha256
 │       ├── dialog.ts          OS native folder picker (osascript/powershell/zenity) + revealFolder
 │       ├── git.ts             hasGit / gitInit
+│       ├── git/
+│       │   └── worktree.ts    ensure / remove / prune (per pipeline,~/.vibe-pipeline/worktrees/<h>/<id>)
+│       ├── runner/
+│       │   ├── orchestrator.ts spawn 主 agent (claude session) + log file + recoverStale
+│       │   └── runnerPrompt.ts RUNNER_BEHAVIOR_PROMPT (主 agent 流程定義)
+│       ├── notifs/
+│       │   └── store.ts       emit / list / markRead / dismiss → .runtime/notifs.jsonl
 │       └── qa/
 │           ├── claudeCli.ts   spawn `claude -p` + parseReply 4-fallback + enforceContract
 │           ├── draftStore.ts  qa-drafts/<id>.json fs CRUD + appendTurn + markStarted
@@ -133,13 +147,15 @@ vibe-pipeline/
 ```
 ~/.vibe-pipeline/              global runtime,跨 project 共用(在 user home,跟 target repo 內的 .vibe-pipeline/ 不衝突,只是同名)
 ├── state.json                 { lastProject, recentProjects: [{path, lastOpenedAt}] }
-└── worktrees/<projHash>/<pipelineId>/   ([P2]) git worktree per pipeline,平行執行用,見 refs/git-design
+└── worktrees/<projHash>/<pipelineId>/   git worktree per pipeline (Phase 3 落地),平行執行用
 
 <target-repo>/.vibe-pipeline/  每個 user target repo 內,由 init 建
 ├── config.json                (git tracked) project-level 設定
 ├── pipelines/*.json           (git tracked) 一檔一條,內含 tickets 陣列 (id 格式: <12-hex-ms-ts>-<slug>)
-└── .runtime/                  (gitignored, [Phase 2]+) 執行期暫存
-    └── qa-drafts/<id>.json    QA 對話 draft (含 session_id,可 resume / 之後可當 memory)
+└── .runtime/                  (gitignored) 執行期暫存
+    ├── qa-drafts/<id>.json    QA 對話 draft (含 session_id,可 resume / 之後可當 memory)
+    ├── notifs.jsonl           backend emit 的事件流 (append-only,Phase 3)
+    └── logs/<pipelineId>-<ts>.log  runner 主 agent stdout/stderr (Phase 3)
 ```
 
 注意:`<target-repo>/.vibe-pipeline/` **不在這個 repo 內**(除非自我 dogfood),是 vibe-pipeline 操作的 target repo 才有。跟 user home 的 `~/.vibe-pipeline/`(global state)同名但位置不同,程式上不會撞。

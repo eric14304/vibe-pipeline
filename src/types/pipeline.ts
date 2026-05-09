@@ -1,4 +1,12 @@
-export type TicketStatus = "draft" | "ready" | "running" | "paused" | "done" | "failed";
+export type TicketStatus =
+  | "draft"
+  | "ready"
+  | "running"
+  | "paused"
+  | "done"
+  | "failed"
+  | "failed_iter_limit"
+  | "failed_transient";
 export type TicketMode = "step" | "iter";
 export type IterStage = "doer" | "critic" | "✓" | "done";
 
@@ -23,7 +31,14 @@ export type Ticket = {
   reason?: string;
 };
 
-export type PipelineState = "planning" | "running" | "paused" | "ready" | "failed" | "merged";
+export type PipelineState =
+  | "planning"
+  | "running"
+  | "stopping"
+  | "paused"
+  | "ready"
+  | "failed"
+  | "merged";
 
 export type Pipeline = {
   id: string;

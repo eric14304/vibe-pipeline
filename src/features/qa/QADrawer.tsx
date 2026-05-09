@@ -4,12 +4,7 @@ import "./qa.css";
 import type { Draft, TicketSpec } from "../../api/qa";
 
 const FIRST_AI_MESSAGE = "這張 ticket 大概是哪一類?";
-const FIRST_AI_OPTIONS = [
-  "對 repo 做完整健檢",
-  "重構專案且清除無用檔案",
-  "整理目前檔案",
-  "建立 CI Test/Lint",
-];
+const FIRST_AI_OPTIONS = ["列出這個專案問題"];
 
 export function QADrawer({
   pipelineName,
@@ -77,54 +72,57 @@ export function QADrawer({
           <SpecChecklist spec={draft?.spec ?? null} />
         </div>
 
-        <div className="drawer-body qadr-body" ref={transcriptRef}>
-          {!draft && busy && (
-            <div className="qadr-loading mono">
-              <span>啟動 QA session</span>
-              <ThinkingDots />
-            </div>
-          )}
-          {!draft && error && <div className="qadr-error">{error}</div>}
-          {draft && (
-            <>
-              <Bubble role="ai" message={FIRST_AI_MESSAGE} />
-              {draft.turns.map((t, i) => (
-                <Bubble key={i} role={t.role} message={t.message} />
-              ))}
-              {busy && (
-                <div className="qadr-loading mono">
-                  <span>AI 思考中</span>
-                  <ThinkingDots />
-                </div>
-              )}
-              {error && <div className="qadr-error">{error}</div>}
-            </>
-          )}
-        </div>
-
-        <div className="drawer-foot qadr-foot">
-          {isSpecComplete(draft?.spec ?? null) ? (
+        {isSpecComplete(draft?.spec ?? null) ? (
+          <div className="drawer-body qadr-body qadr-spec-body">
             <SpecReview
               spec={draft!.spec as TicketSpec}
               busy={busy}
               onCancel={onCancel}
               onFinalize={onFinalize}
             />
-          ) : (
-            (() => {
-              const last = lastAiOptions(draft);
-              return (
-                <Composer
-                  options={last.options}
-                  optionsMode={last.mode}
-                  busy={busy}
-                  onSend={onSendTurn}
-                  onCancel={onCancel}
-                />
-              );
-            })()
-          )}
-        </div>
+          </div>
+        ) : (
+          <>
+            <div className="drawer-body qadr-body" ref={transcriptRef}>
+              {!draft && busy && (
+                <div className="qadr-loading mono">
+                  <span>啟動 QA session</span>
+                  <ThinkingDots />
+                </div>
+              )}
+              {!draft && error && <div className="qadr-error">{error}</div>}
+              {draft && (
+                <>
+                  <Bubble role="ai" message={FIRST_AI_MESSAGE} />
+                  {draft.turns.map((t, i) => (
+                    <Bubble key={i} role={t.role} message={t.message} />
+                  ))}
+                  {busy && (
+                    <div className="qadr-loading mono">
+                      <span>AI 思考中</span>
+                      <ThinkingDots />
+                    </div>
+                  )}
+                  {error && <div className="qadr-error">{error}</div>}
+                </>
+              )}
+            </div>
+            <div className="drawer-foot qadr-foot">
+              {(() => {
+                const last = lastAiOptions(draft);
+                return (
+                  <Composer
+                    options={last.options}
+                    optionsMode={last.mode}
+                    busy={busy}
+                    onSend={onSendTurn}
+                    onCancel={onCancel}
+                  />
+                );
+              })()}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -399,7 +397,7 @@ function SpecReview({
       <Field label="goal">
         <textarea
           className="qadr-input qadr-textarea"
-          rows={2}
+          rows={3}
           value={edited.goal}
           onChange={(e) => setEdited({ ...edited, goal: e.target.value })}
         />
@@ -407,7 +405,7 @@ function SpecReview({
       <Field label="acceptance">
         <textarea
           className="qadr-input qadr-textarea"
-          rows={Math.max(2, edited.acceptance.length)}
+          rows={Math.max(4, edited.acceptance.length + 1)}
           value={edited.acceptance.join("\n")}
           onChange={(e) =>
             setEdited({ ...edited, acceptance: e.target.value.split("\n").filter(Boolean) })
@@ -417,31 +415,68 @@ function SpecReview({
       <Field label="prompt">
         <textarea
           className="qadr-input qadr-textarea"
-          rows={5}
+          rows={10}
           value={edited.prompt}
           onChange={(e) => setEdited({ ...edited, prompt: e.target.value })}
         />
       </Field>
       <Field label="mode">
-        <div style={{ display: "flex", gap: 12, fontSize: 13 }}>
-          <label>
+        <div style={{ display: "flex", gap: 16, fontSize: 13 }}>
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
             <input
               type="radio"
               checked={edited.mode === "iter"}
               onChange={() => setEdited({ ...edited, mode: "iter" })}
-            />{" "}
-            iter
+            />
+            迭代任務 (iter)
           </label>
-          <label>
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
             <input
               type="radio"
               checked={edited.mode === "step"}
               onChange={() => setEdited({ ...edited, mode: "step" })}
-            />{" "}
-            step
+            />
+            單次任務 (step)
           </label>
         </div>
       </Field>
+      {edited.mode === "iter" && (
+        <>
+          <Field label="iter 上限輪數">
+            <input
+              className="qadr-input"
+              type="number"
+              min={1}
+              max={50}
+              value={edited.iterLimit ?? 5}
+              onChange={(e) =>
+                setEdited({ ...edited, iterLimit: Number(e.target.value) || 5 })
+              }
+              style={{ width: 80 }}
+            />
+          </Field>
+          <Field label="達上限後">
+            <div style={{ display: "flex", gap: 16, fontSize: 13 }}>
+              <label style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <input
+                  type="radio"
+                  checked={(edited.iterStopAtLimit ?? true) === true}
+                  onChange={() => setEdited({ ...edited, iterStopAtLimit: true })}
+                />
+                整條 pipeline 暫停 (建議)
+              </label>
+              <label style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <input
+                  type="radio"
+                  checked={(edited.iterStopAtLimit ?? true) === false}
+                  onChange={() => setEdited({ ...edited, iterStopAtLimit: false })}
+                />
+                標 failed,跳下一張
+              </label>
+            </div>
+          </Field>
+        </>
+      )}
       <div className="qadr-spec-actions">
         <button className="btn" onClick={onCancel} disabled={busy}>
           取消 draft

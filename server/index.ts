@@ -1,5 +1,7 @@
 import * as projects from "./routes/projects";
 import * as qa from "./routes/qa";
+import * as projectStore from "./lib/projectStore";
+import * as orchestrator from "./lib/runner/orchestrator";
 
 const PORT = Number(process.env.PORT ?? 3001);
 
@@ -47,6 +49,24 @@ async function handle(req: Request): Promise<Response> {
       if (method === "PUT") return projects.savePipeline(hash, id, req);
     }
 
+    const pipelineRunMatch = rest.match(/^\/pipelines\/([a-z0-9_-]+)\/(run|pause)$/);
+    if (pipelineRunMatch && method === "POST") {
+      const id = pipelineRunMatch[1];
+      const action = pipelineRunMatch[2];
+      if (action === "run") return projects.runPipeline(hash, id);
+      if (action === "pause") return projects.pausePipeline(hash, id);
+    }
+
+    if (rest === "/notifs" && method === "GET") return projects.listNotifs(hash);
+    if (rest === "/notifs/mark-all-read" && method === "POST")
+      return projects.markAllNotifsRead(hash);
+    const notifMatch = rest.match(/^\/notifs\/([a-z0-9]+)\/(read|dismiss)$/);
+    if (notifMatch && method === "POST") {
+      const nid = notifMatch[1];
+      if (notifMatch[2] === "read") return projects.markNotifRead(hash, nid);
+      if (notifMatch[2] === "dismiss") return projects.dismissNotif(hash, nid);
+    }
+
     const qaStartMatch = rest.match(/^\/pipelines\/([a-z0-9_-]+)\/qa\/start$/);
     if (qaStartMatch && method === "POST") return qa.start(hash, qaStartMatch[1], req);
 
@@ -82,3 +102,21 @@ const server = Bun.serve({
 });
 
 console.log(`vibe-pipeline backend listening on http://${server.hostname}:${server.port}`);
+
+// Crash recovery: 啟動時掃所有有 .vibe-pipeline/ 的 recent project,
+// 若 pipeline.state="running" 或 "stopping" 但 process 不在 (server 重啟),標 paused
+(async () => {
+  try {
+    const recents = await projectStore.listRecent();
+    for (const p of recents) {
+      if (!p.hasInit) continue;
+      try {
+        await orchestrator.recoverStale(p.path);
+      } catch (e) {
+        console.error(`[recover] ${p.path} failed:`, e);
+      }
+    }
+  } catch (e) {
+    console.error("[recover] scan failed:", e);
+  }
+})();

@@ -22,7 +22,7 @@
 ```
 
 **範圍外**(這次不做,留下階段):
-- doer / critic runner spawn
+- 執行AI / 審核AI runner spawn
 - SQLite log
 - git branch / worktree 操作
 - Q&A 引擎、stall detection、budget tracker、notification 通道
@@ -169,7 +169,7 @@ type Ticket = {
 
 - **#1 單一定義源**:Pipeline / Ticket 在 JSON,backend 是 schema authority,前端不另存
 - **#2 Branch 是並行邊界**:這版還沒做 git ops,但 schema 已預留 `branch` 欄
-- **#5 Critic fail 不等於 ticket fail**:這版沒 runner,但 ticket schema 預留 `mode`(step/iter)為將來 critic loop 鋪路
+- **#5 Critic fail 不等於 ticket fail**:這版沒 runner,但 ticket schema 預留 `mode`(step/iter)為將來 審核AI loop 鋪路
 
 ## 9. 對焦過的 ref 借鏡(挑這次用得到的)
 

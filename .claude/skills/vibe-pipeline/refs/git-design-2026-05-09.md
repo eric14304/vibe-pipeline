@@ -47,7 +47,7 @@
                                        ~/.vibe-pipeline/worktrees/<h>/<id> \
                                        -b pipeline/<name> <baseBranch>
 
-3. doer / critic 跑               cd ~/.vibe-pipeline/worktrees/<h>/<id>
+3. 執行AI / 審核AI 跑               cd ~/.vibe-pipeline/worktrees/<h>/<id>
                                    spawn agent(claude / codex / ...)
                                    agent commit 落在 pipeline/<name>
 
@@ -64,7 +64,7 @@
 ## 4. Concurrency 邊界
 
 - 每條 pipeline = 1 worktree = 1 branch checkout = 1 cwd → **絕對不共享檔案**
-- doer / critic spawn 時 `cwd` = worktree 路徑,不可能踩到別條
+- 執行AI / 審核AI spawn 時 `cwd` = worktree 路徑,不可能踩到別條
 - main worktree(user 自己)跟 pipeline worktree 也獨立,user 改 source 不影響 agent
 - metadata `.vibe-pipeline/pipelines/*.json` 永遠在 main worktree 寫(不在 pipeline worktree 寫)
 
@@ -91,7 +91,7 @@
 |---|---|
 | Phase 1(Project + Pipeline CRUD,已完成) | ❌ 沒 runner,不需要 |
 | Phase 2(QA-driven ticket 建立) | ❌ QA 只是收集 spec,不執行 code |
-| **[P2] runner 階段** | ✅ doer/critic spawn 在 worktree 內。**這份設計從這階段開始實作** |
+| **[P2] runner 階段** | ✅ 執行AI / 審核AI spawn 在 worktree 內。**這份設計從這階段開始實作** |
 | [P3] 多 pipeline scheduler | ✅ 平行調度 N 個 worktree |
 
 ## 8. 開工點(等實作時再寫)
@@ -102,6 +102,6 @@ server/lib/git/
 ├── branch.ts          create / delete / merge per strategy
 └── repo.ts            git -C wrapper、status / log / diff
 
-server/lib/runner/     spawn doer/critic in worktree
+server/lib/runner/     spawn 執行AI / 審核AI in worktree
                        (實作時讀本檔)
 ```

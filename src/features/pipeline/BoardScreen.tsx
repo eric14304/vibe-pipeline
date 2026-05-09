@@ -45,12 +45,15 @@ export function BoardScreen({
 
   function markRead(id: string) {
     setItems((arr) => arr.map((it) => (it.id === id ? { ...it, unread: false } : it)));
+    if (hash) api.markNotifRead(hash, id).catch(() => {});
   }
   function dismissNotif(id: string) {
     setItems((arr) => arr.filter((it) => it.id !== id));
+    if (hash) api.dismissNotif(hash, id).catch(() => {});
   }
   function markAllRead() {
     setItems((arr) => arr.map((it) => ({ ...it, unread: false })));
+    if (hash) api.markAllNotifsRead(hash).catch(() => {});
   }
   function focusNotif(id: string, pipelineId?: string) {
     setInboxState("expanded");
@@ -64,6 +67,31 @@ export function BoardScreen({
     const t = setTimeout(() => setHighlightId(null), 1600);
     return () => clearTimeout(t);
   }, [highlightId]);
+
+  // Fetch notifs every 3s while project is open
+  useEffect(() => {
+    if (!hash) {
+      setItems([]);
+      return;
+    }
+    let cancelled = false;
+    function fetchNotifs() {
+      if (!hash) return;
+      api
+        .listNotifs(hash)
+        .then((records) => {
+          if (cancelled) return;
+          setItems(records.map(toNotifItem));
+        })
+        .catch(() => {});
+    }
+    fetchNotifs();
+    const id = setInterval(fetchNotifs, 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [hash]);
 
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 1000);
@@ -116,24 +144,44 @@ export function BoardScreen({
       return;
     }
     let cancelled = false;
-    api
-      .listPipelines(project.hash)
-      .then((arr) => {
-        if (cancelled) return;
-        const sorted = [...((arr as Pipeline[]) ?? [])].sort((a, b) =>
-          a.id < b.id ? 1 : a.id > b.id ? -1 : 0
-        );
-        setPipelines(sorted);
-        if (sorted.length > 0) setActiveId((id) => id || sorted[0].id);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setPipelines([]);
-      });
+    const fetchOnce = () =>
+      api
+        .listPipelines(project.hash)
+        .then((arr) => {
+          if (cancelled) return;
+          const sorted = [...((arr as Pipeline[]) ?? [])].sort((a, b) =>
+            a.id < b.id ? 1 : a.id > b.id ? -1 : 0
+          );
+          setPipelines(sorted);
+          if (sorted.length > 0) setActiveId((id) => id || sorted[0].id);
+        })
+        .catch(() => {
+          if (cancelled) return;
+        });
+    fetchOnce();
     return () => {
       cancelled = true;
     };
-  }, [project]);
+  }, [project, reloadKey]);
+
+  // Polling: 任何 pipeline 處於 running / stopping → 每 1.5s refetch
+  useEffect(() => {
+    if (!project || !project.hasInit) return;
+    const needPoll = pipelines.some((p) => p.state === "running" || p.state === "stopping");
+    if (!needPoll) return;
+    const id = setInterval(() => {
+      api
+        .listPipelines(project.hash)
+        .then((arr) => {
+          const sorted = [...((arr as Pipeline[]) ?? [])].sort((a, b) =>
+            a.id < b.id ? 1 : a.id > b.id ? -1 : 0
+          );
+          setPipelines(sorted);
+        })
+        .catch(() => {});
+    }, 1500);
+    return () => clearInterval(id);
+  }, [project, pipelines]);
 
   const active = useMemo(
     () => pipelines.find((p) => p.id === activeId) || pipelines[0],
@@ -310,6 +358,24 @@ export function BoardScreen({
             tick={tick}
             onAddTicket={(pid) => qa.open(pid)}
             hasActiveDraft={!!qa.draftFor(active.id)}
+            onRun={async (pid) => {
+              if (!project) return;
+              try {
+                await api.runPipeline(project.hash, pid);
+                setReloadKey((k) => k + 1);
+              } catch (e) {
+                setLoadError(e instanceof Error ? e.message : String(e));
+              }
+            }}
+            onPause={async (pid) => {
+              if (!project) return;
+              try {
+                await api.pausePipeline(project.hash, pid);
+                setReloadKey((k) => k + 1);
+              } catch (e) {
+                setLoadError(e instanceof Error ? e.message : String(e));
+              }
+            }}
           />
         )
       }
@@ -317,4 +383,54 @@ export function BoardScreen({
       aside={inboxAside}
     />
   );
+}
+
+// ── Notif adapter: backend NotifRecord → frontend NotifItem ──
+const SEV_BY_EVENT: Record<string, "block" | "info" | "muted"> = {
+  pipeline_started: "muted",
+  pipeline_paused: "info",
+  pipeline_ready_to_merge: "info",
+  pipeline_failed: "block",
+  pipeline_merged: "info",
+  ticket_started: "muted",
+  ticket_done: "info",
+  ticket_failed: "block",
+  iter_critic_pass: "info",
+  iter_critic_fail: "muted",
+  budget_warn: "info",
+  budget_hard_cap: "block",
+  runner_stall: "block",
+  runner_crash: "block",
+};
+
+function iconFor(sev: "block" | "info" | "muted"): { icon: string; iconKind: "alert" | "warn" | "check" | "iter" | "skill" | "dot" } {
+  if (sev === "block") return { icon: "🚨", iconKind: "alert" };
+  if (sev === "info") return { icon: "✓", iconKind: "check" };
+  return { icon: "·", iconKind: "dot" };
+}
+
+function fmtTs(ms: number): { ts: string; since: number } {
+  const since = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+  if (since < 60) return { ts: "just now", since };
+  if (since < 3600) return { ts: `${Math.floor(since / 60)} min`, since };
+  if (since < 86400) return { ts: `${Math.floor(since / 3600)} h`, since };
+  return { ts: `${Math.floor(since / 86400)} d`, since };
+}
+
+function toNotifItem(r: api.NotifRecord): NotifItem {
+  const sev = (SEV_BY_EVENT[r.type] ?? "muted") as "block" | "info" | "muted";
+  const { icon, iconKind } = iconFor(sev);
+  const { ts, since } = fmtTs(r.ts);
+  return {
+    id: r.id,
+    sev,
+    icon,
+    iconKind,
+    title: r.title,
+    sub: r.sub ?? "",
+    ts,
+    since,
+    unread: r.unread,
+    pipelineId: r.pipelineId,
+  };
 }

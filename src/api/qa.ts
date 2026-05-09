@@ -1,4 +1,15 @@
-import type { ApiResponse, ApiErrorCode } from "../../shared/types";
+import type {
+  ApiResponse,
+  ApiErrorCode,
+  TicketSpec,
+  PartialSpec,
+  QAReply,
+  Turn,
+  Draft,
+} from "../../shared/types";
+
+export type { TicketSpec, PartialSpec, QAReply, Turn, Draft };
+export { MODE_LABELS, DEFAULT_ITER_LIMIT, DEFAULT_ITER_STOP_AT_LIMIT } from "../../shared/types";
 
 export class ApiError extends Error {
   constructor(public code: ApiErrorCode | string, message: string) {
@@ -19,44 +30,6 @@ async function call<T>(path: string, init?: CallInit): Promise<T> {
   if (!json.ok) throw new ApiError(json.error.code, json.error.message);
   return json.data!;
 }
-
-export type TicketSpec = {
-  title: string;
-  goal: string;
-  acceptance: string[];
-  prompt: string;
-  mode: "step" | "iter";
-};
-
-export type PartialSpec = Partial<TicketSpec>;
-
-export type QAReply = {
-  message: string;
-  options: string[];
-  optionsMode?: "single" | "multi";
-  complete: boolean;
-  spec: PartialSpec | null;
-};
-
-export type Turn = {
-  role: "user" | "ai";
-  message: string;
-  options?: string[];
-  optionsMode?: "single" | "multi";
-  ts: number;
-};
-
-export type Draft = {
-  draftId: string;
-  pipelineId: string;
-  sessionId: string;
-  sessionStarted?: boolean;
-  complete?: boolean;
-  createdAt: number;
-  updatedAt: number;
-  turns: Turn[];
-  spec: PartialSpec | null;
-};
 
 type StartResp = { draft: Draft; reply: QAReply };
 type TurnResp = { draft: Draft; reply: QAReply };

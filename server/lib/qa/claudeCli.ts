@@ -91,6 +91,13 @@ function coerceSpec(spec: unknown): unknown {
   const o = { ...(spec as Record<string, unknown>) };
   const mode = normalizeMode(o.mode);
   if (mode) o.mode = mode;
+  // acceptance 偶爾被 AI 寫成字串(多行 join);split 成陣列
+  if (typeof o.acceptance === "string") {
+    o.acceptance = (o.acceptance as string)
+      .split(/\r?\n/)
+      .map((s) => s.replace(/^\s*[-*•]?\s*\d*[.\)]?\s*/, "").trim())
+      .filter((s) => s.length > 0);
+  }
   return o;
 }
 

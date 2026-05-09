@@ -3,6 +3,8 @@ import { existsSync, statSync } from "node:fs";
 import * as projectStore from "../lib/projectStore";
 import * as pipelineDir from "../lib/pipelineDir";
 import * as git from "../lib/git";
+import * as orchestrator from "../lib/runner/orchestrator";
+import * as notifs from "../lib/notifs/store";
 import { pickFolder, revealFolder } from "../lib/dialog";
 import { projectHash } from "../lib/hash";
 import type { ApiResponse, ApiErrorCode, Project } from "../../shared/types";
@@ -149,6 +151,59 @@ export async function reveal(hash: string): Promise<Response> {
   } catch (e) {
     return err("internal_error", String(e), 500);
   }
+  return ok({ ok: true });
+}
+
+export async function runPipeline(hash: string, pipelineId: string): Promise<Response> {
+  const project = await projectStore.findByHash(hash);
+  if (!project) return err("not_found", `Project not found: ${hash}`, 404);
+  if (!validProjectPath(project.path)) return err("invalid_path", `Path missing: ${project.path}`);
+  if (!project.hasGit) return err("invalid_path", "Project 沒 .git/,先 git init 再跑 pipeline");
+  const r = await orchestrator.start({
+    projectPath: project.path,
+    projectHash: hash,
+    pipelineId,
+  });
+  if (!r.ok) return err("internal_error", r.error, 500);
+  return ok({ ok: true });
+}
+
+export async function pausePipeline(hash: string, pipelineId: string): Promise<Response> {
+  const project = await projectStore.findByHash(hash);
+  if (!project) return err("not_found", `Project not found: ${hash}`, 404);
+  const r = await orchestrator.stop({
+    projectPath: project.path,
+    projectHash: hash,
+    pipelineId,
+  });
+  if (!r.ok) return err("invalid_path", r.error);
+  return ok({ ok: true });
+}
+
+export async function listNotifs(hash: string): Promise<Response> {
+  const project = await projectStore.findByHash(hash);
+  if (!project) return err("not_found", `Project not found: ${hash}`, 404);
+  return ok(notifs.list(project.path));
+}
+
+export async function markNotifRead(hash: string, id: string): Promise<Response> {
+  const project = await projectStore.findByHash(hash);
+  if (!project) return err("not_found", `Project not found: ${hash}`, 404);
+  notifs.markRead(project.path, id);
+  return ok({ ok: true });
+}
+
+export async function markAllNotifsRead(hash: string): Promise<Response> {
+  const project = await projectStore.findByHash(hash);
+  if (!project) return err("not_found", `Project not found: ${hash}`, 404);
+  notifs.markAllRead(project.path);
+  return ok({ ok: true });
+}
+
+export async function dismissNotif(hash: string, id: string): Promise<Response> {
+  const project = await projectStore.findByHash(hash);
+  if (!project) return err("not_found", `Project not found: ${hash}`, 404);
+  notifs.dismiss(project.path, id);
   return ok({ ok: true });
 }
 

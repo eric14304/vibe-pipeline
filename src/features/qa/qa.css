@@ -299,8 +299,11 @@
 }
 .qadr-input {
   flex: 1;
+  width: 100%;
+  box-sizing: border-box;
   font-family: inherit;
   font-size: 13px;
+  line-height: 1.5;
   padding: 7px 10px;
   border-radius: 6px;
   border: 1px solid var(--line-2);
@@ -312,15 +315,20 @@
   border-color: var(--accent);
 }
 .qadr-textarea {
-  font-family: var(--font-mono);
-  font-size: 12px;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.55;
   resize: vertical;
+  min-height: 60px;
 }
 
+.qadr-spec-body {
+  padding: 14px 20px 20px;
+}
 .qadr-spec {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 .qadr-spec-head {
   font-size: 11px;

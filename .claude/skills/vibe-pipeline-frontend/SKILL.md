@@ -19,7 +19,7 @@ description: vibe-pipeline 前端開發規範 — shell 結構、設計 token、
 - `src/data/pipelines.ts` PROJECTS / PIPELINES:大部分 dead,留 STATE_COLOR/LABEL/fmtElapsed 給 UI 算
 
 加新東西的優先序(P2 開始):
-1. Doer / critic runner 跑起來後,FocusColumn ticket 顯示 real iter state
+1. Doer / 審核AI runner 跑起來後,FocusColumn ticket 顯示 real iter state
 2. Notification producer 接上,inbox 有東西
 3. Multi-pipeline 平行執行 UI
 4. SKILL 候選 review UI(P3)

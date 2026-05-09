@@ -3,6 +3,23 @@
   "branch": "pipeline/test",
   "baseBranch": "main",
   "state": "planning",
-  "tickets": [],
+  "tickets": [
+    {
+      "id": "t1-19e0df717c2",
+      "n": 1,
+      "status": "draft",
+      "title": "Repo 健檢:tsc + ESLint 設置與修零",
+      "goal": "建立 ESLint 工具鏈並讓 TypeScript 與 ESLint 在 repo 全綠,作為後續 backend 串接前的程式碼基線。",
+      "acceptance": [
+        "`bunx tsc --noEmit` 0 error",
+        "`package.json` 加入 `lint` script(eslint + @typescript-eslint),可單一指令跑全 repo",
+        "`bun run lint` 0 error / 0 warning",
+        "ESLint config(flat config 或 .eslintrc)checked in,涵蓋 src/ server/ shared/ tests/",
+        "不改動 src/styles/、prototype DOM/className(避免破 pixel-diff),純修 TS / lint 層級"
+      ],
+      "prompt": "對整個 vibe-pipeline repo 做型別與 lint 健檢。\n\n步驟:\n1. 跑 `bunx tsc --noEmit`,列出所有 error。\n2. 安裝 eslint + @typescript-eslint/parser + @typescript-eslint/eslint-plugin(以及 React 相關 plugin 若 src/ 需要),加 ESLint config(優先 flat config eslint.config.js)。\n3. 在 package.json 加 `\"lint\": \"eslint . --ext .ts,.tsx\"` 之類的 script。\n4. 跑一次 lint,iterative 修到 0 error / 0 warning。\n5. 修 tsc error 與 lint 問題時:不動 src/styles/、不改 JSX className、不改 prototype 對齊用的 DOM 結構(會破 tests/pixel-diff.ts)。\n6. 完成後輸出最終 `bunx tsc --noEmit` 與 `bun run lint` 的 stdout 證明全綠。\n\n禁止:\n- 不要關 rule 來規避(除非該 rule 跟既有 prototype 1:1 約定衝突,需在 PR 註明原因)\n- 不要動 .vibe-pipeline/、~/.vibe-pipeline/、design/ 下任何檔\n- 不要 refactor 業務邏輯,只修型別/風格層級",
+      "mode": "iter"
+    }
+  ],
   "id": "019e0d4dc78b-test"
 }

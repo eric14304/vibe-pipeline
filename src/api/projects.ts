@@ -63,3 +63,37 @@ export function getPipeline(hash: string, id: string): Promise<unknown> {
 export function savePipeline(hash: string, id: string, body: unknown): Promise<unknown> {
   return call<unknown>(`/api/projects/${hash}/pipelines/${id}`, { method: "PUT", body });
 }
+
+export function runPipeline(hash: string, id: string): Promise<{ ok: true }> {
+  return call<{ ok: true }>(`/api/projects/${hash}/pipelines/${id}/run`, { method: "POST" });
+}
+
+export function pausePipeline(hash: string, id: string): Promise<{ ok: true }> {
+  return call<{ ok: true }>(`/api/projects/${hash}/pipelines/${id}/pause`, { method: "POST" });
+}
+
+export type NotifRecord = {
+  id: string;
+  type: string;
+  title: string;
+  sub?: string;
+  ts: number;
+  unread: boolean;
+  pipelineId?: string;
+};
+
+export function listNotifs(hash: string): Promise<NotifRecord[]> {
+  return call<NotifRecord[]>(`/api/projects/${hash}/notifs`);
+}
+
+export function markNotifRead(hash: string, id: string): Promise<{ ok: true }> {
+  return call<{ ok: true }>(`/api/projects/${hash}/notifs/${id}/read`, { method: "POST" });
+}
+
+export function dismissNotif(hash: string, id: string): Promise<{ ok: true }> {
+  return call<{ ok: true }>(`/api/projects/${hash}/notifs/${id}/dismiss`, { method: "POST" });
+}
+
+export function markAllNotifsRead(hash: string): Promise<{ ok: true }> {
+  return call<{ ok: true }>(`/api/projects/${hash}/notifs/mark-all-read`, { method: "POST" });
+}
