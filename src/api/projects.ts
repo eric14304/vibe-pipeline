@@ -1,0 +1,49 @@
+import type { ApiResponse, Project, ApiErrorCode } from "../../shared/types";
+
+export class ApiError extends Error {
+  constructor(public code: ApiErrorCode, message: string) {
+    super(message);
+  }
+}
+
+type CallInit = { method?: string; body?: unknown; headers?: Record<string, string> };
+
+async function call<T>(path: string, init?: CallInit): Promise<T> {
+  const opts: RequestInit = { method: init?.method, headers: init?.headers };
+  if (init?.body !== undefined) {
+    opts.body = typeof init.body === "string" ? init.body : JSON.stringify(init.body);
+    opts.headers = { "Content-Type": "application/json", ...(init.headers || {}) };
+  }
+  const res = await fetch(path, opts);
+  const json = (await res.json()) as ApiResponse<T>;
+  if (!json.ok) throw new ApiError(json.error.code, json.error.message);
+  return json.data;
+}
+
+export function listRecent(): Promise<Project[]> {
+  return call<Project[]>("/api/projects");
+}
+
+export function selectFolder(): Promise<{ path: string }> {
+  return call<{ path: string }>("/api/projects/select", { method: "POST" });
+}
+
+export function openProject(path: string): Promise<Project> {
+  return call<Project>("/api/projects/open", { method: "POST", body: { path } });
+}
+
+export function status(hash: string): Promise<Project> {
+  return call<Project>(`/api/projects/${hash}/status`);
+}
+
+export function init(hash: string): Promise<Project> {
+  return call<Project>(`/api/projects/${hash}/init`, { method: "POST" });
+}
+
+export function listPipelines(hash: string): Promise<unknown[]> {
+  return call<unknown[]>(`/api/projects/${hash}/pipelines`);
+}
+
+export function listTickets(hash: string): Promise<unknown[]> {
+  return call<unknown[]>(`/api/projects/${hash}/tickets`);
+}

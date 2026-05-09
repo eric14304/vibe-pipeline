@@ -1,0 +1,154 @@
+/* Init screen styles */
+.init-root {
+  position: relative;
+  width: 100%; height: 100%;
+  background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+
+.init-brand {
+  position: absolute; top: 24px; left: 28px;
+  display: flex; align-items: center; gap: 9px;
+  color: var(--fg);
+  font-size: 14px; font-weight: 600; letter-spacing: -0.01em;
+}
+.init-brand-name { color: var(--fg); }
+
+.init-card {
+  width: 580px; max-width: calc(100% - 48px);
+  background: var(--bg-elevated);
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+}
+
+.init-scan {
+  display: flex; gap: 14px; padding: 22px 26px 16px;
+  border-bottom: 1px dashed var(--line);
+}
+.init-scan-icon {
+  width: 44px; height: 44px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+.init-scan-text { font-size: 11.5px; line-height: 1.65; color: var(--fg-mute); flex: 1; min-width: 0; }
+.init-scan-status { display: flex; align-items: center; gap: 6px; }
+.init-scan-path { color: var(--fg); font-weight: 500; }
+.init-scan-miss { color: var(--fg-mute); }
+
+.init-inline-code {
+  font-family: var(--font-mono); font-size: 0.93em;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  padding: 1px 6px; border-radius: 4px;
+  color: var(--fg);
+}
+
+.init-body { padding: 22px 28px 6px; }
+.init-title {
+  margin: 0 0 8px;
+  font-size: 22px; font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+}
+.init-desc {
+  margin: 0;
+  font-size: 13.5px; line-height: 1.6;
+  color: var(--fg-mute);
+  text-wrap: pretty;
+}
+
+.init-section-label {
+  font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--fg-faint); margin-bottom: 8px;
+}
+
+.init-cmd-wrap { padding: 18px 28px 10px; }
+.init-cmd {
+  display: flex; align-items: center; gap: 10px;
+  background: #0a0c10;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 13px;
+}
+html.light .init-cmd { background: #1c1916; color: #fbf8f1; }
+html.light .init-cmd .init-cmd-prompt { color: #d8a25a; }
+.init-cmd-prompt { color: #6b7077; font-weight: 600; }
+.init-cmd-text { flex: 1; min-width: 0; color: #e8e3d6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html.light .init-cmd-text { color: #fbf8f1; }
+.init-cmd-copy {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--font-mono); font-size: 11px;
+  padding: 4px 9px; border-radius: 5px;
+  color: var(--fg-mute);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  transition: background 120ms, color 120ms, border-color 120ms;
+}
+.init-cmd-copy:hover { background: rgba(255,255,255,0.08); color: var(--fg); }
+.init-cmd-copy.is-copied { color: var(--done); border-color: var(--done-soft); background: var(--done-soft); }
+
+.init-tree-wrap { padding: 14px 28px 18px; }
+.init-tree {
+  font-size: 12px; line-height: 1.85;
+  color: var(--fg-mute);
+}
+.init-tree-row {
+  padding-left: 14px;
+  display: grid; grid-template-columns: 28px 130px 1fr; gap: 4px;
+  align-items: baseline;
+}
+.init-tree-glyph { color: var(--accent); margin-right: 6px; }
+.init-tree-line { color: var(--fg-faint); }
+.init-tree-name { color: var(--fg); }
+.init-tree-cmt { color: var(--fg-faint); font-size: 11px; }
+
+.init-foot {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 22px 14px 28px;
+  border-top: 1px solid var(--line);
+  background: var(--panel-2);
+}
+.init-foot-q { font-size: 12.5px; color: var(--fg-mute); }
+.init-foot-spacer { flex: 1; }
+.init-foot-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11.5px; color: var(--fg-mute);
+  text-decoration: none;
+}
+.init-foot-link:hover { color: var(--fg); }
+
+.init-hint {
+  position: absolute; bottom: 18px; left: 28px;
+  font-size: 11px; color: var(--fg-faint);
+  letter-spacing: 0.01em;
+}
+
+.init-popup-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.55);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100;
+  backdrop-filter: blur(2px);
+}
+.init-popup-actions {
+  display: flex; gap: 10px; align-items: center;
+}
+.init-popup-error {
+  padding: 10px 14px;
+  margin: 0 28px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--fg);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+}

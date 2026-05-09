@@ -1,0 +1,911 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<title>vibe-pipeline · Prototype Overview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="proto/tokens.css" />
+<style>
+  body { background: var(--bg); color: var(--fg); font-family: var(--font-ui); margin: 0; }
+
+  .ov-shell { max-width: 1240px; margin: 0 auto; padding: 56px 40px 80px; }
+
+  /* header */
+  .ov-head { display: flex; align-items: flex-start; gap: 24px; margin-bottom: 36px; flex-wrap: wrap; }
+  .ov-head-left { flex: 1; min-width: 320px; }
+  .ov-brand {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13.5px; font-weight: 600;
+    color: var(--fg);
+    margin-bottom: 18px;
+  }
+  .ov-brand-tag {
+    font-family: var(--font-mono); font-size: 11px;
+    color: var(--fg-faint);
+    padding: 2px 7px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    margin-left: 4px;
+  }
+  .ov-h1 {
+    margin: 0;
+    font-size: 36px; font-weight: 600; letter-spacing: -0.025em;
+    line-height: 1.15;
+    text-wrap: pretty;
+  }
+  .ov-sub {
+    margin: 12px 0 0;
+    font-size: 14px; color: var(--fg-mute);
+    line-height: 1.6; max-width: 620px;
+    text-wrap: pretty;
+  }
+  .ov-meta {
+    display: flex; flex-direction: column; gap: 6px; align-items: flex-end;
+    font-family: var(--font-mono); font-size: 11px;
+    color: var(--fg-faint);
+  }
+  .ov-meta-row { display: flex; align-items: center; gap: 6px; }
+  .ov-meta-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulseDot 2s ease-in-out infinite; }
+
+  /* journey strip */
+  .ov-journey {
+    display: flex; gap: 0; align-items: stretch;
+    padding: 14px 16px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    margin-bottom: 44px;
+    overflow-x: auto;
+  }
+  .ov-step {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 10px;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .ov-step-num {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--panel-2);
+    color: var(--fg-mute);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono); font-size: 10.5px; font-weight: 600;
+    border: 1px solid var(--line);
+  }
+  .ov-step.is-built .ov-step-num {
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+  .ov-step-label { font-size: 12px; color: var(--fg-mute); }
+  .ov-step.is-built .ov-step-label { color: var(--fg); font-weight: 500; }
+  .ov-step-arrow { color: var(--fg-faint); align-self: center; padding: 0 2px; font-size: 11px; }
+
+  /* sections */
+  .ov-section { margin-bottom: 44px; }
+  .ov-section-head {
+    display: flex; align-items: baseline; gap: 12px;
+    margin-bottom: 18px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  .ov-section-num {
+    font-family: var(--font-mono); font-size: 10.5px;
+    color: var(--fg-faint);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .ov-section-title {
+    margin: 0; font-size: 19px; font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+  .ov-section-desc {
+    margin-left: 4px;
+    font-size: 12.5px; color: var(--fg-mute);
+  }
+  .ov-section-count {
+    margin-left: auto;
+    font-family: var(--font-mono); font-size: 11px;
+    color: var(--fg-faint);
+  }
+
+  /* card grid */
+  .ov-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+    gap: 14px;
+  }
+  .ov-card {
+    display: flex; flex-direction: column;
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+    text-decoration: none;
+    color: var(--fg);
+    transition: border-color 140ms, transform 140ms, background 140ms;
+    position: relative;
+  }
+  .ov-card:hover { border-color: var(--line-2); transform: translateY(-2px); }
+  .ov-card.is-built:hover { border-color: var(--accent); }
+  .ov-card.is-todo {
+    background: transparent; border-style: dashed;
+  }
+  .ov-card.is-todo:hover { transform: none; }
+
+  .ov-thumb {
+    position: relative;
+    aspect-ratio: 16 / 10;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    overflow: hidden;
+    display: flex;
+  }
+
+  /* mini renders ─ Init */
+  .mini-init {
+    flex: 1;
+    background:
+      radial-gradient(rgba(232,228,217,0.04) 1px, transparent 1.4px) 0 0/14px 14px,
+      var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    padding: 14px;
+  }
+  .mini-init-card {
+    width: 80%;
+    background: var(--bg-elevated);
+    border: 1px solid var(--line-2);
+    border-radius: 8px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.35);
+    padding: 12px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .mi-row { display: flex; gap: 6px; align-items: center; }
+  .mi-folder { width: 18px; height: 18px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .mi-bar { height: 4px; border-radius: 2px; background: var(--panel-2); }
+  .mi-bar.long { width: 80%; }
+  .mi-bar.short { width: 50%; }
+  .mi-cmd {
+    background: #0a0c10; height: 16px; border-radius: 4px;
+    margin-top: 2px;
+    border: 1px solid var(--line);
+    display: flex; align-items: center; padding: 0 6px;
+    gap: 4px;
+  }
+  .mi-cmd-dollar { color: #6b7077; font-family: var(--font-mono); font-size: 8px; }
+  .mi-cmd-text { width: 60%; height: 3px; border-radius: 1px; background: var(--accent); opacity: 0.7; }
+
+  /* mini ─ Board */
+  .mini-board {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 32% 1fr;
+    grid-template-rows: 14px 1fr;
+    background: var(--bg);
+  }
+  .mb-top {
+    grid-column: 1/3;
+    background: var(--bg-elevated);
+    border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 4px;
+    padding: 0 6px;
+  }
+  .mb-top-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
+  .mb-top-text { width: 40px; height: 3px; border-radius: 1px; background: var(--fg-mute); opacity: 0.5; }
+  .mb-rail {
+    background: var(--bg-elevated);
+    border-right: 1px solid var(--line);
+    padding: 6px 5px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .mb-rail-item {
+    height: 14px; border-radius: 3px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    position: relative;
+  }
+  .mb-rail-item.is-active {
+    background: var(--accent-soft); border-color: var(--accent);
+  }
+  .mb-rail-item::before {
+    content: ""; position: absolute; left: 3px; top: 50%; transform: translateY(-50%);
+    width: 4px; height: 4px; border-radius: 50%;
+  }
+  .mb-rail-item.s-paused::before { background: var(--paused); }
+  .mb-rail-item.s-running::before { background: var(--running); }
+  .mb-rail-item.s-done::before { background: var(--done); }
+  .mb-rail-item.s-draft::before { background: var(--draft); }
+  .mb-focus {
+    padding: 8px 8px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .mb-focus-title { width: 50%; height: 8px; border-radius: 2px; background: var(--fg); opacity: 0.85; margin-bottom: 4px; }
+  .mb-ticket {
+    height: 18px; border-radius: 4px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--done);
+    position: relative;
+  }
+  .mb-ticket.r { border-left-color: var(--running); }
+  .mb-ticket.p { border-left-color: var(--paused); }
+  .mb-ticket.d { border-left-color: var(--draft); opacity: 0.55; }
+  .mb-ticket::after {
+    content: ""; position: absolute; left: 8px; top: 50%; transform: translateY(-50%);
+    width: 50%; height: 4px; border-radius: 1px; background: var(--fg-mute); opacity: 0.4;
+  }
+
+  /* mini ─ generic placeholder */
+  .mini-placeholder {
+    flex: 1;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--fg-faint);
+    background:
+      repeating-linear-gradient(
+        45deg,
+        transparent 0 8px,
+        rgba(232,228,217,0.025) 8px 9px
+      ),
+      var(--panel);
+  }
+  .mini-placeholder-inner {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+  }
+  .mini-placeholder-inner svg { opacity: 0.5; }
+  .mini-placeholder-label {
+    font-family: var(--font-mono); font-size: 10px;
+    color: var(--fg-faint);
+    text-transform: uppercase; letter-spacing: 0.1em;
+  }
+
+  /* mini ─ Pipeline create */
+  .mini-pipe {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 32% 1fr;
+    grid-template-rows: 14px 1fr;
+    background: var(--bg);
+  }
+  .mp-top { grid-column: 1/3; background: var(--bg-elevated); border-bottom: 1px solid var(--line); }
+  .mp-rail {
+    background: var(--bg-elevated);
+    border-right: 1px solid var(--line);
+    padding: 6px 5px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .mp-rail .mb-rail-item.is-ghost {
+    background: var(--accent-soft); border: 1.5px dashed var(--accent);
+    height: 28px;
+  }
+  .mp-focus {
+    padding: 10px;
+    display: flex; flex-direction: column; gap: 5px;
+    background: var(--bg);
+  }
+  .mp-form {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 5px; padding: 8px;
+    display: flex; flex-direction: column; gap: 5px;
+  }
+  .mp-form-label { width: 40px; height: 3px; border-radius: 1px; background: var(--fg-mute); opacity: 0.5; }
+  .mp-form-input { height: 6px; border-radius: 2px; background: var(--bg); border: 1px solid var(--line-2); }
+
+  /* mini ─ QA chat */
+  .mini-qa {
+    flex: 1;
+    display: grid; grid-template-columns: 1fr 38%;
+    background: var(--bg);
+  }
+  .mq-chat {
+    padding: 10px 8px;
+    display: flex; flex-direction: column; gap: 5px;
+    border-right: 1px solid var(--line);
+  }
+  .mq-bubble {
+    max-width: 70%; padding: 5px 7px;
+    border-radius: 6px; height: 8px;
+    background: var(--panel-2);
+  }
+  .mq-bubble.user { align-self: flex-end; background: var(--accent-soft); border: 1px solid var(--accent); }
+  .mq-side {
+    background: var(--panel);
+    padding: 8px 6px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .mq-side-label { width: 60%; height: 4px; border-radius: 1px; background: var(--accent); opacity: 0.6; }
+  .mq-draft { height: 5px; border-radius: 1px; background: var(--fg-mute); opacity: 0.4; }
+  .mq-draft.short { width: 60%; }
+
+  /* mini ─ drawer */
+  .mini-drawer {
+    flex: 1;
+    display: grid; grid-template-columns: 1fr 50%;
+    background: var(--bg);
+  }
+  .md-back {
+    background: var(--bg);
+    padding: 8px 6px;
+    display: flex; flex-direction: column; gap: 4px;
+    opacity: 0.4;
+  }
+  .md-drawer {
+    background: var(--bg-elevated);
+    border-left: 1px solid var(--line-2);
+    box-shadow: -8px 0 24px rgba(0,0,0,0.3);
+    padding: 10px 8px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .md-drawer-title { width: 75%; height: 8px; background: var(--fg); opacity: 0.85; border-radius: 2px; }
+  .md-iter-stage {
+    display: flex; gap: 3px; align-items: center;
+  }
+  .md-iter-stage span {
+    height: 9px; border-radius: 2px; flex: 1;
+    background: var(--panel-2); border: 1px solid var(--line);
+  }
+  .md-iter-stage span.active { background: var(--iter-soft); border-color: var(--iter); }
+  .md-log {
+    background: #0a0c10; border-radius: 3px;
+    flex: 1; min-height: 30px;
+    padding: 5px;
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .md-log-line { height: 3px; border-radius: 1px; background: var(--running); opacity: 0.5; }
+  .md-log-line.short { width: 50%; }
+
+  /* mini ─ ready merge */
+  .mini-ready {
+    flex: 1;
+    display: grid; grid-template-columns: 32% 1fr;
+    grid-template-rows: 14px 1fr;
+    background: var(--bg);
+  }
+  .mr-top { grid-column: 1/3; background: var(--bg-elevated); border-bottom: 1px solid var(--line); }
+  .mr-rail {
+    background: var(--bg-elevated); border-right: 1px solid var(--line);
+    padding: 6px 5px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .mr-focus { padding: 8px; display: flex; flex-direction: column; gap: 5px; }
+  .mr-banner {
+    background: var(--done-soft); border: 1px solid var(--done);
+    border-radius: 4px; padding: 6px;
+    display: flex; gap: 4px; align-items: center;
+  }
+  .mr-banner-text { flex: 1; height: 4px; background: var(--done); opacity: 0.6; border-radius: 1px; }
+  .mr-banner-btn { width: 30px; height: 9px; background: var(--done); border-radius: 2px; }
+  .mr-ticket { height: 14px; border-radius: 3px; background: var(--panel); border-left: 3px solid var(--done); }
+
+  /* mini ─ notif */
+  .mini-notif {
+    flex: 1;
+    display: grid; grid-template-columns: 1fr 36%;
+    background: var(--bg);
+  }
+  .mn-back { background: var(--bg); opacity: 0.45; padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+  .mn-inbox {
+    background: var(--bg-elevated); border-left: 1px solid var(--line-2);
+    padding: 8px 6px; display: flex; flex-direction: column; gap: 5px;
+  }
+  .mn-inbox-label { width: 50%; height: 4px; background: var(--accent); opacity: 0.6; border-radius: 1px; }
+  .mn-item {
+    height: 22px; border-radius: 3px;
+    background: var(--panel); border: 1px solid var(--line);
+    border-left: 3px solid var(--paused);
+  }
+  .mn-item.r { border-left-color: var(--running); }
+  .mn-item.d { border-left-color: var(--done); }
+
+  /* mini ─ settings */
+  .mini-settings {
+    flex: 1;
+    display: flex; flex-direction: column;
+    background: var(--bg);
+  }
+  .ms-tabs { display: flex; border-bottom: 1px solid var(--line); }
+  .ms-tab { flex: 1; height: 16px; border-right: 1px solid var(--line); }
+  .ms-tab.is-active { background: var(--accent-soft); border-bottom: 2px solid var(--accent); }
+  .ms-body { flex: 1; padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+  .ms-row {
+    height: 12px; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 2px;
+  }
+  .ms-row.tall { height: 28px; }
+
+  .ov-thumb-tag {
+    position: absolute; top: 8px; right: 8px;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+    padding: 3px 7px; border-radius: 4px;
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .tag-built { background: var(--done-soft); color: var(--done); }
+  .tag-todo { background: var(--panel-2); color: var(--fg-faint); border: 1px solid var(--line); }
+  .tag-wireframe { background: var(--iter-soft); color: var(--iter); }
+
+  .ov-card-body {
+    padding: 12px 14px 14px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .ov-card-row {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .ov-card-id {
+    font-family: var(--font-mono); font-size: 10px;
+    color: var(--fg-faint);
+    letter-spacing: 0.06em;
+  }
+  .ov-card-title {
+    font-size: 14px; font-weight: 600;
+    letter-spacing: -0.005em;
+  }
+  .ov-card-desc {
+    font-size: 12px; color: var(--fg-mute);
+    line-height: 1.5;
+    text-wrap: pretty;
+  }
+  .ov-card-arrow {
+    margin-left: auto;
+    color: var(--fg-faint);
+    transition: transform 140ms, color 140ms;
+  }
+  .ov-card.is-built:hover .ov-card-arrow { color: var(--accent); transform: translateX(2px); }
+
+  .ov-foot {
+    margin-top: 56px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    display: flex; align-items: center; gap: 16px;
+    font-size: 11.5px; color: var(--fg-faint);
+    flex-wrap: wrap;
+  }
+  .ov-foot-spacer { flex: 1; }
+  .ov-foot a { color: var(--fg-mute); text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
+  .ov-foot a:hover { color: var(--fg); }
+</style>
+</head>
+<body>
+
+<div class="ov-shell">
+
+  <header class="ov-head">
+    <div class="ov-head-left">
+      <div class="ov-brand">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-label="vibe-pipeline">
+          <path d="M4 7 L9 12 L4 17" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M10 7 L15 12 L10 17" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.55" />
+          <circle cx="19" cy="12" r="2" fill="var(--accent)" />
+        </svg>
+        <span>vibe-pipeline</span>
+        <span class="ov-brand-tag mono">prototype v1</span>
+      </div>
+      <h1 class="ov-h1">Prototype Overview</h1>
+      <p class="ov-sub">
+        把 v3 線框轉成可互動 hi-fi 的進度看板。每張卡片對應一個使用者旅程節點 — 已完成的可點進去玩,還沒做的列出來等下一輪。
+      </p>
+    </div>
+    <div class="ov-meta">
+      <div class="ov-meta-row"><span class="ov-meta-dot"></span><span>5 / 8 built</span></div>
+      <div>last updated · today</div>
+      <div>source · 線框圖探索 v3</div>
+    </div>
+  </header>
+
+  <!-- Journey strip -->
+  <div class="ov-journey">
+    <div class="ov-step is-built">
+      <span class="ov-step-num">01</span>
+      <span class="ov-step-label">Init</span>
+    </div>
+    <span class="ov-step-arrow">→</span>
+    <div class="ov-step is-built">
+      <span class="ov-step-num">02</span>
+      <span class="ov-step-label">Board</span>
+    </div>
+    <span class="ov-step-arrow">→</span>
+    <div class="ov-step is-built">
+      <span class="ov-step-num">03</span>
+      <span class="ov-step-label">Pipeline 創建</span>
+    </div>
+    <span class="ov-step-arrow">→</span>
+    <div class="ov-step is-built">
+      <span class="ov-step-num">04</span>
+      <span class="ov-step-label">Ticket Q&amp;A</span>
+    </div>
+    <span class="ov-step-arrow">→</span>
+    <div class="ov-step is-built">
+      <span class="ov-step-num">05</span>
+      <span class="ov-step-label">Drawer</span>
+    </div>
+    <span class="ov-step-arrow">→</span>
+    <div class="ov-step">
+      <span class="ov-step-num">06</span>
+      <span class="ov-step-label">Ready to merge</span>
+    </div>
+    <span class="ov-step-arrow">→</span>
+    <div class="ov-step">
+      <span class="ov-step-num">07</span>
+      <span class="ov-step-label">通知</span>
+    </div>
+    <span class="ov-step-arrow">→</span>
+    <div class="ov-step">
+      <span class="ov-step-num">08</span>
+      <span class="ov-step-label">Settings</span>
+    </div>
+  </div>
+
+  <!-- Section: built -->
+  <section class="ov-section">
+    <header class="ov-section-head">
+      <span class="ov-section-num">已完成</span>
+      <h2 class="ov-section-title">Hi-fi Prototype</h2>
+      <span class="ov-section-desc">可互動、可 review</span>
+      <span class="ov-section-count mono">6 screens</span>
+    </header>
+    <div class="ov-grid">
+
+      <!-- Ticket Drawer card (moved up — now built) -->
+      <a class="ov-card is-built" href="Prototype - Ticket Drawer.html">
+        <div class="ov-thumb">
+          <div class="mini-drawer">
+            <div class="md-back">
+              <div class="mb-ticket"></div>
+              <div class="mb-ticket p"></div>
+              <div class="mb-ticket r"></div>
+              <div class="mb-ticket d"></div>
+            </div>
+            <div class="md-drawer">
+              <div class="md-drawer-title"></div>
+              <div class="md-iter-stage">
+                <span></span>
+                <span class="active"></span>
+                <span></span>
+              </div>
+              <div class="md-log">
+                <div class="md-log-line"></div>
+                <div class="md-log-line short"></div>
+                <div class="md-log-line"></div>
+                <div class="md-log-line short"></div>
+                <div class="md-log-line"></div>
+              </div>
+            </div>
+          </div>
+          <span class="ov-thumb-tag tag-built">built</span>
+        </div>
+        <div class="ov-card-body">
+          <div class="ov-card-id mono">05 · TICKET DRAWER</div>
+          <div class="ov-card-title">Ticket Drawer · 多狀態</div>
+          <div class="ov-card-desc">Step done / Iter running / Iter done — 從看板側滑展開,可即時切換狀態。</div>
+          <div class="ov-card-row" style="margin-top:6px;">
+            <span class="ov-card-arrow">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </span>
+          </div>
+        </div>
+      </a>
+
+      <!-- Init card -->
+      <a class="ov-card is-built" href="Prototype - Init.html">
+        <div class="ov-thumb">
+          <div class="mini-init">
+            <div class="mini-init-card">
+              <div class="mi-row">
+                <span class="mi-folder">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg>
+                </span>
+                <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
+                  <div class="mi-bar long"></div>
+                  <div class="mi-bar short"></div>
+                </div>
+              </div>
+              <div class="mi-bar long" style="margin-top:4px;"></div>
+              <div class="mi-bar short"></div>
+              <div class="mi-cmd">
+                <span class="mi-cmd-dollar">$</span>
+                <span class="mi-cmd-text"></span>
+              </div>
+            </div>
+          </div>
+          <span class="ov-thumb-tag tag-built">built</span>
+        </div>
+        <div class="ov-card-body">
+          <div class="ov-card-row">
+            <span class="ov-card-id mono">01 · INIT</span>
+          </div>
+          <div class="ov-card-title">初始化 Init</div>
+          <div class="ov-card-desc">repo 還沒 .tickets/ — 全屏卡片引導跑 <span class="mono">tt init</span>,refresh 後進到看板。</div>
+          <div class="ov-card-row" style="margin-top:6px;">
+            <span class="ov-card-arrow">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </span>
+          </div>
+        </div>
+      </a>
+
+      <!-- Pipeline Create card -->
+      <a class="ov-card is-built" href="Prototype - Pipeline Create.html">
+        <div class="ov-thumb">
+          <div class="mini-pipe">
+            <div class="mp-top"></div>
+            <div class="mp-rail">
+              <div class="mb-rail-item s-paused"></div>
+              <div class="mb-rail-item s-running"></div>
+              <div class="mb-rail-item is-ghost"></div>
+            </div>
+            <div class="mp-focus">
+              <div class="mp-form">
+                <div class="mp-form-label"></div>
+                <div class="mp-form-input"></div>
+                <div class="mp-form-label"></div>
+                <div class="mp-form-input"></div>
+              </div>
+            </div>
+          </div>
+          <span class="ov-thumb-tag tag-built">built</span>
+        </div>
+        <div class="ov-card-body">
+          <div class="ov-card-row">
+            <span class="ov-card-id mono">03 · PIPELINE CREATE</span>
+          </div>
+          <div class="ov-card-title">Pipeline 創建 · Rail ghost 展開</div>
+          <div class="ov-card-desc">從 rail 底部 ghost 原地展開命名表單——不離開看板就完成 base_branch 與 merge_strategy 設定。</div>
+          <div class="ov-card-row" style="margin-top:6px;">
+            <span class="ov-card-arrow">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </span>
+          </div>
+        </div>
+      </a>
+
+      <!-- Board card -->
+      <a class="ov-card is-built" href="Prototype - Board.html">
+        <div class="ov-thumb">
+          <div class="mini-board">
+            <div class="mb-top">
+              <span class="mb-top-dot"></span>
+              <span class="mb-top-text"></span>
+              <span style="flex:1"></span>
+              <span class="mb-top-text" style="width:14px;"></span>
+            </div>
+            <div class="mb-rail">
+              <div class="mb-rail-item s-paused is-active"></div>
+              <div class="mb-rail-item s-running"></div>
+              <div class="mb-rail-item s-done"></div>
+              <div class="mb-rail-item s-draft"></div>
+            </div>
+            <div class="mb-focus">
+              <div class="mb-focus-title"></div>
+              <div class="mb-ticket"></div>
+              <div class="mb-ticket p"></div>
+              <div class="mb-ticket r"></div>
+              <div class="mb-ticket d"></div>
+              <div class="mb-ticket d"></div>
+            </div>
+          </div>
+          <span class="ov-thumb-tag tag-built">built</span>
+        </div>
+        <div class="ov-card-body">
+          <div class="ov-card-row">
+            <span class="ov-card-id mono">02 · BOARD</span>
+          </div>
+          <div class="ov-card-title">整體看板 · Rail + focus column</div>
+          <div class="ov-card-desc">左側 rail 列所有 pipeline,右側 focus 顯示選中那條的 ticket 與即時狀態。Running iter 計時、paused 介入按鈕。</div>
+          <div class="ov-card-row" style="margin-top:6px;">
+            <span class="ov-card-arrow">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </span>
+          </div>
+        </div>
+      </a>
+
+      <!-- Notifications card -->
+      <a class="ov-card is-built" href="Prototype - Notifications.html">
+        <div class="ov-thumb">
+          <div class="mini-notif">
+            <div class="mn-back">
+              <div class="mb-ticket p"></div>
+              <div class="mb-ticket"></div>
+              <div class="mb-ticket d"></div>
+              <div class="mb-ticket r"></div>
+            </div>
+            <div class="mn-inbox">
+              <div class="mn-inbox-label"></div>
+              <div class="mn-item"></div>
+              <div class="mn-item r"></div>
+              <div class="mn-item d"></div>
+              <div class="mn-item"></div>
+            </div>
+          </div>
+          <span class="ov-thumb-tag tag-built">built</span>
+        </div>
+        <div class="ov-card-body">
+          <div class="ov-card-row">
+            <span class="ov-card-id mono">05 · NOTIFICATIONS</span>
+          </div>
+          <div class="ov-card-title">通知系統 · Inbox</div>
+          <div class="ov-card-desc">Banner 堆疊 + 可收合 inbox 側欄,疊在 rail 看板上。三段嚴重度分組。</div>
+          <div class="ov-card-row" style="margin-top:6px;">
+            <span class="ov-card-arrow">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </span>
+          </div>
+        </div>
+      </a>
+
+      <!-- Ticket Q&A card -->
+      <a class="ov-card is-built" href="Prototype - Ticket QA.html">
+        <div class="ov-thumb">
+          <div class="mini-qa">
+            <div class="mq-chat">
+              <div class="mq-bubble"></div>
+              <div class="mq-bubble user"></div>
+              <div class="mq-bubble"></div>
+              <div class="mq-bubble user" style="width:50%"></div>
+              <div class="mq-bubble" style="width:60%"></div>
+            </div>
+            <div class="mq-side">
+              <div class="mq-side-label"></div>
+              <div class="mq-draft"></div>
+              <div class="mq-draft short"></div>
+              <div class="mq-draft"></div>
+              <div class="mq-draft"></div>
+              <div class="mq-draft short"></div>
+            </div>
+          </div>
+          <span class="ov-thumb-tag tag-built">built</span>
+        </div>
+        <div class="ov-card-body">
+          <div class="ov-card-row">
+            <span class="ov-card-id mono">04 · TICKET Q&amp;A</span>
+          </div>
+          <div class="ov-card-title">Ticket 創建 Q&amp;A</div>
+          <div class="ov-card-desc">Chat 收斂需求、右側即時長出 ticket draft。3 種互動模型可切換。</div>
+          <div class="ov-card-row" style="margin-top:6px;">
+            <span class="ov-card-arrow">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </span>
+          </div>
+        </div>
+      </a>
+
+    </div>
+  </section>
+
+  <!-- Section: next up -->
+  <section class="ov-section">
+    <header class="ov-section-head">
+      <span class="ov-section-num">下一輪</span>
+      <h2 class="ov-section-title">Up Next</h2>
+      <span class="ov-section-desc">線框已收斂、等轉 hi-fi</span>
+      <span class="ov-section-count mono">2 screens</span>
+    </header>
+    <div class="ov-grid">
+
+      <div class="ov-card is-todo">
+        <div class="ov-thumb">
+          <div class="mini-ready">
+            <div class="mr-top"></div>
+            <div class="mr-rail">
+              <div class="mb-rail-item s-done is-active"></div>
+              <div class="mb-rail-item s-done"></div>
+              <div class="mb-rail-item s-running"></div>
+            </div>
+            <div class="mr-focus">
+              <div class="mr-banner">
+                <div class="mr-banner-text"></div>
+                <div class="mr-banner-btn"></div>
+              </div>
+              <div class="mr-ticket"></div>
+              <div class="mr-ticket"></div>
+              <div class="mr-ticket"></div>
+              <div class="mr-ticket"></div>
+            </div>
+          </div>
+          <span class="ov-thumb-tag tag-wireframe">wireframe</span>
+        </div>
+        <div class="ov-card-body">
+          <div class="ov-card-id mono">06 · READY TO MERGE</div>
+          <div class="ov-card-title">Pipeline 完成狀態</div>
+          <div class="ov-card-desc">所有 ticket 全綠 — 頂部 banner 顯示 diff 摘要,一鍵 merge to main。</div>
+        </div>
+      </div>
+
+      <div class="ov-card is-todo">
+        <div class="ov-thumb">
+          <div class="mini-settings">
+            <div class="ms-tabs">
+              <div class="ms-tab is-active"></div>
+              <div class="ms-tab"></div>
+              <div class="ms-tab"></div>
+            </div>
+            <div class="ms-body">
+              <div class="ms-row tall"></div>
+              <div class="ms-row"></div>
+              <div class="ms-row"></div>
+              <div class="ms-row tall"></div>
+            </div>
+          </div>
+          <span class="ov-thumb-tag tag-wireframe">wireframe</span>
+        </div>
+        <div class="ov-card-body">
+          <div class="ov-card-id mono">08 · SETTINGS</div>
+          <div class="ov-card-title">Settings · SKILL + Budget</div>
+          <div class="ov-card-desc">SKILL.md 編輯 + 候選蒸餾;Budget tab 設今日上限與模型分配。</div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Section: backdrop / archived explorations -->
+  <section class="ov-section">
+    <header class="ov-section-head">
+      <span class="ov-section-num">參考</span>
+      <h2 class="ov-section-title">線框 &amp; 探索</h2>
+      <span class="ov-section-desc">設計討論的起點</span>
+    </header>
+    <div class="ov-grid">
+
+      <a class="ov-card" href="線框圖探索 v3 - 重排.html">
+        <div class="ov-thumb">
+          <div class="mini-placeholder">
+            <div class="mini-placeholder-inner">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M4 9h16M9 4v16"/></svg>
+              <span class="mini-placeholder-label">v3 重排</span>
+            </div>
+          </div>
+        </div>
+        <div class="ov-card-body">
+          <div class="ov-card-id mono">REF · 線框 v3</div>
+          <div class="ov-card-title">線框圖探索 v3 · 依使用者旅程重排</div>
+          <div class="ov-card-desc">8 個畫面、依旅程順序排成 design canvas — 這份 prototype 的來源。</div>
+        </div>
+      </a>
+
+      <a class="ov-card" href="線框圖探索 v2 - 收斂.html">
+        <div class="ov-thumb">
+          <div class="mini-placeholder">
+            <div class="mini-placeholder-inner">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h16"/></svg>
+              <span class="mini-placeholder-label">v2 收斂</span>
+            </div>
+          </div>
+        </div>
+        <div class="ov-card-body">
+          <div class="ov-card-id mono">REF · 線框 v2</div>
+          <div class="ov-card-title">線框圖探索 v2 · 收斂</div>
+          <div class="ov-card-desc">圈選的三個方向:rail board / chat-side QA / inbox 通知。</div>
+        </div>
+      </a>
+
+      <a class="ov-card" href="線框圖探索.html">
+        <div class="ov-thumb">
+          <div class="mini-placeholder">
+            <div class="mini-placeholder-inner">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M8 6h8M6 8v8M18 8v8M8 18h8"/></svg>
+              <span class="mini-placeholder-label">v1 發散</span>
+            </div>
+          </div>
+        </div>
+        <div class="ov-card-body">
+          <div class="ov-card-id mono">REF · 線框 v1</div>
+          <div class="ov-card-title">線框圖探索 · 發散</div>
+          <div class="ov-card-desc">最初一輪、各題多版本草稿,還沒收斂。</div>
+        </div>
+      </a>
+
+    </div>
+  </section>
+
+  <footer class="ov-foot">
+    <span>vibe-pipeline · prototype overview</span>
+    <span class="ov-foot-spacer"></span>
+    <a href="Prototype - Board.html">
+      ↗ 開啟最新 prototype
+    </a>
+  </footer>
+
+</div>
+
+</body>
+</html>

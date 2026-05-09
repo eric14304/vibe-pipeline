@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<title>Ticket 編排器 — 線框 V3 · 依使用者旅程重排</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Kalam:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  body { margin: 0; }
+  /* Sketchy wireframe primitives */
+  .wf {
+    font-family: "Noto Sans TC", "PingFang TC", system-ui, sans-serif;
+    color: #1c1916;
+  }
+  .wf-mono { font-family: "JetBrains Mono", monospace; }
+  .wf-hand { font-family: "Kalam", "Caveat", cursive; }
+  .wf-board { width: 100%; height: 100%; background: #fbf8f1; box-sizing: border-box; position: relative; overflow: hidden; }
+  .wf-board.dark { background: #14161a; color: #e7e3d8; }
+  .wf-board.dark .wf-mono { color: #c8c2b1; }
+
+  /* Hand-drawn box */
+  .sk {
+    border: 1.5px solid #1c1916;
+    border-radius: 6px 4px 8px 5px / 5px 7px 4px 6px;
+    background: #fff;
+  }
+  .dark .sk { background: #1d2025; border-color: #d8d2c0; color: #e7e3d8; }
+  .sk-thin { border-width: 1px; }
+  .sk-dash { border-style: dashed; }
+  .sk-fill-warm { background: #f6efe0; }
+  .dark .sk-fill-warm { background: #2a2317; }
+  .sk-fill-cool { background: #e8edf2; }
+  .dark .sk-fill-cool { background: #1a2230; }
+  .sk-fill-amber { background: #fce9c4; }
+  .dark .sk-fill-amber { background: #3a2d12; }
+  .sk-fill-red { background: #f8d7d2; }
+  .dark .sk-fill-red { background: #3a1f1c; }
+  .sk-fill-green { background: #d8ecd8; }
+  .dark .sk-fill-green { background: #1f3320; }
+  .sk-fill-purple { background: #e7dff2; }
+  .dark .sk-fill-purple { background: #2a1f3a; }
+  .sk-fill-mute { background: #efeae0; }
+  .dark .sk-fill-mute { background: #20232a; }
+
+  /* Status band (left edge of card) */
+  .band { position: absolute; left: 0; top: 0; bottom: 0; width: 5px; border-radius: 3px 0 0 3px; }
+  .band-gray { background: #8a8478; }
+  .band-blue { background: #3a6fb0; }
+  .band-indigo { background: #4a4fb0; }
+  .band-amber { background: #c98a2a; }
+  .band-green { background: #3a8a4a; }
+  .band-red { background: #b04040; }
+
+  /* Squiggly underline (placeholder text) */
+  .squig { display: inline-block; height: 7px; border-radius: 3px; background: #1c1916; opacity: 0.7; vertical-align: middle; }
+  .dark .squig { background: #d8d2c0; opacity: 0.6; }
+  .squig.short { width: 32px; }
+  .squig.med { width: 60px; }
+  .squig.long { width: 96px; }
+
+  /* Pip (small filled circle) */
+  .pip { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+  .pip-g { background: #3a8a4a; } .pip-r { background: #b04040; } .pip-a { background: #c98a2a; } .pip-d { background: #6a6258; }
+
+  /* Chip */
+  .chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    border: 1px solid currentColor; border-radius: 8px 6px 8px 6px / 6px 8px 6px 8px;
+    padding: 1px 6px; font-size: 10px; line-height: 1.4;
+    font-family: "JetBrains Mono", monospace;
+  }
+  .chip.solid { background: #1c1916; color: #fbf8f1; border-color: transparent; }
+  .dark .chip.solid { background: #e7e3d8; color: #14161a; }
+
+  /* Hand-drawn arrow */
+  .arrow { stroke: currentColor; fill: none; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Pulsing dot for "running" */
+  @keyframes wf-pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.3); } }
+  .pulse { animation: wf-pulse 1.5s ease-in-out infinite; }
+  @keyframes wf-blink { 0%,49% { opacity: 1; } 50%,100% { opacity: 0.25; } }
+  .blink { animation: wf-blink 1s steps(2) infinite; }
+
+  /* Note style */
+  .note {
+    font-family: "Kalam", cursive; font-size: 12px; color: #6e5b3e;
+    line-height: 1.3;
+  }
+  .dark .note { color: #b39e75; }
+
+  /* Tweaks panel must sit above the canvas chrome */
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="wireframes/board.jsx"></script>
+<script type="text/babel" src="wireframes/cards.jsx"></script>
+<script type="text/babel" src="wireframes/qa.jsx"></script>
+<script type="text/babel" src="wireframes/pipeline.jsx"></script>
+<script type="text/babel" src="wireframes/notif.jsx"></script>
+<script type="text/babel" src="wireframes/notif-on-rail.jsx"></script>
+<script type="text/babel" src="wireframes/drawer.jsx"></script>
+<script type="text/babel" src="wireframes/drawer-branch-mismatch.jsx"></script>
+<script type="text/babel" src="wireframes/pipeline-ready.jsx"></script>
+<script type="text/babel" src="wireframes/settings-skill.jsx"></script>
+<script type="text/babel" src="wireframes/settings-budget.jsx"></script>
+<script type="text/babel" src="wireframes/init.jsx"></script>
+<script type="text/babel" src="wireframes/pipeline-create.jsx"></script>
+<script type="text/babel" src="app-v3.jsx"></script>
+</body>
+</html>

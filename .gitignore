@@ -1,0 +1,21 @@
+node_modules/
+dist/
+.vite/
+.DS_Store
+tests/.snapshots/
+tests/.diffs/
+
+# logs
+*.log
+npm-debug.log*
+
+# env
+.env
+.env.*
+!.env.example
+
+# editors
+.vscode/
+.idea/
+*.swp
+*.swo
