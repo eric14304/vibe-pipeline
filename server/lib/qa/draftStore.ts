@@ -17,6 +17,7 @@ export type Draft = {
   pipelineId: string;
   sessionId: string;
   sessionStarted: boolean; // warm-up 完成 / 第一個 turn 跑過 → true
+  complete: boolean; // 最後一次 AI reply 的 complete flag
   createdAt: number;
   updatedAt: number;
   turns: Turn[];
@@ -78,6 +79,7 @@ export async function createDraft(projectPath: string, pipelineId: string): Prom
     pipelineId,
     sessionId,
     sessionStarted: false,
+    complete: false,
     createdAt: now,
     updatedAt: now,
     turns: [],
@@ -107,6 +109,7 @@ export async function appendTurn(
     ts: now,
   });
   d.spec = reply.spec ?? d.spec;
+  d.complete = reply.complete;
   d.updatedAt = now;
   await writeJson(file(projectPath, draftId), d);
   return d;

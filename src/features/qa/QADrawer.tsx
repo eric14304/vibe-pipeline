@@ -78,7 +78,12 @@ export function QADrawer({
         </div>
 
         <div className="drawer-body qadr-body" ref={transcriptRef}>
-          {!draft && busy && <div className="qadr-loading mono">啟動 QA session…</div>}
+          {!draft && busy && (
+            <div className="qadr-loading mono">
+              <span>啟動 QA session</span>
+              <ThinkingDots />
+            </div>
+          )}
           {!draft && error && <div className="qadr-error">{error}</div>}
           {draft && (
             <>
@@ -86,16 +91,21 @@ export function QADrawer({
               {draft.turns.map((t, i) => (
                 <Bubble key={i} role={t.role} message={t.message} />
               ))}
-              {busy && <div className="qadr-loading mono">AI 思考中…</div>}
+              {busy && (
+                <div className="qadr-loading mono">
+                  <span>AI 思考中</span>
+                  <ThinkingDots />
+                </div>
+              )}
               {error && <div className="qadr-error">{error}</div>}
             </>
           )}
         </div>
 
         <div className="drawer-foot qadr-foot">
-          {isSpecComplete(draft?.spec ?? null) ? (
+          {(draft?.complete || isSpecComplete(draft?.spec ?? null)) ? (
             <SpecReview
-              spec={draft!.spec as TicketSpec}
+              spec={draft!.spec ?? {}}
               busy={busy}
               onCancel={onCancel}
               onFinalize={onFinalize}
@@ -208,6 +218,16 @@ function lastAiOptions(
   const last = draft.turns[draft.turns.length - 1];
   if (last.role !== "ai") return { options: [], mode: "single" };
   return { options: last.options ?? [], mode: last.optionsMode ?? "single" };
+}
+
+function ThinkingDots() {
+  return (
+    <span className="qadr-thinking-dots" aria-label="loading">
+      <span />
+      <span />
+      <span />
+    </span>
+  );
 }
 
 function Bubble({ role, message }: { role: "user" | "ai"; message: string }) {
@@ -356,20 +376,31 @@ function SpecReview({
   onCancel,
   onFinalize,
 }: {
-  spec: TicketSpec;
+  spec: Partial<TicketSpec>;
   busy: boolean;
   onCancel: () => void;
   onFinalize: (edits?: Partial<TicketSpec>) => void;
 }) {
-  const [edited, setEdited] = useState<TicketSpec>(spec);
+  const [edited, setEdited] = useState<Partial<TicketSpec>>(() => ({
+    title: spec.title ?? "",
+    goal: spec.goal ?? "",
+    acceptance: spec.acceptance ?? [],
+    prompt: spec.prompt ?? "",
+    mode: spec.mode ?? "iter",
+  }));
+  const ready = isSpecComplete(edited);
+  const acceptance = edited.acceptance ?? [];
 
   return (
     <div className="qadr-spec">
-      <div className="qadr-spec-head mono">收齊了。確認後送出。</div>
+      <div className="qadr-spec-head mono">
+        {ready ? "收齊了。確認後送出。" : "AI 沒填完所有欄位,自己補上才能送出。"}
+      </div>
       <Field label="title">
         <input
           className="qadr-input"
-          value={edited.title}
+          value={edited.title ?? ""}
+          placeholder="(必填) 15 字內"
           onChange={(e) => setEdited({ ...edited, title: e.target.value })}
         />
       </Field>
@@ -377,15 +408,17 @@ function SpecReview({
         <textarea
           className="qadr-input qadr-textarea"
           rows={2}
-          value={edited.goal}
+          value={edited.goal ?? ""}
+          placeholder="(必填) 為什麼做這個"
           onChange={(e) => setEdited({ ...edited, goal: e.target.value })}
         />
       </Field>
       <Field label="acceptance">
         <textarea
           className="qadr-input qadr-textarea"
-          rows={Math.max(2, edited.acceptance.length)}
-          value={edited.acceptance.join("\n")}
+          rows={Math.max(2, acceptance.length)}
+          value={acceptance.join("\n")}
+          placeholder="(必填) 一行一條,可驗證的條件"
           onChange={(e) =>
             setEdited({ ...edited, acceptance: e.target.value.split("\n").filter(Boolean) })
           }
@@ -395,7 +428,8 @@ function SpecReview({
         <textarea
           className="qadr-input qadr-textarea"
           rows={5}
-          value={edited.prompt}
+          value={edited.prompt ?? ""}
+          placeholder="(必填) 給 doer agent 的完整指令"
           onChange={(e) => setEdited({ ...edited, prompt: e.target.value })}
         />
       </Field>
@@ -424,7 +458,12 @@ function SpecReview({
           取消 draft
         </button>
         <span style={{ flex: 1 }} />
-        <button className="btn btn-primary" onClick={() => onFinalize(edited)} disabled={busy}>
+        <button
+          className="btn btn-primary"
+          onClick={() => onFinalize(edited)}
+          disabled={busy || !ready}
+          title={ready ? "送出建立 ticket" : "5 個欄位都要填才能送出"}
+        >
           送出建立 ticket
         </button>
       </div>

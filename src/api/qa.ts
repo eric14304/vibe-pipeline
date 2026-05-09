@@ -50,6 +50,8 @@ export type Draft = {
   draftId: string;
   pipelineId: string;
   sessionId: string;
+  sessionStarted?: boolean;
+  complete?: boolean;
   createdAt: number;
   updatedAt: number;
   turns: Turn[];

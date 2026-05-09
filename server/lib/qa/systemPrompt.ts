@@ -30,7 +30,16 @@ spec 結構(每輪累積填,缺的欄位省略):
 
 ## 收斂規則(嚴格)
 
-要收齊 **5 個欄位**:title / goal / acceptance / prompt / mode。**少任何一個就不可以 complete=true**。
+要收齊 **5 個欄位**:title / goal / acceptance / prompt / mode。
+
+**complete=true 的硬條件(全部必須 true)**:
+- spec.title 是非空字串
+- spec.goal 是非空字串
+- spec.acceptance 是長度 >= 1 的字串陣列
+- spec.prompt 是非空字串
+- spec.mode 是 "step" 或 "iter"
+
+**少任何一個就不可以 complete=true**,即使 user 說「夠了 / 直接送」也不能跳。如果 user 急著結束,你就一輪自己把缺的欄位生成合理預設值並一次填齊,再 complete=true。**不准 complete=true 但 spec 缺欄位**。
 
 **每個欄位的標準**
 - title:15 字內,動詞開頭最好(例:修 X / 加 Y / 重構 Z)
