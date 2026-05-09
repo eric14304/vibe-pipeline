@@ -9,7 +9,7 @@
 **已完成**
 - Phase 1 — Project / Pipeline CRUD + .vibe-pipeline/ JSON 持久化 + git init / reveal
 - Phase 2 — QA drawer + claude CLI 整合 + Draft store + Spec checklist + Multi-select option
-- Phase 3 第一刀 — git worktree per pipeline、runner orchestrator (claude CLI session as 主 agent + Task tool 派 sub-agent)、Pipeline state machine 加 stopping、Ticket 加 failed_iter_limit / failed_transient、Run/Pause endpoints + Frontend RunButton + polling、Crash recovery on startup、Notif store (`.runtime/notifs.jsonl`) + emit on pipeline_started/ready/paused/failed + frontend inbox 接 backend
+- Phase 3 第一刀 — git worktree per pipeline、runner orchestrator (claude CLI session as 主 agent + Task tool 派 sub-agent)、Pipeline state machine 加 stopping、Ticket 加 failed_iter_limit / failed_transient、Run/Pause endpoints + Frontend RunButton + polling、Crash recovery on startup、Notif store (`.runtime/notifs.jsonl`) + emit on pipeline_started/ready/paused/failed + ticket_started/done/failed (透過 fs.watch 偵測 pipeline.json 變化) + frontend inbox 接 backend
 
 **架構決策**:Bun local server + browser(前端 Vite 5173 / 後端 Bun 3001 / `/api/*` 透過 Vite proxy)。
 
@@ -17,7 +17,6 @@
 - 實際 spawn claude 跑一張 step ticket end-to-end(需要燒 API)
 - iter 迴圈實測(主 agent 可能要再調 prompt)
 - Transient retry 真正觸發(orchestrator hook 在,要邏輯)
-- Ticket 顆粒度 notif emit(目前只 pipeline 級,主 agent 內變化沒推上來)
 - Budget tracker / SQLite log / SKILL 蒸餾(P2+/P3)
 
 **計畫 ref**
@@ -97,6 +96,7 @@ vibe-pipeline/
 │       │   └── worktree.ts    ensure / remove / prune (per pipeline,~/.vibe-pipeline/worktrees/<h>/<id>)
 │       ├── runner/
 │       │   ├── orchestrator.ts spawn 主 agent (claude session) + log file + recoverStale
+│       │   ├── ticketWatcher.ts fs.watch pipeline.json + diff status → emit ticket_* notif
 │       │   └── runnerPrompt.ts RUNNER_BEHAVIOR_PROMPT (主 agent 流程定義)
 │       ├── notifs/
 │       │   └── store.ts       emit / list / markRead / dismiss → .runtime/notifs.jsonl

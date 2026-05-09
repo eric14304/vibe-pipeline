@@ -4,6 +4,7 @@ import { mkdirSync } from "node:fs";
 import * as pipelineDir from "../pipelineDir";
 import * as worktree from "../git/worktree";
 import * as notifs from "../notifs/store";
+import * as ticketWatcher from "./ticketWatcher";
 import { RUNNER_BEHAVIOR_PROMPT } from "./runnerPrompt";
 
 type RunningProcess = {
@@ -103,6 +104,9 @@ export async function start(opts: {
     pipelineId,
   });
 
+  // 啟 ticket watcher:監看 pipeline.json,ticket.status 變化 → emit notif
+  await ticketWatcher.start({ projectPath, projectHash, pipelineId });
+
   // log file: <target>/.vibe-pipeline/.runtime/logs/<pipelineId>-<ts>.log
   const logsDir = pipelineDir.ensureRuntime(projectPath, "logs");
   mkdirSync(logsDir, { recursive: true });
@@ -173,6 +177,7 @@ export async function start(opts: {
       } catch {}
     } finally {
       running.delete(k);
+      ticketWatcher.stop({ projectHash, pipelineId });
     }
   })();
 

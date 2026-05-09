@@ -1,25 +1,26 @@
 ---
 name: vibe-pipeline-backend
-description: vibe-pipeline 後端 / 執行層規格與計畫 — Phase 1 (Project / Pipeline CRUD) + Phase 2 (QA-driven ticket 建立) 已落地。本 SKILL 是 spec 索引與架構記憶。實作 執行AI / 審核AI runner、SQLite log、git branch / worktree、budget tracker、`vp` CLI、SKILL 蒸餾之前先讀。
+description: vibe-pipeline 後端 / 執行層規格與計畫 — Phase 1 (Project / Pipeline CRUD) + Phase 2 (QA-driven ticket 建立) + Phase 3 第一刀 (pipeline runner + worktree + notif emit) 已落地。本 SKILL 是 spec 索引與架構記憶。SQLite log、budget tracker、`vp` CLI、SKILL 蒸餾、merge ops 之前先讀。
 ---
 
 ## 現況(2026-05-10)
 
-**Phase 1 + Phase 2 已落地**:
+**Phase 1 + 2 + 3 第一刀 已落地**:
 - Phase 1:Project 偵測 / 開啟 / git-init / reveal、Pipeline CRUD(JSON,tickets 內嵌)、`.vibe-pipeline/` 自動建立
 - Phase 2:QA-driven ticket 建立(claude CLI 對話收斂、draft store、tool 限制、Spec finalize 寫進 pipeline.tickets[])
+- Phase 3 第一刀:Pipeline runner — 主 agent (claude CLI session,Task tool 派 sub-agent)、git worktree per pipeline、Run/Pause UX、log file、crash recovery、notif emit (pipeline 級 + ticket 級透過 fs.watch)
 
-**還沒做(P2 / P3)**:執行AI / 審核AI runner spawn、SQLite log、git branch/worktree、Q&A engine 進化版、budget tracker、notification 通道、SKILL 蒸餾、`vp` CLI。
+**還沒做(P2+ / P3)**:iter 迴圈實測 (RUNNER_BEHAVIOR_PROMPT 寫了還沒驗)、transient retry 邏輯、SQLite log、merge ops、budget tracker、Q&A engine 進化版、SKILL 蒸餾、`vp` CLI。
 
 要開工 backend 前:
 
-1. 看你的事屬於「補 phase 1/2 細節」、「擴張到 P2 runner」、「P3+」哪一段
-2. **Phase 1/2 補丁** → 讀本 SKILL「Phase 1+2 已落地架構」段 + 對應 ref
-3. **P2 runner / git** → 讀「完整規格」段 + [refs/git-design-2026-05-09.md](../vibe-pipeline/refs/git-design-2026-05-09.md)
+1. 看你的事屬於「補 phase 1-3 細節」、「擴張到 [P2] runner 完整實測」、「P3+」哪一段
+2. **Phase 1-3 補丁** → 讀本 SKILL「已落地架構」段 + 對應 ref
+3. **P2 runner 完整 / git merge** → 讀「完整規格」段 + [refs/git-design-2026-05-09.md](../vibe-pipeline/refs/git-design-2026-05-09.md) + [refs/integration-plan-v3-runner-2026-05-10.md](../vibe-pipeline/refs/integration-plan-v3-runner-2026-05-10.md)
 4. **完整規格** → [refs/spec-2026-05-09.md](../vibe-pipeline/refs/spec-2026-05-09.md)
-5. 開工前回報「我要做 X,屬 Phase 1/2 補 / [P2] / [P3],預估 Y」
+5. 開工前回報「我要做 X,屬 Phase 1-3 補 / [P2] / [P3],預估 Y」
 
-## Phase 1+2 已落地架構
+## 已落地架構 (Phase 1-3 第一刀)
 
 ### 技術選型
 
