@@ -28,6 +28,8 @@ type RunOpts = {
   isFirstTurn: boolean;
   // 收斂進度提示:caller (qa.ts route) 計算後傳進來,讓 AI 知道目前狀態
   progressHint?: string;
+  // pipeline 內既有 ticket 摘要,/qa/start 時 snapshot 進 draft;每輪都 append 進 system prompt
+  pipelineContext?: string;
 };
 
 // Run one turn through claude CLI. First turn supplies session-id + system prompt,
@@ -38,6 +40,7 @@ export async function runTurn({
   userMessage,
   isFirstTurn,
   progressHint,
+  pipelineContext,
 }: RunOpts): Promise<QAReply> {
   // E2E mock:從 testMode store 拿下一筆 scripted reply。不 spawn 真 claude。
   // 走 enforceContract 通過保留跟 real 模式同樣的 spec coercion / completeness check。
@@ -46,6 +49,7 @@ export async function runTurn({
     void userMessage;
     void isFirstTurn;
     void progressHint;
+    void pipelineContext;
     const reply = nextQAReply(projectHash(cwd));
     return enforceContract(reply);
   }
@@ -55,11 +59,15 @@ export async function runTurn({
   args.push("--disallowedTools", "Edit Write Task");
   if (isFirstTurn) {
     args.push("--session-id", sessionId);
-    args.push("--system-prompt", QA_BEHAVIOR_PROMPT);
+    const sysPrompt = pipelineContext
+      ? QA_BEHAVIOR_PROMPT + "\n\n" + pipelineContext
+      : QA_BEHAVIOR_PROMPT;
+    args.push("--system-prompt", sysPrompt);
   } else {
     args.push("--resume", sessionId);
     const hint =
       "提醒:你只負責對話收斂 ticket 需求,不要實際執行任何工具(Bash/Read/Edit/Grep/...)。回覆永遠用單一 JSON 物件 {message, options, complete, spec},不要解釋、不要 markdown 包裝。" +
+      (pipelineContext ? "\n\n" + pipelineContext : "") +
       (progressHint ? "\n\n" + progressHint : "");
     args.push("--append-system-prompt", hint);
   }

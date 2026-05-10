@@ -42,6 +42,7 @@ export type Ticket = {
   id: string;
   n: number;
   title: string;
+  goal?: string;
   mode: TicketMode;
   status: TicketStatus;
   meta?: string;

@@ -57,6 +57,9 @@ export type Draft = {
   updatedAt: number;
   turns: Turn[];
   spec: PartialSpec | null;
+  // QA 開始時 snapshot 的 pipeline 內既有 ticket 摘要,供 AI 引導時避免重複定義。
+  // 不在後續 turn 重抓 — 一條 draft 整段對話用同一份上下文,避免 AI 看到漂移。
+  pipelineContext?: string;
 };
 
 export function isCompleteSpec(s: unknown): s is TicketSpec {

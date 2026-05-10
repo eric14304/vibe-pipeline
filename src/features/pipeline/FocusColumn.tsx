@@ -719,6 +719,8 @@ function TicketCard({
         {ticket.meta && !isIter && <span className="ticket-meta mono">{ticket.meta}</span>}
       </div>
 
+      {ticket.goal && <div className="ticket-goal">{ticket.goal}</div>}
+
       {isIter && ticket.iter && (
         <div className="ticket-iter">
           <IterStages stage={ticket.iter.stage} status={ticket.status} />

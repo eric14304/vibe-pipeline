@@ -76,7 +76,11 @@ export async function readDraft(projectPath: string, draftId: string): Promise<D
   }
 }
 
-export async function createDraft(projectPath: string, pipelineId: string): Promise<Draft> {
+export async function createDraft(
+  projectPath: string,
+  pipelineId: string,
+  pipelineContext?: string
+): Promise<Draft> {
   const draftId = randomUUID().replace(/-/g, "").slice(0, 16);
   const sessionId = randomUUID();
   const now = Date.now();
@@ -90,6 +94,7 @@ export async function createDraft(projectPath: string, pipelineId: string): Prom
     updatedAt: now,
     turns: [],
     spec: null,
+    pipelineContext,
   };
   await writeJson(file(projectPath, draftId), draft);
   return draft;

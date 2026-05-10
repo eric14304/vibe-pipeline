@@ -99,8 +99,43 @@ export async function start(hash: string, pipelineId: string, _req: Request): Pr
 
   // 不打 claude — draft 建好,frontend 會顯示寫死的第一句 + 選項。
   // 第一個真實 claude turn 由 user 點選項 / 打字觸發 /turn。
-  const draft = await draftStore.createDraft(project.path, pipelineId);
+  const ctx = buildPipelineContext(pipeline as { tickets?: Array<Record<string, unknown>> } | null);
+  const draft = await draftStore.createDraft(project.path, pipelineId, ctx);
   return ok({ draft });
+}
+
+// 把 pipeline 內現有 ticket 摘成一段 context 給 QA AI 看。
+// 引導它別建跟既有 ticket 高度重疊的新 ticket。
+function buildPipelineContext(
+  pipeline: { tickets?: Array<Record<string, unknown>> } | null
+): string | undefined {
+  const tickets = pipeline?.tickets ?? [];
+  if (tickets.length === 0) return undefined;
+  const MAX = 20;
+  const shown = tickets.slice(0, MAX);
+  const lines: string[] = [
+    "PIPELINE 內已存在的 ticket(請避免新 ticket 重複既有任務範圍):",
+  ];
+  for (const t of shown) {
+    const n = typeof t.n === "number" ? t.n : "?";
+    const status = typeof t.status === "string" ? t.status : "?";
+    const mode = typeof t.mode === "string" ? t.mode : "?";
+    const title = typeof t.title === "string" ? t.title : "(no title)";
+    const goal = typeof t.goal === "string" ? truncate(t.goal, 140) : "";
+    lines.push(`#${n} [${status}/${mode}] ${title}`);
+    if (goal) lines.push(`   goal: ${goal}`);
+  }
+  if (tickets.length > MAX) lines.push(`...還有 ${tickets.length - MAX} 條未列`);
+  lines.push("");
+  lines.push(
+    "如果 user 描述跟某張現有 ticket 高度重疊,在 message 提醒「這已經有 #N 在做了」,引導 user 縮 scope 或換主題;新 ticket 應該是補完既有,不是重做。"
+  );
+  return lines.join("\n");
+}
+
+function truncate(s: string, max: number): string {
+  if (s.length <= max) return s;
+  return s.slice(0, max - 1) + "…";
 }
 
 export async function turn(hash: string, draftId: string, req: Request): Promise<Response> {
@@ -132,6 +167,7 @@ export async function turn(hash: string, draftId: string, req: Request): Promise
       userMessage,
       isFirstTurn,
       progressHint,
+      pipelineContext: draft.pipelineContext,
     });
   } catch (e) {
     return err("internal_error", String(e), 500);
