@@ -100,6 +100,22 @@ export async function createDraft(
   return draft;
 }
 
+// 只 append user message 到 disk(claude 尚未跑完前的中繼狀態)。
+// 給 turn handler 在送 claude 前先寫,避免「user 送完 → 關 drawer → 接續看不到剛送的訊息」。
+export async function appendUserMessage(
+  projectPath: string,
+  draftId: string,
+  userMessage: string
+): Promise<Draft> {
+  const d = await readDraft(projectPath, draftId);
+  if (!d) throw new Error("draft_not_found");
+  const now = Date.now();
+  d.turns.push({ role: "user", message: userMessage, ts: now });
+  d.updatedAt = now;
+  await writeJson(file(projectPath, draftId), d);
+  return d;
+}
+
 export async function appendTurn(
   projectPath: string,
   draftId: string,

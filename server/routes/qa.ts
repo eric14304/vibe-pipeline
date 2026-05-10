@@ -163,6 +163,10 @@ export async function turn(hash: string, draftId: string, req: Request): Promise
   const userTurns = draft.turns.filter((t) => t.role === "user").length;
   const progressHint = !isFirstTurn ? buildProgressHint(draft.spec, userTurns + 1) : undefined;
 
+  // 先把 user message 寫進 disk(claude 跑前的中繼狀態),這樣 user 中途關 drawer 再回來
+  // 還能看到他剛送的話;之後再 appendTurn(userMessage=null)只 append AI reply
+  await draftStore.appendUserMessage(project.path, draftId, userMessage);
+
   let reply: Awaited<ReturnType<typeof cli.runTurn>>;
   try {
     reply = await cli.runTurn({
@@ -178,7 +182,8 @@ export async function turn(hash: string, draftId: string, req: Request): Promise
   }
 
   if (isFirstTurn) await draftStore.markStarted(project.path, draftId);
-  const updated = await draftStore.appendTurn(project.path, draftId, userMessage, reply);
+  // userMessage=null:user 已先寫過,這裡只 append AI reply + merge spec + 更新 complete
+  const updated = await draftStore.appendTurn(project.path, draftId, null, reply);
   return ok({ draft: updated, reply });
 }
 
