@@ -88,6 +88,16 @@ export async function splitTicketSpec(opts: {
     "claude-haiku-4-5-20251001",
     "--effort",
     "low",
+    // perf:split 是 server-controlled feature,system prompt 自己定 JSON 契約,
+    // 不該被 user setting / project hooks / MCP / slash commands / persistence 干擾。
+    // 與 QA / runner spawn 同步套用。
+    "--setting-sources",
+    "",
+    "--strict-mcp-config",
+    "--mcp-config",
+    '{"mcpServers":{}}',
+    "--no-session-persistence",
+    "--disable-slash-commands",
     "--system-prompt",
     SPLIT_BEHAVIOR_PROMPT,
     "--disallowedTools",
