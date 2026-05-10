@@ -87,32 +87,35 @@
   height: 100%;
   animation: fadeUp 220ms ease-out both;
 }
-.inbox-strip-expand {
+.inbox-strip-bell {
   width: 32px; height: 32px;
   display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 7px;
+  border-radius: 8px;
   border: 1px solid var(--line);
   background: var(--panel-2);
   color: var(--fg-mute);
+  position: relative;
+  cursor: pointer;
   transition: background 120ms, color 120ms, border-color 120ms;
 }
-.inbox-strip-expand:hover { background: var(--hover); border-color: var(--accent); color: var(--fg); }
-.inbox-strip-count {
-  font-size: 14px; font-weight: 700; color: var(--fg);
-  background: var(--bg);
-  width: 32px; height: 32px;
+.inbox-strip-bell:hover { background: var(--hover); border-color: var(--accent); color: var(--fg); }
+.inbox-strip-bell.has-unread { border-color: var(--accent); color: var(--accent); }
+.inbox-strip-bell-num {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
   border-radius: 8px;
-  display: inline-flex; align-items: center; justify-content: center;
-  border: 1.5px solid var(--line-2);
-  position: relative;
-  letter-spacing: -0.01em;
-}
-.inbox-strip-count.has-unread { border-color: var(--accent); color: var(--accent); }
-.inbox-strip-count.has-unread::after {
-  content: ""; position: absolute; top: -2px; right: -2px;
-  width: 8px; height: 8px; border-radius: 50%;
   background: var(--accent);
-  border: 2px solid var(--bg-elevated);
+  color: var(--bg-elevated);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  letter-spacing: -0.02em;
+  box-shadow: 0 0 0 2px var(--bg-elevated);
 }
 .inbox-strip-divider {
   width: 18px; height: 1px; background: var(--line);

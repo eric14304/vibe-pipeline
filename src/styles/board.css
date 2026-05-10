@@ -121,26 +121,6 @@
   border: 1px solid var(--line);
 }
 .budget-gauge .budget-cap { color: var(--fg-faint); }
-.bell-dot {
-  position: absolute; top: 4px; right: 4px;
-  width: 6px; height: 6px; border-radius: 50%;
-  background: var(--accent); border: 1.5px solid var(--bg-elevated);
-}
-/* 帶數字版本(>0 時取代純圓點) */
-.bell-dot.bell-dot-num {
-  top: 1px; right: -2px;
-  width: auto; height: auto;
-  min-width: 14px;
-  padding: 0 4px;
-  border-radius: 8px;
-  font-size: 9px;
-  font-weight: 600;
-  font-family: var(--font-mono);
-  line-height: 14px;
-  color: var(--bg-elevated);
-  text-align: center;
-  display: inline-block;
-}
 .icon-btn { position: relative; }
 .icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 

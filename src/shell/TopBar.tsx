@@ -1,23 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Logo } from "../ui/Logo";
-import { BellIcon, CheckIconSm, ChevronIcon, FolderIcon, GearIcon, MoonIcon, PlusIcon, SunIcon } from "../ui/icons";
+import { CheckIconSm, ChevronIcon, FolderIcon, GearIcon, MoonIcon, PlusIcon, SunIcon } from "../ui/icons";
 import * as api from "../api/projects";
 import { useActiveProjectHash } from "../hooks/useActiveProject";
 import type { Project } from "../../shared/types";
 import { SettingsPopover } from "../features/settings/SettingsPopover";
 
 export function TopBar({
-  onBellClick,
-  notifActive = false,
-  unreadCount = 0,
   runningCount = 0,
   maxParallel = 0,
   onConfigSaved,
 }: {
-  onBellClick?: () => void;
-  notifActive?: boolean;
-  unreadCount?: number;
   runningCount?: number;
   maxParallel?: number;
   onConfigSaved?: (cfg: api.ProjectConfig) => void;
@@ -235,19 +229,6 @@ export function TopBar({
           aria-label={isDark ? "切到亮色主題" : "切到暗色主題"}
         >
           {isDark ? <SunIcon /> : <MoonIcon />}
-        </button>
-        <button type="button"
-          className={"icon-btn" + (notifActive ? " is-active" : "")}
-          title={unreadCount > 0 ? `${unreadCount} 則未讀通知` : "通知"}
-          onClick={onBellClick}
-          aria-label={unreadCount > 0 ? `通知 (${unreadCount} 未讀)` : "通知"}
-        >
-          <BellIcon />
-          {unreadCount > 0 && (
-            <span className="bell-dot bell-dot-num" aria-hidden="true">
-              {unreadCount > 99 ? "99+" : unreadCount}
-            </span>
-          )}
         </button>
         <SettingsButton
           hash={hash}

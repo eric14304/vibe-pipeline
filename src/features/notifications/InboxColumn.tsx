@@ -1,5 +1,5 @@
-import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, InboxEmptyIcon } from "../../ui/icons";
-// ChevronLeft 用在 strip。InboxItem 已改用單 dot(.inbox-item-dot)取代 icon box,不再需要 BannerIcon。
+import { BellIcon, ChevronRightIcon, CloseIcon, InboxEmptyIcon } from "../../ui/icons";
+// strip 改 bell + 數字 badge 一顆按鈕(取代原本 ChevronLeft 展開鈕 + 獨立 count box 兩件)。
 import { SEV_COLOR } from "../../data/notifications";
 import type { InboxFilter, InboxState, NotifItem } from "../../types/notif";
 
@@ -57,10 +57,20 @@ function InboxStrip({
 
   return (
     <div className="inbox-strip">
-      <button type="button" className="inbox-strip-expand" onClick={onExpand} title="展開 inbox" aria-label="展開">
-        <ChevronLeftIcon />
+      <button
+        type="button"
+        className={"inbox-strip-bell" + (unreadCount > 0 ? " has-unread" : "")}
+        onClick={onExpand}
+        title={unreadCount > 0 ? `展開 inbox(${unreadCount} 未讀)` : "展開 inbox"}
+        aria-label={unreadCount > 0 ? `展開 inbox,${unreadCount} 未讀` : "展開 inbox"}
+      >
+        <BellIcon />
+        {unreadCount > 0 && (
+          <span className="inbox-strip-bell-num mono" aria-hidden="true">
+            {unreadCount > 99 ? "99+" : unreadCount}
+          </span>
+        )}
       </button>
-      <div className={"inbox-strip-count" + (unreadCount > 0 ? " has-unread" : "")}>{unreadCount}</div>
       <div className="inbox-strip-divider"></div>
 
       <div className="inbox-strip-pips">

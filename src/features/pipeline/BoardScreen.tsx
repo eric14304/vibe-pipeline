@@ -44,8 +44,6 @@ export function BoardScreen({
   const [maxParallel, setMaxParallel] = useState<number>(0);
 
   const [inboxState, setInboxState] = useState<InboxState>("collapsed");
-  const toggleInbox = () =>
-    setInboxState((s) => (s === "expanded" ? "collapsed" : "expanded"));
   const [filter, setFilter] = useState<InboxFilter>("all");
   const [items, setItems] = useState<NotifItem[]>([]);
   const [highlightId, setHighlightId] = useState<string | null>(null);
@@ -304,9 +302,6 @@ export function BoardScreen({
 
   const topBar = (
     <TopBar
-      onBellClick={toggleInbox}
-      notifActive={inboxState === "expanded"}
-      unreadCount={unreadCount}
       runningCount={runningCount}
       maxParallel={maxParallel}
       onConfigSaved={(cfg) => setMaxParallel(cfg.defaults.max_parallel)}
