@@ -124,6 +124,14 @@ export async function deletePipeline(hash: string, id: string): Promise<Response
   if (orchestrator.isRunning(hash, id)) {
     return err("invalid_path", "Pipeline 還在跑,先 pause 才能刪", 409);
   }
+  // queued 的順手從 queue 拔,避免 dispatcher 等下撈到一個刪掉的 pipeline
+  if (orchestrator.isQueued(hash, id)) {
+    await orchestrator.cancelQueued({
+      projectPath: project.path,
+      projectHash: hash,
+      pipelineId: id,
+    });
+  }
   // 刪 pipeline.json + qa drafts(若有)。worktree 留著,user 自己 git worktree remove 清。
   const removed = pipelineDir.deletePipeline(project.path, id);
   if (!removed) return err("not_found", `Pipeline not found: ${id}`, 404);
@@ -142,11 +150,16 @@ export async function savePipeline(hash: string, id: string, req: Request): Prom
   if (!existing) {
     return err("not_found", `Pipeline not found: ${id}(建立用 POST /pipelines)`, 404);
   }
-  // Race guard:running / stopping 時禁止 PUT,避免覆蓋 runner 主 agent 正在寫的 iter / commits
-  if (existing.state === "running" || existing.state === "stopping") {
+  // Race guard:running / stopping / queued 時禁止 PUT,避免覆蓋 runner 主 agent 正在寫的 iter / commits
+  // 或把 queued 狀態踩掉導致 dispatcher 接不到。queued 可走「取消排隊」端點處理。
+  if (
+    existing.state === "running" ||
+    existing.state === "stopping" ||
+    existing.state === "queued"
+  ) {
     return err(
       "invalid_path",
-      `Pipeline 在 ${existing.state} 狀態,先 pause 才能修改(避免覆蓋 runner 寫的 iter / commits)`,
+      `Pipeline 在 ${existing.state} 狀態,先 pause/取消排隊 才能修改`,
       409
     );
   }
@@ -210,15 +223,26 @@ export async function runPipeline(hash: string, pipelineId: string): Promise<Res
   });
   if (!r.ok) {
     // 邏輯阻擋(state guard / 已在跑等)用 409 conflict;真正爆炸用 500
-    const isConflict = /已在|stopping|完成|已 running/.test(r.error);
+    const isConflict = /已在|stopping|完成|排隊|merge/.test(r.error);
     return err("invalid_path", r.error, isConflict ? 409 : 500);
   }
-  return ok({ ok: true });
+  // queued: true 時,前端可立即顯示「排隊中(順位 N)」不等下一輪 poll
+  return ok({ ok: true, queued: r.queued ?? false, position: r.position ?? 0 });
 }
 
 export async function pausePipeline(hash: string, pipelineId: string): Promise<Response> {
   const project = await projectStore.findByHash(hash);
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);
+  // queued 狀態走 cancelQueued(直接從 queue 拔 + 標 paused);running 走原 stop 流程
+  if (orchestrator.isQueued(hash, pipelineId)) {
+    const r = await orchestrator.cancelQueued({
+      projectPath: project.path,
+      projectHash: hash,
+      pipelineId,
+    });
+    if (!r.ok) return err("invalid_path", r.error, 409);
+    return ok({ ok: true, cancelled: true });
+  }
   const r = await orchestrator.stop({
     projectPath: project.path,
     projectHash: hash,
@@ -350,6 +374,68 @@ export async function revealWorktree(hash: string, pipelineId: string): Promise<
   }
   await revealFolder(path);
   return ok({ ok: true, path });
+}
+
+// GET /api/projects/:hash/config — 回 project config(目前只暴露 max_parallel,其他保留)
+export async function getConfig(hash: string): Promise<Response> {
+  const project = await projectStore.findByHash(hash);
+  if (!project) return err("not_found", `Project not found: ${hash}`, 404);
+  if (!pipelineDir.hasInit(project.path))
+    return err("not_initialized", `.vibe-pipeline/ not found in ${project.path}`);
+  const cfg = await pipelineDir.readConfig(project.path);
+  const max_parallel = pipelineDir.clampMaxParallel(cfg.defaults?.max_parallel);
+  return ok({
+    defaults: {
+      base_branch: cfg.defaults?.base_branch ?? "main",
+      merge_strategy: cfg.defaults?.merge_strategy ?? "squash",
+      max_parallel,
+    },
+  });
+}
+
+// PUT /api/projects/:hash/config — 接 partial body,只認可白名單欄位
+export async function updateConfig(hash: string, req: Request): Promise<Response> {
+  const project = await projectStore.findByHash(hash);
+  if (!project) return err("not_found", `Project not found: ${hash}`, 404);
+  if (!pipelineDir.hasInit(project.path))
+    return err("not_initialized", `.vibe-pipeline/ not found in ${project.path}`);
+  const body = await readJson(req);
+  const cur = await pipelineDir.readConfig(project.path);
+  const next: pipelineDir.ProjectConfig = {
+    ...cur,
+    defaults: { ...(cur.defaults ?? {}) },
+    scripts: cur.scripts,
+    qa: cur.qa,
+  };
+  const incomingDefaults = (body.defaults ?? {}) as Record<string, unknown>;
+  if ("max_parallel" in incomingDefaults) {
+    next.defaults!.max_parallel = pipelineDir.clampMaxParallel(incomingDefaults.max_parallel);
+  }
+  // 其他 defaults 欄位之後再放白名單;目前只 max_parallel 可改
+  await pipelineDir.writeConfig(project.path, next);
+  // max_parallel 變大可能補位,觸發 dispatch
+  await orchestrator.triggerDispatch(project.path, hash);
+  return ok({
+    defaults: {
+      base_branch: next.defaults?.base_branch ?? "main",
+      merge_strategy: next.defaults?.merge_strategy ?? "squash",
+      max_parallel: pipelineDir.clampMaxParallel(next.defaults?.max_parallel),
+    },
+  });
+}
+
+// GET /api/projects/:hash/runtime — 回 N/M(running 條數 / max_parallel)給 TopBar
+export async function getRuntime(hash: string): Promise<Response> {
+  const project = await projectStore.findByHash(hash);
+  if (!project) return err("not_found", `Project not found: ${hash}`, 404);
+  // 即使 hasInit 還沒,也回 0/default(避免 TopBar 爆)
+  const max_parallel = pipelineDir.hasInit(project.path)
+    ? await pipelineDir.getMaxParallel(project.path)
+    : pipelineDir.DEFAULT_MAX_PARALLEL;
+  return ok({
+    runningCount: orchestrator.runningCount(hash),
+    maxParallel: max_parallel,
+  });
 }
 
 export async function listBranches(hash: string): Promise<Response> {

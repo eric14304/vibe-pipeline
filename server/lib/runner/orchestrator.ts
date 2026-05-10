@@ -17,6 +17,17 @@ type RunningProcess = {
 
 const running = new Map<string, RunningProcess>(); // key: <projectHash>:<pipelineId>
 
+// FIFO queue per project:enqueue 順序 = 排隊順位。dispatcher 從隊頭撈、轉 spawn。
+// 不存 process,只存「下一次 spawn 該帶的 opts」。
+type QueuedItem = {
+  projectPath: string;
+  projectHash: string;
+  pipelineId: string;
+  enqueuedAt: number;
+};
+// key: projectHash → ordered list (順位 = index + 1)
+const queues = new Map<string, QueuedItem[]>();
+
 function key(projectHash: string, pipelineId: string): string {
   return `${projectHash}:${pipelineId}`;
 }
@@ -25,17 +36,83 @@ export function isRunning(projectHash: string, pipelineId: string): boolean {
   return running.has(key(projectHash, pipelineId));
 }
 
+export function isQueued(projectHash: string, pipelineId: string): boolean {
+  const q = queues.get(projectHash);
+  return q ? q.some((it) => it.pipelineId === pipelineId) : false;
+}
+
+// 同 project 還在跑的條數 — 給 routes / TopBar N/M 用
+export function runningCount(projectHash: string): number {
+  let n = 0;
+  for (const k of running.keys()) {
+    if (k.startsWith(projectHash + ":")) n++;
+  }
+  return n;
+}
+
+// 順位(1-based);不在 queue 回 0
+export function queuePosition(projectHash: string, pipelineId: string): number {
+  const q = queues.get(projectHash);
+  if (!q) return 0;
+  const i = q.findIndex((it) => it.pipelineId === pipelineId);
+  return i < 0 ? 0 : i + 1;
+}
+
+function enqueue(item: QueuedItem): void {
+  const arr = queues.get(item.projectHash) ?? [];
+  arr.push(item);
+  queues.set(item.projectHash, arr);
+}
+
+function dequeue(projectHash: string, pipelineId: string): boolean {
+  const arr = queues.get(projectHash);
+  if (!arr) return false;
+  const i = arr.findIndex((it) => it.pipelineId === pipelineId);
+  if (i < 0) return false;
+  arr.splice(i, 1);
+  if (arr.length === 0) queues.delete(projectHash);
+  return true;
+}
+
+// 從 queue 撈下一張可跑的並 spawn。每次 ticket 跑完 / max_parallel 變動時呼叫。
+// 每次只取 1 張(if slot 還空就會被下一輪 dispatch 接著跑)。
+async function dispatch(projectPath: string, projectHash: string): Promise<void> {
+  const max = await pipelineDir.getMaxParallel(projectPath);
+  while (runningCount(projectHash) < max) {
+    const arr = queues.get(projectHash);
+    if (!arr || arr.length === 0) return;
+    const next = arr.shift()!;
+    if (arr.length === 0) queues.delete(projectHash);
+
+    // 嘗試 spawn — 若目標 pipeline 已不在 queued 狀態(被 user 改回 paused / 刪掉)就跳過
+    const cur = (await pipelineDir.readPipeline(projectPath, next.pipelineId)) as {
+      state?: string;
+    } | null;
+    if (!cur || cur.state !== "queued") continue;
+    // 改回 ready / paused 之類後再 spawn(spawn 內會 mark running)
+    // 但內部 spawn 已 own state guard;這邊不重設 state,直接呼叫內部 spawn
+    await spawnDirect({ projectPath, projectHash, pipelineId: next.pipelineId });
+  }
+}
+
 // 起 main agent。Pipeline 必須已存在,有 branch 欄位。
+// 行為:
+//   - 既有 state guard(running/stopping/merged/queued + ready 沒可跑 ticket)擋
+//   - slot 滿 → 標 queued + emit pipeline_queued + enqueue,不 spawn
+//   - slot 沒滿 → 直接 spawn(走 spawnDirect)
 export async function start(opts: {
   projectPath: string;
   projectHash: string;
   pipelineId: string;
-}): Promise<{ ok: true } | { ok: false; error: string }> {
+}): Promise<{ ok: true; queued?: boolean; position?: number } | { ok: false; error: string }> {
   const { projectPath, projectHash, pipelineId } = opts;
   const k = key(projectHash, pipelineId);
 
   if (running.has(k)) {
     return { ok: false, error: "Pipeline 已在跑" };
+  }
+  if (isQueued(projectHash, pipelineId)) {
+    return { ok: false, error: "Pipeline 已在排隊" };
   }
 
   const pipeline = (await pipelineDir.readPipeline(projectPath, pipelineId)) as {
@@ -44,6 +121,7 @@ export async function start(opts: {
     name?: string;
     state?: string;
     tickets?: Array<{ status?: string }>;
+    [k: string]: unknown;
   } | null;
   if (!pipeline) return { ok: false, error: `Pipeline not found: ${pipelineId}` };
 
@@ -53,6 +131,9 @@ export async function start(opts: {
   }
   if (pipeline.state === "stopping") {
     return { ok: false, error: "Pipeline 正在 stopping,等它收完再 run" };
+  }
+  if (pipeline.state === "queued") {
+    return { ok: false, error: "Pipeline 已在 queued" };
   }
   if (pipeline.state === "ready") {
     // 全部 ticket 都 done,沒事可跑。要重跑的話 user 要先 reset ticket 狀態。
@@ -66,6 +147,47 @@ export async function start(opts: {
   if (pipeline.state === "merged") {
     return { ok: false, error: "Pipeline 已 merge 進 base branch,不能再跑(刪掉重新建一條)" };
   }
+
+  // Slot 檢查:滿了改進 queue
+  const max = await pipelineDir.getMaxParallel(projectPath);
+  if (runningCount(projectHash) >= max) {
+    enqueue({ projectPath, projectHash, pipelineId, enqueuedAt: Date.now() });
+    await pipelineDir.writePipeline(projectPath, pipelineId, {
+      ...pipeline,
+      state: "queued",
+    });
+    const pos = queuePosition(projectHash, pipelineId);
+    notifs.emit(projectPath, {
+      type: "pipeline_queued",
+      title: `${pipeline.name || pipelineId} 已排隊`,
+      sub: `順位 ${pos}(slot ${runningCount(projectHash)}/${max} 已滿)`,
+      pipelineId,
+    });
+    return { ok: true, queued: true, position: pos };
+  }
+
+  return spawnDirect({ projectPath, projectHash, pipelineId });
+}
+
+// 真正 spawn 主 agent。state guard / slot 檢查在外層 start 完成。
+// dispatcher 也走這條(已從 queue 撈出來、確認 slot 有空)。
+async function spawnDirect(opts: {
+  projectPath: string;
+  projectHash: string;
+  pipelineId: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { projectPath, projectHash, pipelineId } = opts;
+  const k = key(projectHash, pipelineId);
+
+  const pipeline = (await pipelineDir.readPipeline(projectPath, pipelineId)) as {
+    branch?: string;
+    baseBranch?: string;
+    name?: string;
+    state?: string;
+    tickets?: Array<{ status?: string }>;
+    [k: string]: unknown;
+  } | null;
+  if (!pipeline) return { ok: false, error: `Pipeline not found: ${pipelineId}` };
 
   const branch = pipeline.branch || `pipeline/${pipeline.name || pipelineId}`;
   const baseBranch = pipeline.baseBranch || "main";
@@ -216,6 +338,10 @@ export async function start(opts: {
     } finally {
       running.delete(k);
       ticketWatcher.stop({ projectHash, pipelineId });
+      // slot 釋出,看看 queue 有沒有 pending 接棒
+      dispatch(projectPath, projectHash).catch((e) =>
+        console.error(`[runner ${pipelineId}] dispatch after exit failed:`, e)
+      );
     }
   })();
 
@@ -405,6 +531,9 @@ async function startMockRunner(opts: {
     } finally {
       running.delete(k);
       ticketWatcher.stop({ projectHash, pipelineId });
+      dispatch(projectPath, projectHash).catch((e) =>
+        console.error(`[mock runner ${pipelineId}] dispatch after exit failed:`, e)
+      );
     }
   })();
 
@@ -430,7 +559,8 @@ async function mutateTicket(
   await pipelineDir.writePipeline(projectPath, pipelineId, { ...p, tickets });
 }
 
-// Crash recovery:server 啟動時,任何 pipeline.state="running"/"stopping" 但 process 不在 → 標 paused
+// Crash recovery:server 啟動時,任何 pipeline.state="running"/"stopping"/"queued"
+// 但 process / queue 不在(in-memory state 隨 server 重啟蒸發)→ 標 paused
 export async function recoverStale(projectPath: string): Promise<void> {
   const pipelines = (await pipelineDir.listPipelines(projectPath)) as Array<{
     id?: string;
@@ -439,9 +569,36 @@ export async function recoverStale(projectPath: string): Promise<void> {
   }>;
   for (const p of pipelines) {
     if (!p.id) continue;
-    if (p.state === "running" || p.state === "stopping") {
+    if (p.state === "running" || p.state === "stopping" || p.state === "queued") {
       await pipelineDir.writePipeline(projectPath, p.id, { ...p, state: "paused" });
-      console.log(`[runner] recovered stale pipeline ${p.id} → paused`);
+      console.log(`[runner] recovered stale pipeline ${p.id} (was ${p.state}) → paused`);
     }
   }
+}
+
+// 把已 queued 的 pipeline 從 queue 移除 + state 回 paused。給 user 在排隊時按「取消排隊」用。
+export async function cancelQueued(opts: {
+  projectPath: string;
+  projectHash: string;
+  pipelineId: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { projectPath, projectHash, pipelineId } = opts;
+  const removed = dequeue(projectHash, pipelineId);
+  if (!removed) return { ok: false, error: "Pipeline 不在排隊中" };
+  const pipeline = (await pipelineDir.readPipeline(projectPath, pipelineId)) as {
+    state?: string;
+    [k: string]: unknown;
+  } | null;
+  if (pipeline && pipeline.state === "queued") {
+    await pipelineDir.writePipeline(projectPath, pipelineId, {
+      ...pipeline,
+      state: "paused",
+    });
+  }
+  return { ok: true };
+}
+
+// 公開給 routes:max_parallel 變大時手動觸發補位
+export async function triggerDispatch(projectPath: string, projectHash: string): Promise<void> {
+  await dispatch(projectPath, projectHash);
 }

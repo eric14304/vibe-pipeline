@@ -41,6 +41,7 @@ export function BoardScreen({
   const qa = useQA(hash);
   const [openTicket, setOpenTicket] = useState<Ticket | null>(null);
   const [branches, setBranches] = useState<string[]>([]);
+  const [maxParallel, setMaxParallel] = useState<number>(0);
 
   const [inboxState, setInboxState] = useState<InboxState>("collapsed");
   const toggleInbox = () =>
@@ -203,6 +204,27 @@ export function BoardScreen({
       .catch(() => setBranches([]));
   }, [project]);
 
+  // max_parallel 只在 hash / hasInit 變動時抓一次。Settings 儲存完透過 onConfigSaved
+  // 或 reloadKey 也會 trigger,不另開 polling(避免 1.5s 衝撞 listPipelines)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reloadKey is a force-refetch trigger
+  useEffect(() => {
+    if (!project?.hasInit) {
+      setMaxParallel(0);
+      return;
+    }
+    let cancelled = false;
+    api
+      .getConfig(project.hash)
+      .then((c) => {
+        if (cancelled) return;
+        setMaxParallel(c.defaults.max_parallel);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [project, reloadKey]);
+
   // reloadKey 同上 — force-refetch trigger
   // biome-ignore lint/correctness/useExhaustiveDependencies: reloadKey is a force-refetch trigger
   useEffect(() => {
@@ -263,11 +285,31 @@ export function BoardScreen({
     }
   }
 
+  // running 條數從 pipelines 推(pipelines 已 1.5s polling,不另起 setInterval)。
+  // 視覺上 stopping 還佔 slot,算進去。
+  const runningCount = pipelines.filter(
+    (p) => p.state === "running" || p.state === "stopping"
+  ).length;
+  // queue 順位:state=queued 的依 id desc(列表 sort 順序)排,但 backend FIFO 是 enqueue 時間。
+  // 沒 enqueueAt 持久化,只能近似 — 顯示順位從 1 起算同一批 queued 的 index。
+  // (跨 server restart 會 reset 到 paused,reset 後重排 OK。)
+  const queuedIds = pipelines
+    .filter((p) => p.state === "queued")
+    .map((p) => p.id)
+    .sort();
+  function queuePositionOf(pid: string): number {
+    const i = queuedIds.indexOf(pid);
+    return i < 0 ? 0 : i + 1;
+  }
+
   const topBar = (
     <TopBar
       onBellClick={toggleInbox}
       notifActive={inboxState === "expanded"}
       unreadCount={unreadCount}
+      runningCount={runningCount}
+      maxParallel={maxParallel}
+      onConfigSaved={(cfg) => setMaxParallel(cfg.defaults.max_parallel)}
     />
   );
   // actionError 用右下角小 toast 浮現,別用 NotifBanner(那是 prototype 用,真 notif 走 inbox)
@@ -498,6 +540,7 @@ export function BoardScreen({
             pipeline={active}
             tick={tick}
             projectHash={project.hash}
+            queuePosition={queuePositionOf(active.id)}
             onAddTicket={(pid) => qa.open(pid)}
             hasActiveDraft={!!qa.draftFor(active.id)}
             onTicketClick={(t) => setOpenTicket(t)}

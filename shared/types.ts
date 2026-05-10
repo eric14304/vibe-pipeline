@@ -111,6 +111,7 @@ export type NotifEventType =
   | "ticket_status_changed"
   // P2(runner / budget 落地後)
   | "pipeline_started"
+  | "pipeline_queued"
   | "pipeline_paused"
   | "ticket_started"
   | "iter_critic_pass"
@@ -145,6 +146,7 @@ export const NOTIF_EVENTS: Record<NotifEventType, NotifEventMeta> = {
   ticket_status_changed: { sev: "muted", phase: "stub-first", label: "Ticket 狀態變更" },
 
   pipeline_started: { sev: "muted", phase: "P2", label: "Pipeline 開始運行" },
+  pipeline_queued: { sev: "muted", phase: "P2", label: "Pipeline 已排隊" },
   pipeline_paused: { sev: "info", phase: "P2", label: "Pipeline 已暫停" },
   ticket_started: { sev: "muted", phase: "P2", label: "Ticket 開始跑" },
   iter_critic_pass: { sev: "info", phase: "P2", label: "Iteration critic pass" },

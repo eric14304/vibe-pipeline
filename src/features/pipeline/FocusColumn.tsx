@@ -12,11 +12,13 @@ export function RunButton({
   onRun,
   onPause,
   lastRun,
+  queuePosition,
 }: {
   pipeline: Pipeline;
   onRun?: (id: string) => void;
   onPause?: (id: string) => void;
   lastRun?: RunSummary | null;
+  queuePosition?: number;
 }) {
   const s = pipeline.state;
   const noTickets = pipeline.tickets.length === 0;
@@ -38,6 +40,20 @@ export function RunButton({
           停止中
         </button>
       );
+    case "queued": {
+      const posLabel = queuePosition && queuePosition > 0 ? `順位 ${queuePosition}` : "排隊中";
+      return (
+        <button
+          type="button"
+          className="btn"
+          onClick={() => onPause?.(pipeline.id)}
+          title="取消排隊(改回 paused)"
+          style={{ color: "var(--queued)", borderColor: "var(--queued)" }}
+        >
+          ⏳ {posLabel}
+        </button>
+      );
+    }
     case "ready":
       return (
         <button type="button" className="btn" disabled title="所有 ticket 已完成">
@@ -112,6 +128,7 @@ export function FocusColumn({
   existingNames = [],
   onTicketClick,
   projectHash,
+  queuePosition,
 }: {
   pipeline: Pipeline;
   tick: number;
@@ -127,6 +144,7 @@ export function FocusColumn({
   existingNames?: string[];
   onTicketClick?: (ticket: Ticket) => void;
   projectHash?: string;
+  queuePosition?: number;
 }) {
   // Runs summary 給 head chip + RunButton 預估用。pipeline.id / state 變動就 refetch
   // (state 變表示可能新跑完一次)。失敗安靜忽略 — 純資訊性。
@@ -159,7 +177,9 @@ export function FocusColumn({
     t.status === "failed_transient"
   );
   const lockedByState =
-    pipeline.state === "running" || pipeline.state === "stopping";
+    pipeline.state === "running" ||
+    pipeline.state === "stopping" ||
+    pipeline.state === "queued";
 
   return (
     <main className="focus" key={pipeline.id}>
@@ -203,7 +223,13 @@ export function FocusColumn({
 
           <span style={{ flex: 1 }} />
 
-          <RunButton pipeline={pipeline} onRun={onRun} onPause={onPause} lastRun={lastRun} />
+          <RunButton
+            pipeline={pipeline}
+            onRun={onRun}
+            onPause={onPause}
+            lastRun={lastRun}
+            queuePosition={queuePosition}
+          />
           <OverflowMenu
             pipeline={pipeline}
             hasResettable={hasResettable}
@@ -513,7 +539,9 @@ function FocusTitle({
     trimmed !== pipeline.name && existingNames.includes(trimmed);
   const valid = trimmed.length > 0 && formatOk && !taken;
   const lockedByState =
-    pipeline.state === "running" || pipeline.state === "stopping";
+    pipeline.state === "running" ||
+    pipeline.state === "stopping" ||
+    pipeline.state === "queued";
 
   function commit() {
     if (!valid || trimmed === pipeline.name) {

@@ -56,6 +56,7 @@ export type PipelineState =
   | "planning"
   | "running"
   | "stopping"
+  | "queued"
   | "paused"
   | "ready"
   | "failed"

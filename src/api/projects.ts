@@ -52,6 +52,34 @@ export function listBranches(hash: string): Promise<string[]> {
   return call<string[]>(`/api/projects/${hash}/branches`);
 }
 
+export type ProjectConfig = {
+  defaults: {
+    base_branch: string;
+    merge_strategy: string;
+    max_parallel: number;
+  };
+};
+
+export function getConfig(hash: string): Promise<ProjectConfig> {
+  return call<ProjectConfig>(`/api/projects/${hash}/config`);
+}
+
+export function updateConfig(
+  hash: string,
+  patch: { defaults?: Partial<ProjectConfig["defaults"]> }
+): Promise<ProjectConfig> {
+  return call<ProjectConfig>(`/api/projects/${hash}/config`, {
+    method: "PUT",
+    body: patch,
+  });
+}
+
+export type RuntimeStats = { runningCount: number; maxParallel: number };
+
+export function getRuntime(hash: string): Promise<RuntimeStats> {
+  return call<RuntimeStats>(`/api/projects/${hash}/runtime`);
+}
+
 export function listPipelines(hash: string): Promise<unknown[]> {
   return call<unknown[]>(`/api/projects/${hash}/pipelines`);
 }

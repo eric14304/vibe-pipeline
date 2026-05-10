@@ -4,9 +4,9 @@
 
 ## 當前 phase(2026-05-10)
 
-**Phase 3 第四刀已落地**:Pipeline merge → base branch,phase 3 完整收尾。Real-run e2e 驗過(vp-autotest project,squash merge into main,commit `5e9581e`)。
+**Phase 3 第五刀已落地**:Multi-pipeline 平行執行 — config `defaults.max_parallel`(預設 2,1-8 clamp)、orchestrator slot tracker + FIFO queue per project、滿 slot 自動轉 'queued' state + emit `pipeline_queued` notif、process exit 觸發 dispatcher FIFO 接棒、TopBar N/M chip(過載紅標)、RunButton 'queued' 狀態(順位顯示 + 按鈕變取消排隊)、Settings popover 露 max_parallel 數字欄位、PUT /api/projects/:hash/config 改值即時 triggerDispatch、recovery 把 queued 也視作 stale → paused。
 
-**Phase 3 第三刀**:UX 完整化 + 操作補齊 + 安全網。delete / rename / reset(per-ticket / per-pipeline)/ reveal worktree / overflow menu / theme 持久化 / actionError toast / state guard / shape guard。
+**Phase 3 第四刀**:Pipeline merge → base branch。Real-run e2e 驗過(vp-autotest project,squash merge into main,commit `5e9581e`)。
 
 **已完成**
 - Phase 1 — Project / Pipeline CRUD + .vibe-pipeline/ JSON 持久化 + git init / reveal
@@ -16,16 +16,17 @@
 - Phase 3 第三刀 — Pipeline 操作補齊(delete pipeline、rename inline ✎、reset ticket、reset all done/failed、reveal worktree)、TopBar(真實 currentBranch、⌘O / Ctrl+O 鍵盤捷徑、theme toggle 走 localStorage 持久化、Settings disabled stub)、UX 系列(bell unread 數字、actionError 右下 toast、collapsed inbox 讀過 block 沉降 muted、ts 絕對定位右下、commit hash click-to-copy、empty pipeline 空狀態 CTA、EmptyProject 箭頭指向 TopBar、browser tab title 動態、FocusColumn 累計成本 chip + RunButton 上次 duration 預估、overflow menu 收 worktree/重跑全部/刪除、QADrawer tech leak 清除)、Backend 安全網(orchestrator state guard 擋 ready/running/stopping 的 /run、savePipeline shape 驗證 + race guard + PUT-as-upsert 擋、auto-cancel 空 QA draft)、Backend 新 endpoint(GET /branches、POST /pipelines/:id/worktree/reveal、DELETE /pipelines/:id、GET /pipelines/:id/runs[/:filename])、Project type 加 currentBranch、Rail 漏狀態色補齊(stopping / failed_iter_limit / failed_transient)+ 移除假 Archive chip
 - Phase 3 第二.五刀 — iter FAIL → PASS round chain 驗證(test pipeline,$1.51,verdicts ["FAIL","PASS"] + criticFeedback 全寫入 + executor 第二輪確實 incorporate feedback + 真實 ms 時間戳)、multi-ticket 順序 + pause/resume 驗證(3-step pipeline,$1.47 split 兩段,pause 後 runner 跑完 t1 才收 paused、resume 從 t2 接,3 commit 各自獨立)、atomic write(.tmp + JSON.parse round-trip + renameSync,防 partial write / serialize 炸)、inbox panel + strip 改 flat 列表(不分 sev 群組,strip 改全 8px pip)、iter-stage-pulse 改 box 內右上角 notification badge 樣式
 - Phase 3 第四刀 — Pipeline merge:`POST /pipelines/:id/merge` 用 project config `defaults.merge_strategy`(預設 squash;支援 merge/squash/ff-only),checkout base → merge → squash 模式追加 commit,衝突 / not-fast-forward / 其他 abort + 訊息;成功標 `state="merged"` + `mergedAt` + `mergeCommit{hash,subject,ts}` + emit `pipeline_merged` notif。ReadyBanner 的 View diff(改開 worktree)/ Merge 按鈕從 disabled 接通。orchestrator state guard 補擋 merged 狀態的 /run。E2E 驗過 squash → main
+- Phase 3 第五刀 — Multi-pipeline 平行執行:config `defaults.max_parallel`(預設 2,clamp 1-8)+ orchestrator in-memory slot tracker + FIFO queue per project + 滿 slot 自動 'queued' state(新增到 PipelineState union + STATE_COLOR/STATE_LABEL + tokens.css teal `--queued`)+ emit `pipeline_queued` notif + process exit 觸發 dispatcher 接棒 FIFO + recovery 把 queued 視同 stale → paused。Backend 新 endpoint:GET /api/projects/:hash/config / PUT /api/projects/:hash/config(只白名單 max_parallel)/ GET /api/projects/:hash/runtime(回 N/M)。Pause endpoint 對 queued 狀態走 `cancelQueued`(從 queue 拔 + 標 paused)。前端 TopBar N/M chip(running >= max 變 queued 色,過載紅 `!`)、RunButton 'queued' 狀態(順位顯示 + 按鈕當「取消排隊」)、Settings popover(SettingsPopover.tsx)露 max_parallel 數字欄位 1-8 + 即時 triggerDispatch 補位、FocusColumn / Title rename 把 'queued' 加進 lockedByState。savePipeline race guard 加 'queued',deletePipeline 在 queued 時走 cancelQueued 拔出再刪。
 
 **架構決策**:Bun local server + browser(前端 Vite 5173 / 後端 Bun 3001 / `/api/*` 透過 Vite proxy)。Runner 主 agent 工具白名單只准 Edit/Write 改 pipeline.json + Bash 跑 read-only 指令 + git add/commit;source code 改動 100% 透過 Task 派 sub-agent。Theme 偏好走 localStorage(URL `?theme=` 仍 override 給分享連結用),非 backend config — 簡單 + 無 round-trip + first-paint 不閃。
 
 **還沒做(下個 iteration)**
 - Transient retry 真正觸發測試(沒自然 fixture,需 fault injection;低優先,留 production 真踩到再補)
-- Multi-pipeline 平行執行
 - Budget tracker(P2+;不需 SQLite,直接 sum log JSON)
-- Settings 畫面實際內容(default base branch / merge_strategy / cost 上限等;button 已 disabled stub)
+- Settings 畫面其餘欄位(default base branch / merge_strategy / cost 上限等;phase 3-5 已露 max_parallel,其他保留)
 - atomic write 已落地;**charset guard for PUT body 還沒**(real frontend fetch 沒事,只 shell 端 mojibake 風險)
 - log/notif GC 已落地(per-pipeline 留 10 / 全 project 留 500)
+- Phase 3-5 e2e 留給 user 手動(orchestrator 不會 spawn 巢狀 claude session 跑覆蓋)
 
 **已 final 決定**(不再討論)
 - Theme 偏好 → localStorage(URL `?theme=` 仍 override)

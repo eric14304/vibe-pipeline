@@ -27,6 +27,8 @@
   --failed-soft: rgba(196, 123, 120, 0.14);
   --paused: #d8a25a;
   --paused-soft: rgba(216, 162, 90, 0.14);
+  --queued: #5fb3a8;        /* teal — queued (跟 paused amber / running indigo 區隔) */
+  --queued-soft: rgba(95, 179, 168, 0.14);
   --draft: #6e6a5e;
 
   --radius: 10px;
@@ -68,6 +70,8 @@ html.light {
   --failed-soft: rgba(176, 64, 64, 0.10);
   --paused: #b5751a;
   --paused-soft: rgba(181, 117, 26, 0.12);
+  --queued: #2e8a80;
+  --queued-soft: rgba(46, 138, 128, 0.10);
   --draft: #a8a292;
 }
 

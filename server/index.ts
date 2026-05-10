@@ -55,6 +55,9 @@ async function handle(req: Request): Promise<Response> {
     if (rest === "/git-init" && method === "POST") return projects.gitInit(hash);
     if (rest === "/reveal" && method === "POST") return projects.reveal(hash);
     if (rest === "/branches" && method === "GET") return projects.listBranches(hash);
+    if (rest === "/config" && method === "GET") return projects.getConfig(hash);
+    if (rest === "/config" && method === "PUT") return projects.updateConfig(hash, req);
+    if (rest === "/runtime" && method === "GET") return projects.getRuntime(hash);
     if (rest === "/pipelines" && method === "GET") return projects.listPipelines(hash);
     if (rest === "/pipelines" && method === "POST") return projects.createPipeline(hash, req);
     const pipelineMatch = rest.match(/^\/pipelines\/([a-z0-9_-]+)$/);
