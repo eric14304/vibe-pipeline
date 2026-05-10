@@ -11,7 +11,7 @@ export type TempProject = {
 const API = "http://127.0.0.1:3001/api";
 
 // Run git deterministically:設 user.name/email + -b baseBranch,避免吃 user 全域 git config 出 surprise。
-function git(cwd: string, args: string[]): { ok: boolean; out: string; err: string } {
+export function gitIn(cwd: string, args: string[]): { ok: boolean; out: string; err: string } {
   const res = spawnSync("git", args, {
     cwd,
     encoding: "utf-8",
@@ -39,12 +39,12 @@ export async function createTempProject(opts?: {
   const baseBranch = opts?.baseBranch ?? "main";
   const dir = mkdtempSync(join(tmpdir(), "vp-e2e-proj-"));
 
-  const init = git(dir, ["init", "-b", baseBranch]);
+  const init = gitIn(dir, ["init", "-b", baseBranch]);
   if (!init.ok) throw new Error(`git init failed: ${init.err}`);
   writeFileSync(join(dir, "README.md"), "# vp-e2e fixture\n");
-  const add = git(dir, ["add", "."]);
+  const add = gitIn(dir, ["add", "."]);
   if (!add.ok) throw new Error(`git add failed: ${add.err}`);
-  const commit = git(dir, ["commit", "-m", "init"]);
+  const commit = gitIn(dir, ["commit", "-m", "init"]);
   if (!commit.ok) throw new Error(`git commit failed: ${commit.err}`);
 
   const res = await fetch(`${API}/__test/register-project`, {
