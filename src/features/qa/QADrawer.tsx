@@ -483,11 +483,12 @@ function SpecReview({
               className="qadr-input"
               type="number"
               min={1}
-              max={50}
+              max={5}
               value={edited.iterLimit ?? 5}
-              onChange={(e) =>
-                setEdited({ ...edited, iterLimit: Number(e.target.value) || 5 })
-              }
+              onChange={(e) => {
+                const v = Math.max(1, Math.min(5, Number(e.target.value) || 5));
+                setEdited({ ...edited, iterLimit: v });
+              }}
               style={{ width: 80 }}
             />
           </Field>
