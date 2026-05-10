@@ -12,6 +12,8 @@ export type ConfirmOptions = {
   // 三選一場景:給第三顆 secondary 按鈕(沒設就是普通 binary)
   // 例:merge 前 sync 確認 → primary='先 sync 再 merge' / tertiary='直接 merge' / cancel='取消'
   tertiaryLabel?: string;
+  // 顯眼警告 banner — 渲染在 description 上方紅色框,給有資料遺失風險的 case 用
+  warning?: string;
 };
 
 export type ConfirmResult = "confirm" | "tertiary" | "cancel";
@@ -65,6 +67,12 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
           />
           <div className="confirm-card fade-up">
             <div id="confirm-title" className="confirm-title">{state.title}</div>
+            {state.warning && (
+              <div className="confirm-warning">
+                <span className="confirm-warning-icon" aria-hidden>⚠</span>
+                <span className="confirm-warning-text">{state.warning}</span>
+              </div>
+            )}
             {state.description && (
               <div className="confirm-desc">{state.description}</div>
             )}

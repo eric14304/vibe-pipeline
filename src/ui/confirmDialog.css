@@ -35,6 +35,30 @@
   letter-spacing: -0.005em;
   color: var(--fg);
 }
+/* 危險警告 banner — 紅框 + ⚠ icon + 紅字,給資料遺失風險用 */
+.confirm-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--failed) 16%, transparent);
+  border: 1.5px solid var(--failed);
+  color: var(--failed);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.confirm-warning-icon {
+  font-size: 18px;
+  line-height: 1.2;
+  flex-shrink: 0;
+}
+.confirm-warning-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .confirm-desc {
   font-size: 12.5px;
   line-height: 1.55;
