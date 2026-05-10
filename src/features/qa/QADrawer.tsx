@@ -114,6 +114,28 @@ export function QADrawer({
               )}
             </div>
             <div className="drawer-foot qadr-foot">
+              {/* spec 進度提示:防 AI 嘴砲「可以建 ticket」但實際還沒齊讓 user 困惑 */}
+              {draft?.spec && (() => {
+                const missing = FIELD_LABELS.filter((f) => {
+                  const v = draft.spec?.[f.key];
+                  if (v == null || v === "") return true;
+                  if (Array.isArray(v) && v.length === 0) return true;
+                  if (f.key === "mode") return v !== "step" && v !== "iter";
+                  return false;
+                });
+                if (missing.length === 0) return null;
+                const filled = FIELD_LABELS.length - missing.length;
+                return (
+                  <div className="qadr-progress mono">
+                    <span>spec {filled}/{FIELD_LABELS.length} · 還差</span>
+                    {missing.map((m) => (
+                      <span key={m.key} className="qadr-progress-missing">
+                        {m.label}
+                      </span>
+                    ))}
+                  </div>
+                );
+              })()}
               {(() => {
                 const last = lastAiOptions(draft);
                 return (

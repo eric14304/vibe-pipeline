@@ -203,6 +203,25 @@
   gap: 10px;
 }
 
+.qadr-progress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--fg-mute);
+  padding: 4px 0;
+}
+.qadr-progress-missing {
+  font-size: 10px;
+  padding: 1px 6px;
+  background: var(--paused-soft, color-mix(in srgb, var(--paused) 14%, transparent));
+  color: var(--paused);
+  border: 1px solid color-mix(in srgb, var(--paused) 28%, transparent);
+  border-radius: 3px;
+  letter-spacing: 0.04em;
+}
+
 .qadr-composer {
   display: flex;
   flex-direction: column;
