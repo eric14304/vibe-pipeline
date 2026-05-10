@@ -49,7 +49,7 @@ export async function createTempProject(opts?: {
 
   const res = await fetch(`${API}/__test/register-project`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json; charset=utf-8" },
     body: JSON.stringify({
       path: dir,
       ensureInit: true,

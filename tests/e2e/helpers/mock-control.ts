@@ -36,7 +36,7 @@ export type RunnerScript = {
 async function post(path: string, body: unknown): Promise<unknown> {
   const res = await fetch(`${API}${path}`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json; charset=utf-8" },
     body: JSON.stringify(body),
   });
   const j = (await res.json()) as { ok: boolean; data?: unknown; error?: { message: string } };

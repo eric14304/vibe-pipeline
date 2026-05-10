@@ -9,6 +9,7 @@ import * as runLog from "../lib/runner/runLog";
 import * as notifs from "../lib/notifs/store";
 import { pickFolder, revealFolder } from "../lib/dialog";
 import { projectHash } from "../lib/hash";
+import { requireJsonUtf8 } from "../lib/http";
 import type { ApiResponse, ApiErrorCode, Project } from "../../shared/types";
 
 function ok<T>(data: T): Response {
@@ -58,6 +59,8 @@ export async function selectFolder(): Promise<Response> {
 }
 
 export async function openProject(req: Request): Promise<Response> {
+  const guardErr = requireJsonUtf8(req);
+  if (guardErr) return guardErr;
   const body = await readJson(req);
   const path = body.path as string | undefined;
   if (!path || !validProjectPath(path)) return err("invalid_path", `Invalid path: ${path}`);
@@ -96,6 +99,8 @@ export async function listPipelines(hash: string): Promise<Response> {
 }
 
 export async function createPipeline(hash: string, req: Request): Promise<Response> {
+  const guardErr = requireJsonUtf8(req);
+  if (guardErr) return guardErr;
   const project = await projectStore.findByHash(hash);
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);
   if (!pipelineDir.hasInit(project.path))
@@ -139,6 +144,8 @@ export async function deletePipeline(hash: string, id: string): Promise<Response
 }
 
 export async function savePipeline(hash: string, id: string, req: Request): Promise<Response> {
+  const guardErr = requireJsonUtf8(req);
+  if (guardErr) return guardErr;
   const project = await projectStore.findByHash(hash);
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);
   if (!pipelineDir.hasInit(project.path))
@@ -395,6 +402,8 @@ export async function getConfig(hash: string): Promise<Response> {
 
 // PUT /api/projects/:hash/config — 接 partial body,只認可白名單欄位
 export async function updateConfig(hash: string, req: Request): Promise<Response> {
+  const guardErr = requireJsonUtf8(req);
+  if (guardErr) return guardErr;
   const project = await projectStore.findByHash(hash);
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);
   if (!pipelineDir.hasInit(project.path))
