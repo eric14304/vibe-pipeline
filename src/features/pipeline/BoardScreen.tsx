@@ -634,6 +634,20 @@ export function BoardScreen({
                 setActionError(`觸發 AI 合併失敗: ${e instanceof Error ? e.message : String(e)}`);
               }
             }}
+            onSync={async (pid) => {
+              if (!project) return;
+              try {
+                const r = await api.syncPipeline(project.hash, pid);
+                setReloadKey((k) => k + 1);
+                if (r.nothingToDo) {
+                  setActionError("✓ worktree 已是最新,沒事可同步");
+                } else {
+                  setActionError(`✓ AI 同步已啟動(落後 ${r.behind} commit),runner 接手中…`);
+                }
+              } catch (e) {
+                setActionError(`觸發 AI 同步失敗: ${e instanceof Error ? e.message : String(e)}`);
+              }
+            }}
           />
         )
       }

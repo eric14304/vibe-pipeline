@@ -154,6 +154,7 @@ export function FocusColumn({
   onResetAll,
   onRevealWorktree,
   onMerge,
+  onSync,
   existingNames = [],
   onTicketClick,
   projectHash,
@@ -171,6 +172,7 @@ export function FocusColumn({
   onResetAll?: (pipelineId: string) => void;
   onRevealWorktree?: (pipelineId: string) => void;
   onMerge?: (pipelineId: string) => void;
+  onSync?: (pipelineId: string) => void;
   existingNames?: string[];
   onTicketClick?: (ticket: Ticket) => void;
   projectHash?: string;
@@ -223,6 +225,34 @@ export function FocusColumn({
       if (id) clearInterval(id);
     };
   }, [projectHash, pipeline.id, pipeline.state]);
+
+  // Sync status — worktree 落後 base 幾個 commit。merged 不需顯,planning 沒 worktree 不抓。
+  // 跟 diffStat 同節奏:running/stopping 才 poll(base 那時可能被別條 pipeline 推進);
+  // 其他 state 一次抓完,不同 pipeline.state 自動 refetch。
+  const [behind, setBehind] = useState<number | null>(null);
+  useEffect(() => {
+    if (!projectHash || pipeline.state === "merged" || pipeline.state === "planning") {
+      setBehind(null);
+      return;
+    }
+    let cancelled = false;
+    const tick = () => {
+      api
+        .getSyncStatus(projectHash, pipeline.id)
+        .then((s) => {
+          if (!cancelled) setBehind(s.behind);
+        })
+        .catch(() => {});
+    };
+    tick();
+    const live = pipeline.state === "running" || pipeline.state === "stopping";
+    const id = live ? setInterval(tick, 5000) : null;
+    return () => {
+      cancelled = true;
+      if (id) clearInterval(id);
+    };
+  }, [projectHash, pipeline.id, pipeline.state]);
+
   const totalCost = runs.reduce((sum, r) => sum + (r.costUsd ?? 0), 0);
   const lastRun = runs[0] ?? null;
   const stateColor = STATE_COLOR[pipeline.state];
@@ -335,6 +365,29 @@ export function FocusColumn({
               baseBranch={pipeline.baseBranch || "main"}
               onClose={() => setDiffOpen(false)}
             />
+          )}
+          {behind !== null && behind > 0 && (
+            <button
+              type="button"
+              className="chip mono"
+              title={
+                lockedByState
+                  ? `落後 ${pipeline.baseBranch || "base"} ${behind} commit(pipeline 在跑,等 pause/ready 才能 sync)`
+                  : `落後 ${pipeline.baseBranch || "base"} ${behind} commit · 點擊讓 AI 把 base 同步進 worktree`
+              }
+              style={{
+                fontSize: 11,
+                cursor: lockedByState ? "not-allowed" : "pointer",
+                border: "1px solid var(--queued)",
+                background: "color-mix(in srgb, var(--queued) 12%, transparent)",
+                color: "var(--queued)",
+                opacity: lockedByState ? 0.55 : 1,
+              }}
+              disabled={lockedByState}
+              onClick={() => onSync?.(pipeline.id)}
+            >
+              ⇣ 落後 {behind}
+            </button>
           )}
 
           <button type="button" className="btn" onClick={() => onAddTicket?.(pipeline.id)}>

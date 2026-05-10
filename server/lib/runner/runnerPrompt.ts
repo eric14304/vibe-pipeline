@@ -81,6 +81,33 @@ JSON 結構:
 
 **merge ticket 不跑「ticket commit」流程**(merge commit 已在 main repo 由 sub-agent commit 完;worktree 不會有改動)。
 
+### mode = "sync" (AI sync ticket — synthetic,/sync endpoint append)
+這張 ticket 把 base branch 的最新內容 merge 進 worktree(branch side),讓 pipeline branch 跟上 base。sub-agent 在 worktree 內操作。
+
+跑法跟 merge ticket 對稱(三選一回應 + iter 上限),但**完成後不改 pipeline.state**(只是 ticket done,pipeline 保持原 state ready/paused)。
+
+讓 N = ticket.iterLimit ?? 3(sync ticket 預設 3 輪)。
+
+迴圈最多 N 輪:
+1. Bash "date +%s%3N" 抓 startedAt;標 stage="doer";派 Task sub-agent;寫回 JSON
+2. sub-agent 回應開頭三選一:
+   - "PASS\\n..." → 從回應抽 SYNC_COMMIT_HASH(可能是 "NOTHING_TO_SYNC" 表示 base 沒比 branch 新);verdict="PASS"
+   - "FAIL\\n<reason>" → 可重試;verdict="FAIL",feedback=reason
+   - "FAIL_NORETRY\\n<reason>" → 致命(worktree 髒 / branch 不存在);verdict="FAIL",feedback=reason,**立刻終止 iter**
+3. Bash "date +%s%3N" 抓 endedAt;append round;current+=1;寫回 JSON
+4. PASS →
+   - 標 ticket.status = "done"
+   - **不改 pipeline.state**(維持 ready / paused 等);若有 SYNC_COMMIT_HASH,寫 ticket.syncCommit = { hash, ts }
+   - 寫回 JSON,主迴圈會繼續找下一張 ticket(通常沒了 → ready)
+5. FAIL_NORETRY → 直接跳到「終止」流程(status=failed_iter_limit + state=paused)
+6. FAIL → 下輪繼續,feedback 加進下輪 prompt
+
+跑完 N 輪還沒 PASS / FAIL_NORETRY 觸發:
+- 標 ticket.status = "failed_iter_limit",pipeline.state = "paused"
+- 結束 session
+
+**sync ticket 不跑「ticket commit」流程**(sync merge commit 已在 worktree 由 sub-agent commit 完)。
+
 ### mode = "iter" (迭代任務)
 讓 N = ticket.iterLimit ?? 5,iterStop = ticket.iterStopAtLimit ?? true。
 

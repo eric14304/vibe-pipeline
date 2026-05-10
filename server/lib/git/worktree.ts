@@ -106,6 +106,22 @@ function parseShortstat(s: string): DiffStat {
   };
 }
 
+// 看 worktree 上 branch 落後 base 幾個 commit(從 base merge-base 算起 base 多走的 commit 數)。
+// 用 rev-list --count baseBranch ^HEAD(只在 baseBranch 上 reachable 的 commit,而 worktree HEAD 還沒拿到的)。
+// 沒 worktree / git 異常 → 回 null,UI 自己處理。
+export async function behindBaseCount(
+  projectPath: string,
+  pipelineId: string,
+  baseBranch: string
+): Promise<number | null> {
+  const wt = worktreePath(projectPath, pipelineId);
+  if (!existsSync(wt)) return null;
+  const res = await spawnGit(["rev-list", "--count", `HEAD..${baseBranch}`], wt);
+  if (!res.ok) return null;
+  const n = Number(res.out.trim());
+  return Number.isFinite(n) ? n : null;
+}
+
 // 完整 unified diff:跟 base 比對 worktree 全部改動。
 // 回 { files: [{path, added, deleted}], raw } — raw 是 git diff 全文,前端自己 render。
 export type DiffFile = { path: string; added: number; deleted: number };

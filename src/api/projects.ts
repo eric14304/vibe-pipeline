@@ -124,6 +124,22 @@ export function mergePipeline(hash: string, id: string): Promise<{ ok: true; tic
   );
 }
 
+export type SyncStatus = { behind: number | null; baseBranch?: string };
+
+export function getSyncStatus(hash: string, id: string): Promise<SyncStatus> {
+  return call<SyncStatus>(`/api/projects/${hash}/pipelines/${id}/sync-status`);
+}
+
+export function syncPipeline(
+  hash: string,
+  id: string
+): Promise<{ ok: true; behind: number; nothingToDo?: boolean; ticketId?: string }> {
+  return call<{ ok: true; behind: number; nothingToDo?: boolean; ticketId?: string }>(
+    `/api/projects/${hash}/pipelines/${id}/sync`,
+    { method: "POST" }
+  );
+}
+
 export type DiffStat = { files: number; added: number; deleted: number };
 
 export function getDiffStat(hash: string, id: string): Promise<DiffStat | null> {

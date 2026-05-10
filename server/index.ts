@@ -68,13 +68,19 @@ async function handle(req: Request): Promise<Response> {
       if (method === "DELETE") return projects.deletePipeline(hash, id);
     }
 
-    const pipelineRunMatch = rest.match(/^\/pipelines\/([a-z0-9_-]+)\/(run|pause|merge)$/);
+    const pipelineRunMatch = rest.match(/^\/pipelines\/([a-z0-9_-]+)\/(run|pause|merge|sync)$/);
     if (pipelineRunMatch && method === "POST") {
       const id = pipelineRunMatch[1];
       const action = pipelineRunMatch[2];
       if (action === "run") return projects.runPipeline(hash, id);
       if (action === "pause") return projects.pausePipeline(hash, id);
       if (action === "merge") return projects.mergePipeline(hash, id);
+      if (action === "sync") return projects.syncPipeline(hash, id);
+    }
+
+    const syncStatusMatch = rest.match(/^\/pipelines\/([a-z0-9_-]+)\/sync-status$/);
+    if (syncStatusMatch && method === "GET") {
+      return projects.syncStatus(hash, syncStatusMatch[1]);
     }
 
     const worktreeRevealMatch = rest.match(

@@ -8,6 +8,7 @@ import * as worktree from "../lib/git/worktree";
 import * as runLog from "../lib/runner/runLog";
 import * as notifs from "../lib/notifs/store";
 import { mergeTicketPrompt } from "../lib/runner/mergeTicketPrompt";
+import { syncTicketPrompt } from "../lib/runner/syncTicketPrompt";
 import { pickFolder, revealFolder } from "../lib/dialog";
 import { projectHash } from "../lib/hash";
 import { requireJsonUtf8 } from "../lib/http";
@@ -435,6 +436,85 @@ export async function mergePipeline(hash: string, pipelineId: string): Promise<R
     return err("invalid_path", `append OK but spawn failed: ${startRes.error}`, 500);
   }
   return ok({ ok: true, ticketId: appendRes.ticket.id });
+}
+
+// GET sync 狀態:回 worktree 落後 base 幾個 commit
+// 給前端 chip 用,polling 1 次/3s 由前端控
+export async function syncStatus(hash: string, pipelineId: string): Promise<Response> {
+  const project = await projectStore.findByHash(hash);
+  if (!project) return err("not_found", `Project not found: ${hash}`, 404);
+  if (!project.hasGit) return ok({ behind: null });
+  const pipeline = (await pipelineDir.readPipeline(project.path, pipelineId)) as {
+    branch?: string;
+    baseBranch?: string;
+  } | null;
+  if (!pipeline) return err("not_found", `Pipeline not found: ${pipelineId}`, 404);
+  const baseBranch = pipeline.baseBranch || "main";
+  const behind = await worktree.behindBaseCount(project.path, pipelineId, baseBranch);
+  return ok({ behind, baseBranch });
+}
+
+// POST AI sync:append synthetic sync ticket → spawn runner
+// 前置:state ∈ {ready, paused, planning} 才允許,running/stopping/queued/merged 擋
+// behindCount === 0 → 直接 200 nothing-to-do(不 spawn runner)
+export async function syncPipeline(hash: string, pipelineId: string): Promise<Response> {
+  const project = await projectStore.findByHash(hash);
+  if (!project) return err("not_found", `Project not found: ${hash}`, 404);
+  if (!project.hasGit) return err("invalid_path", "Project 沒 .git/", 400);
+  if (orchestrator.isRunning(hash, pipelineId)) {
+    return err("invalid_path", "Pipeline 在跑,先 pause 才能 sync", 409);
+  }
+  const pipeline = (await pipelineDir.readPipeline(project.path, pipelineId)) as {
+    state?: string;
+    branch?: string;
+    baseBranch?: string;
+    [k: string]: unknown;
+  } | null;
+  if (!pipeline) return err("not_found", `Pipeline not found: ${pipelineId}`, 404);
+  if (pipeline.state === "merged") return err("invalid_path", "Pipeline 已 merged,不需 sync", 409);
+  if (pipeline.state === "queued") return err("invalid_path", "Pipeline 在排隊,等開跑後 pause 才能 sync", 409);
+
+  const baseBranch = pipeline.baseBranch || "main";
+  const branch = pipeline.branch || `pipeline/${pipeline.name || pipelineId}`;
+  const behind = await worktree.behindBaseCount(project.path, pipelineId, baseBranch);
+  if (behind === null) return err("invalid_path", "worktree 不存在,先跑 pipeline 一次再 sync", 400);
+  if (behind === 0) return ok({ ok: true, behind: 0, nothingToDo: true });
+
+  const wt = worktree.worktreePath(project.path, pipelineId);
+  const prompt = syncTicketPrompt({
+    worktreePath: wt,
+    branch,
+    baseBranch,
+    behindCount: behind,
+  });
+  const appendRes = await pipelineDir.appendSyncTicket({
+    projectPath: project.path,
+    pipelineId,
+    prompt,
+    behindCount: behind,
+  });
+  if (!appendRes.ok) return err("invalid_path", appendRes.error, 409);
+
+  const startRes = await orchestrator.start({
+    projectPath: project.path,
+    projectHash: hash,
+    pipelineId,
+  });
+  if (!startRes.ok) {
+    // append 了但 spawn 失敗 → 拔掉避免之後干擾
+    const cur = (await pipelineDir.readPipeline(project.path, pipelineId)) as {
+      tickets?: Array<{ id?: string; mode?: string }>;
+      [k: string]: unknown;
+    } | null;
+    if (cur?.tickets) {
+      const filtered = cur.tickets.filter(
+        (t) => t.mode !== "sync" || t.id !== appendRes.ticket.id
+      );
+      await pipelineDir.writePipeline(project.path, pipelineId, { ...cur, tickets: filtered });
+    }
+    return err("invalid_path", `append OK but spawn failed: ${startRes.error}`, 500);
+  }
+  return ok({ ok: true, behind, ticketId: appendRes.ticket.id });
 }
 
 export async function listNotifs(hash: string): Promise<Response> {
