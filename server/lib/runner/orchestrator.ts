@@ -5,6 +5,7 @@ import * as pipelineDir from "../pipelineDir";
 import * as worktree from "../git/worktree";
 import * as notifs from "../notifs/store";
 import * as ticketWatcher from "./ticketWatcher";
+import * as runLog from "./runLog";
 import { RUNNER_BEHAVIOR_PROMPT } from "./runnerPrompt";
 
 type RunningProcess = {
@@ -81,6 +82,15 @@ export async function start(opts: {
     ...pipeline,
     state: "running",
   });
+
+  // GC:每次 /run 順便修剪累積。logs per-pipeline 留 10、notifs 全 project 留 500。
+  // 失敗安靜忽略,GC 不該擋 runner 起跑。
+  try {
+    runLog.pruneLogs(projectPath, pipelineId, 10);
+    notifs.pruneOldRecords(projectPath, 500);
+  } catch {
+    // skip
+  }
 
   // 3. spawn claude CLI 主 agent (cwd = worktree)
   const sessionId = randomUUID();

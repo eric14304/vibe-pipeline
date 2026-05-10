@@ -8,7 +8,7 @@
 //
 // 也支援沒寫完整(crash 等)的部分檔案 — best effort parse。
 
-import { readdirSync, existsSync } from "node:fs";
+import { readdirSync, existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import * as pipelineDir from "../pipelineDir";
 
@@ -69,6 +69,36 @@ export async function listRuns(
     }
   }
   return out.sort((a, b) => b.startedAt - a.startedAt);
+}
+
+// 該 pipeline 留最新 keep 筆,其餘刪掉。回傳刪除數量。
+// 不 throw — 個別 unlink 失敗安靜忽略,GC 不該擋 runner。
+export function pruneLogs(
+  projectPath: string,
+  pipelineId: string,
+  keep = 10
+): number {
+  const dir = logsDir(projectPath);
+  if (!existsSync(dir)) return 0;
+  const files = readdirSync(dir)
+    .map((f) => {
+      const m = f.match(FILENAME_RE);
+      if (!m || m[1] !== pipelineId) return null;
+      return { name: f, ts: Number(m[2]) };
+    })
+    .filter((x): x is { name: string; ts: number } => x !== null)
+    .sort((a, b) => b.ts - a.ts);
+  if (files.length <= keep) return 0;
+  let deleted = 0;
+  for (const f of files.slice(keep)) {
+    try {
+      unlinkSync(join(dir, f.name));
+      deleted++;
+    } catch {
+      // skip
+    }
+  }
+  return deleted;
 }
 
 export async function getRun(

@@ -85,3 +85,25 @@ export function markAllRead(projectPath: string): void {
 export function dismiss(projectPath: string, id: string): void {
   rewrite(projectPath, (r) => (r.id === id ? null : r));
 }
+
+// 全 project notifs 保留最新 keep 筆(unread / read 不分,純按時序)。
+// JSONL 是 append-only,GC 等於一次性 rewrite。
+// 失敗 (檔不存在 / parse 壞) 安靜忽略。
+export function pruneOldRecords(projectPath: string, keep = 500): number {
+  const f = file(projectPath);
+  if (!existsSync(f)) return 0;
+  let lines: string[];
+  try {
+    lines = readFileSync(f, "utf8").split("\n").filter((l) => l.trim().length > 0);
+  } catch {
+    return 0;
+  }
+  if (lines.length <= keep) return 0;
+  const kept = lines.slice(-keep);
+  try {
+    writeFileSync(f, kept.join("\n") + "\n");
+    return lines.length - keep;
+  } catch {
+    return 0;
+  }
+}
