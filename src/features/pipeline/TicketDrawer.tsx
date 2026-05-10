@@ -116,7 +116,7 @@ export function TicketDrawer({
               <div className="tdrw-actions">
                 {onResetTicket && isTerminalStatus(ticket.status) && (
                   <button type="button"
-                    className="btn btn-ghost tdrw-action"
+                    className="tdrw-action"
                     onClick={async () => {
                       const ok = await confirm({
                         title: `重置 ticket "${ticket.title}" 狀態到 draft?`,
@@ -134,7 +134,7 @@ export function TicketDrawer({
                 )}
                 {onSplitTicket && isSplittable(ticket) && (
                   <button type="button"
-                    className="btn btn-ghost tdrw-action"
+                    className="tdrw-action"
                     onClick={async () => {
                       const ok = await confirm({
                         title: `用 AI 把 "${ticket.title}" 拆成多張獨立 ticket?`,
@@ -152,7 +152,7 @@ export function TicketDrawer({
                 )}
                 {onDeleteTicket && isDeletable(ticket) && (
                   <button type="button"
-                    className="btn btn-ghost tdrw-action tdrw-action-danger"
+                    className="tdrw-action tdrw-action-danger"
                     onClick={async () => {
                       const ok = await confirm({
                         title: `刪除 ticket "${ticket.title}"?`,
