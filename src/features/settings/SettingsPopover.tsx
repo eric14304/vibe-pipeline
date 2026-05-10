@@ -3,9 +3,14 @@ import * as api from "../../api/projects";
 
 const MIN = 1;
 const MAX = 8;
+const MERGE_STRATEGIES: api.MergeStrategy[] = ["merge", "squash", "ff-only"];
+const MERGE_STRATEGY_LABEL: Record<api.MergeStrategy, string> = {
+  merge: "Merge commit",
+  squash: "Squash",
+  "ff-only": "Fast-forward only",
+};
 
-// Project-level Settings popover。目前只露 max_parallel(同時可跑幾條 pipeline)。
-// 其他設定(merge_strategy / cost 上限等)未來再加。
+// Project-level Settings popover。露 max_parallel / default_base_branch / merge_strategy / cost_limit_usd。
 export function SettingsPopover({
   hash,
   open,
@@ -20,7 +25,10 @@ export function SettingsPopover({
   anchorRef: React.RefObject<HTMLElement | null>;
 }) {
   const [cfg, setCfg] = useState<api.ProjectConfig | null>(null);
-  const [draft, setDraft] = useState<number>(2);
+  const [draftMaxParallel, setDraftMaxParallel] = useState<number>(2);
+  const [draftBaseBranch, setDraftBaseBranch] = useState<string>("");
+  const [draftMergeStrategy, setDraftMergeStrategy] = useState<api.MergeStrategy>("merge");
+  const [draftCostLimit, setDraftCostLimit] = useState<string>("0");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -34,7 +42,10 @@ export function SettingsPopover({
       .then((c) => {
         if (cancelled) return;
         setCfg(c);
-        setDraft(c.defaults.max_parallel);
+        setDraftMaxParallel(c.defaults.max_parallel);
+        setDraftBaseBranch(c.defaults.base_branch ?? "");
+        setDraftMergeStrategy(c.defaults.merge_strategy);
+        setDraftCostLimit(String(c.defaults.cost_limit_usd ?? 0));
       })
       .catch((e: Error) => {
         if (cancelled) return;
@@ -67,19 +78,38 @@ export function SettingsPopover({
 
   if (!open) return null;
 
-  const clamped = Math.max(MIN, Math.min(MAX, Math.floor(draft || MIN)));
-  const dirty = cfg ? clamped !== cfg.defaults.max_parallel : false;
+  const clampedMaxParallel = Math.max(MIN, Math.min(MAX, Math.floor(draftMaxParallel || MIN)));
+  const trimmedBase = draftBaseBranch.trim();
+  const parsedCost = Number(draftCostLimit);
+  const costValid = Number.isFinite(parsedCost) && parsedCost >= 0;
+  const baseValid = trimmedBase.length > 0;
+
+  const dirty = cfg
+    ? clampedMaxParallel !== cfg.defaults.max_parallel ||
+      trimmedBase !== (cfg.defaults.base_branch ?? "") ||
+      draftMergeStrategy !== cfg.defaults.merge_strategy ||
+      parsedCost !== cfg.defaults.cost_limit_usd
+    : false;
+  const canSave = dirty && baseValid && costValid;
 
   async function save() {
-    if (!dirty) return;
+    if (!canSave) return;
     setBusy(true);
     setError(null);
     try {
       const next = await api.updateConfig(hash, {
-        defaults: { max_parallel: clamped },
+        defaults: {
+          max_parallel: clampedMaxParallel,
+          default_base_branch: trimmedBase,
+          merge_strategy: draftMergeStrategy,
+          cost_limit_usd: parsedCost,
+        },
       });
       setCfg(next);
-      setDraft(next.defaults.max_parallel);
+      setDraftMaxParallel(next.defaults.max_parallel);
+      setDraftBaseBranch(next.defaults.base_branch ?? "");
+      setDraftMergeStrategy(next.defaults.merge_strategy);
+      setDraftCostLimit(String(next.defaults.cost_limit_usd ?? 0));
       onSaved?.(next);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -87,6 +117,28 @@ export function SettingsPopover({
       setBusy(false);
     }
   }
+
+  const inputStyle: React.CSSProperties = {
+    padding: "4px 8px",
+    border: "1px solid var(--line)",
+    borderRadius: 4,
+    background: "var(--panel)",
+    color: "var(--fg)",
+    fontSize: 13,
+  };
+
+  const labelStyle: React.CSSProperties = {
+    display: "block",
+    marginBottom: 4,
+    fontWeight: 500,
+  };
+
+  const hintStyle: React.CSSProperties = {
+    fontSize: 11,
+    color: "var(--fg-faint)",
+    lineHeight: 1.5,
+    marginBottom: 12,
+  };
 
   return (
     <div
@@ -97,7 +149,7 @@ export function SettingsPopover({
         position: "absolute",
         top: "calc(100% + 6px)",
         right: 0,
-        minWidth: 320,
+        minWidth: 340,
         background: "var(--bg-elevated)",
         border: "1px solid var(--line)",
         borderRadius: 8,
@@ -119,9 +171,7 @@ export function SettingsPopover({
         Project 設定
       </div>
 
-      <label style={{ display: "block", marginBottom: 4, fontWeight: 500 }}>
-        同時可跑 pipeline 數
-      </label>
+      <label style={labelStyle}>同時可跑 pipeline 數</label>
       <div
         style={{
           display: "flex",
@@ -135,37 +185,73 @@ export function SettingsPopover({
           min={MIN}
           max={MAX}
           step={1}
-          value={draft}
-          onChange={(e) => setDraft(Number(e.target.value))}
+          value={draftMaxParallel}
+          onChange={(e) => setDraftMaxParallel(Number(e.target.value))}
           onKeyDown={(e) => {
             if (e.key === "Enter") save();
           }}
           disabled={busy}
           className="mono"
-          style={{
-            width: 64,
-            padding: "4px 8px",
-            border: "1px solid var(--line)",
-            borderRadius: 4,
-            background: "var(--panel)",
-            color: "var(--fg)",
-            fontSize: 13,
-          }}
+          style={{ ...inputStyle, width: 64 }}
         />
         <span className="mono" style={{ fontSize: 11, color: "var(--fg-faint)" }}>
           範圍 {MIN}–{MAX}
         </span>
       </div>
-      <div
-        style={{
-          fontSize: 11,
-          color: "var(--fg-faint)",
-          lineHeight: 1.5,
-          marginBottom: 12,
-        }}
-      >
+      <div style={hintStyle}>
         達到上限後新 Run 會排隊,前面跑完自動接棒。每條走獨立 worktree。
       </div>
+
+      <label style={labelStyle}>預設 base branch</label>
+      <input
+        type="text"
+        value={draftBaseBranch}
+        onChange={(e) => setDraftBaseBranch(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") save();
+        }}
+        disabled={busy}
+        placeholder={cfg?.defaults.base_branch || "main"}
+        className="mono"
+        style={{ ...inputStyle, width: "100%", marginBottom: 6, boxSizing: "border-box" }}
+      />
+      <div style={hintStyle}>
+        新 pipeline 預設從這個 branch 切;merge 也回到這裡。空白不可送。
+      </div>
+
+      <label style={labelStyle}>合併方式</label>
+      <select
+        value={draftMergeStrategy}
+        onChange={(e) => setDraftMergeStrategy(e.target.value as api.MergeStrategy)}
+        disabled={busy}
+        style={{ ...inputStyle, width: "100%", marginBottom: 6, boxSizing: "border-box" }}
+      >
+        {MERGE_STRATEGIES.map((s) => (
+          <option key={s} value={s}>
+            {MERGE_STRATEGY_LABEL[s]}
+          </option>
+        ))}
+      </select>
+      <div style={hintStyle}>
+        AI 合併執行 git merge 時的策略。Merge commit 保留 ticket commit chain。
+      </div>
+
+      <label style={labelStyle}>Cost 上限 (USD)</label>
+      <input
+        type="number"
+        min={0}
+        step={0.01}
+        value={draftCostLimit}
+        onChange={(e) => setDraftCostLimit(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") save();
+        }}
+        disabled={busy}
+        placeholder="0 = 無限"
+        className="mono"
+        style={{ ...inputStyle, width: 120, marginBottom: 6 }}
+      />
+      <div style={hintStyle}>0 = 無限。超過上限會擋下新的 /run 並發 notif。</div>
 
       {error && (
         <div
@@ -182,20 +268,23 @@ export function SettingsPopover({
       )}
 
       <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-        <button
-          type="button"
-          className="btn"
-          onClick={onClose}
-          disabled={busy}
-        >
+        <button type="button" className="btn" onClick={onClose} disabled={busy}>
           關閉
         </button>
         <button
           type="button"
           className="btn btn-primary"
           onClick={save}
-          disabled={!dirty || busy}
-          title={!dirty ? "尚未變更" : `儲存 max_parallel=${clamped}`}
+          disabled={!canSave || busy}
+          title={
+            !dirty
+              ? "尚未變更"
+              : !baseValid
+              ? "base branch 不可空白"
+              : !costValid
+              ? "cost 上限需 >= 0"
+              : "儲存"
+          }
         >
           {busy ? "儲存中…" : "儲存"}
         </button>

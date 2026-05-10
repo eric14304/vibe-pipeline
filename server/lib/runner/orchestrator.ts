@@ -32,6 +32,54 @@ function key(projectHash: string, pipelineId: string): string {
   return `${projectHash}:${pipelineId}`;
 }
 
+// 算該 project 所有 pipeline 的累積花費。
+// 來源優先序:ticket.runs[].cost(若 runner 有寫入)→ fallback 解析 runtime/logs/<pipelineId>-<ts>.log。
+// 已 merged / failed / paused 也算。算不出來就當 0,絕不擋住 /run。
+async function computeProjectSpent(projectPath: string): Promise<number> {
+  let total = 0;
+  try {
+    const pipelines = (await pipelineDir.listPipelines(projectPath)) as Array<{
+      id?: string;
+      tickets?: Array<{
+        runs?: Array<{ cost?: number }>;
+        [k: string]: unknown;
+      }>;
+      [k: string]: unknown;
+    }>;
+    for (const p of pipelines) {
+      if (!p.id) continue;
+      let pipelineCost = 0;
+      let foundTicketCost = false;
+      for (const t of p.tickets ?? []) {
+        for (const r of t.runs ?? []) {
+          if (typeof r.cost === "number" && Number.isFinite(r.cost)) {
+            pipelineCost += r.cost;
+            foundTicketCost = true;
+          }
+        }
+      }
+      if (foundTicketCost) {
+        total += pipelineCost;
+        continue;
+      }
+      // fallback:沒 ticket-level cost,sum log 解析結果
+      try {
+        const runs = await runLog.listRuns(projectPath, p.id);
+        for (const r of runs) {
+          if (typeof r.costUsd === "number" && Number.isFinite(r.costUsd)) {
+            total += r.costUsd;
+          }
+        }
+      } catch {
+        // log 解析失敗當 0
+      }
+    }
+  } catch {
+    return 0;
+  }
+  return total;
+}
+
 export function isRunning(projectHash: string, pipelineId: string): boolean {
   return running.has(key(projectHash, pipelineId));
 }
@@ -100,11 +148,15 @@ async function dispatch(projectPath: string, projectHash: string): Promise<void>
 //   - 既有 state guard(running/stopping/merged/queued + ready 沒可跑 ticket)擋
 //   - slot 滿 → 標 queued + emit pipeline_queued + enqueue,不 spawn
 //   - slot 沒滿 → 直接 spawn(走 spawnDirect)
+export type StartResult =
+  | { ok: true; queued?: boolean; position?: number }
+  | { ok: false; error: string; reason?: "budget_exceeded"; spent?: number; limit?: number };
+
 export async function start(opts: {
   projectPath: string;
   projectHash: string;
   pipelineId: string;
-}): Promise<{ ok: true; queued?: boolean; position?: number } | { ok: false; error: string }> {
+}): Promise<StartResult> {
   const { projectPath, projectHash, pipelineId } = opts;
   const k = key(projectHash, pipelineId);
 
@@ -143,6 +195,29 @@ export async function start(opts: {
     );
     if (!hasRunnable) {
       return { ok: false, error: "Pipeline 沒待跑的 ticket(append 新 ticket 或 reset 既有的)" };
+    }
+  }
+
+  // Budget check:cost_limit_usd > 0 且 累積 spent >= limit 時擋下。
+  // 不改 pipeline state(維持當前)。emit pipeline_blocked_budget notif。
+  const resolved = await pipelineDir.getResolvedDefaults(projectPath);
+  const limit = resolved.cost_limit_usd;
+  if (limit > 0) {
+    const spent = await computeProjectSpent(projectPath);
+    if (spent >= limit) {
+      notifs.emit(projectPath, {
+        type: "pipeline_blocked_budget",
+        title: `${pipeline.name || pipelineId} 被預算上限擋下`,
+        sub: `已花 $${spent.toFixed(4)} / 上限 $${limit.toFixed(2)}`,
+        pipelineId,
+      });
+      return {
+        ok: false,
+        error: `已達預算上限($${spent.toFixed(4)} / $${limit.toFixed(2)})`,
+        reason: "budget_exceeded",
+        spent,
+        limit,
+      };
     }
   }
 
@@ -307,7 +382,7 @@ async function spawnDirect(opts: {
         if (final?.state === "merged") {
           try {
             const cfg = await pipelineDir.readConfig(projectPath);
-            const strategy = cfg.defaults?.merge_strategy as string | undefined;
+            const strategy = pipelineDir.normalizeMergeStrategy(cfg.defaults?.merge_strategy);
             if (strategy !== "squash") {
               const base = final?.baseBranch || "main";
               const rebaseRes = await worktree.rebaseOntoBase(projectPath, pipelineId, base);
