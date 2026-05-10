@@ -506,6 +506,20 @@ export async function revealWorktree(hash: string, pipelineId: string): Promise<
   return ok({ ok: true, path });
 }
 
+// POST /api/projects/:hash/pipelines/:id/worktree/prune
+// 獨立 prune worktree(不刪 pipeline.json)。給 user 想清 worktree dir 但保留 ticket 紀錄用。
+// running 中擋(避免砍掉 runner 的 cwd);其他 state 一律可。
+export async function pruneWorktreeRoute(hash: string, pipelineId: string): Promise<Response> {
+  const project = await projectStore.findByHash(hash);
+  if (!project) return err("not_found", `Project not found: ${hash}`, 404);
+  if (orchestrator.isRunning(hash, pipelineId)) {
+    return err("invalid_path", "Pipeline 還在跑,先 pause 再 prune", 409);
+  }
+  const r = await worktree.removeQuiet(project.path, pipelineId);
+  if (!r.ok) return err("internal_error", r.error ?? "prune failed", 500);
+  return ok({ ok: true });
+}
+
 // GET /api/projects/:hash/config — 回完整四欄(含 fallback 預設)
 export async function getConfig(hash: string): Promise<Response> {
   const project = await projectStore.findByHash(hash);

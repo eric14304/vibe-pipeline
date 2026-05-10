@@ -109,6 +109,13 @@ export function revealWorktree(hash: string, id: string): Promise<{ ok: true; pa
   );
 }
 
+export function pruneWorktree(hash: string, id: string): Promise<{ ok: true }> {
+  return call<{ ok: true }>(
+    `/api/projects/${hash}/pipelines/${id}/worktree/prune`,
+    { method: "POST" }
+  );
+}
+
 export function runPipeline(hash: string, id: string): Promise<{ ok: true }> {
   return call<{ ok: true }>(`/api/projects/${hash}/pipelines/${id}/run`, { method: "POST" });
 }

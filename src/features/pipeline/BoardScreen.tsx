@@ -721,6 +721,16 @@ export function BoardScreen({
                 setActionError(`開啟 worktree 失敗: ${e instanceof Error ? e.message : String(e)}`);
               }
             }}
+            onPruneWorktree={async (pid) => {
+              if (!project) return;
+              try {
+                await api.pruneWorktree(project.hash, pid);
+                setReloadKey((k) => k + 1);
+                setActionError("✓ worktree 已清除");
+              } catch (e) {
+                setActionError(`清除 worktree 失敗: ${e instanceof Error ? e.message : String(e)}`);
+              }
+            }}
             onMerge={async (pid) => {
               if (!project) return;
               // merge 流程本身已含「AI 解衝突」+ 「事後 auto-rebase worktree」,pre-sync 多餘,直接走

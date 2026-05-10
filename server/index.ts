@@ -99,6 +99,13 @@ async function handle(req: Request): Promise<Response> {
       return projects.revealWorktree(hash, worktreeRevealMatch[1]);
     }
 
+    const worktreePruneMatch = rest.match(
+      /^\/pipelines\/([a-z0-9_-]+)\/worktree\/prune$/
+    );
+    if (worktreePruneMatch && method === "POST") {
+      return projects.pruneWorktreeRoute(hash, worktreePruneMatch[1]);
+    }
+
     const diffStatMatch = rest.match(/^\/pipelines\/([a-z0-9_-]+)\/diff-stat$/);
     if (diffStatMatch && method === "GET") {
       return projects.pipelineDiffStat(hash, diffStatMatch[1]);

@@ -137,6 +137,7 @@ export function FocusColumn({
   onRename,
   onResetAll,
   onRevealWorktree,
+  onPruneWorktree,
   onMerge,
   onSync,
   onToggleAutoMerge,
@@ -155,6 +156,7 @@ export function FocusColumn({
   onRename?: (pipelineId: string, newName: string) => void;
   onResetAll?: (pipelineId: string) => void;
   onRevealWorktree?: (pipelineId: string) => void;
+  onPruneWorktree?: (pipelineId: string) => void;
   onMerge?: (pipelineId: string) => void;
   onSync?: (pipelineId: string) => void;
   onToggleAutoMerge?: (pipelineId: string, next: boolean) => void;
@@ -430,6 +432,7 @@ export function FocusColumn({
             lockedByState={lockedByState}
             onResetAll={onResetAll}
             onRevealWorktree={onRevealWorktree}
+            onPruneWorktree={onPruneWorktree}
             onDelete={onDelete}
           />
         </div>
@@ -517,6 +520,7 @@ function OverflowMenu({
   lockedByState,
   onResetAll,
   onRevealWorktree,
+  onPruneWorktree,
   onDelete,
 }: {
   pipeline: Pipeline;
@@ -524,6 +528,7 @@ function OverflowMenu({
   lockedByState: boolean;
   onResetAll?: (id: string) => void;
   onRevealWorktree?: (id: string) => void;
+  onPruneWorktree?: (id: string) => void;
   onDelete?: (id: string) => void;
 }) {
   const confirm = useConfirm();
@@ -546,7 +551,7 @@ function OverflowMenu({
   }, [open]);
 
   // 沒任何 action 可做就不顯示
-  if (!onResetAll && !onRevealWorktree && !onDelete) return null;
+  if (!onResetAll && !onRevealWorktree && !onPruneWorktree && !onDelete) return null;
 
   return (
     <div ref={wrapRef} style={{ position: "relative", display: "inline-block" }}>
@@ -591,6 +596,27 @@ function OverflowMenu({
               }}
             />
           )}
+          {onPruneWorktree && (
+            <MenuItem
+              icon={<span>🧹</span>}
+              label="清除 worktree"
+              hint={lockedByState ? "running 中" : "git worktree remove + 刪 dir"}
+              disabled={lockedByState}
+              onClick={async () => {
+                setOpen(false);
+                const ok = await confirm({
+                  title: `清除 worktree "${pipeline.name}"?`,
+                  description:
+                    `會把 ~/.vibe-pipeline/worktrees/<projHash>/${pipeline.id}/ 整個刪掉,git worktree 註冊也清。\n` +
+                    `branch 跟已 commit 的程式碼留著(在 base / 其他 branch 仍看得到)。pipeline.json 留著不動。\n` +
+                    `下次 Run 會自動重建 worktree。`,
+                  confirmLabel: "清除",
+                  danger: true,
+                });
+                if (ok) onPruneWorktree(pipeline.id);
+              }}
+            />
+          )}
           {onResetAll && hasResettable && (
             <MenuItem
               icon={<span>↺</span>}
@@ -632,7 +658,8 @@ function OverflowMenu({
                 const ok = await confirm({
                   title: `刪除 pipeline "${pipeline.name}"?`,
                   description:
-                    `pipeline.json 會清掉,但 worktree (~/.vibe-pipeline/worktrees/...) 留著。`,
+                    `會清掉 pipeline.json + 對應 worktree (~/.vibe-pipeline/worktrees/...)。\n` +
+                    `branch 跟已 commit 的程式碼留著(可在 base branch 看到)。`,
                   confirmLabel: "刪除",
                   danger: true,
                 });
