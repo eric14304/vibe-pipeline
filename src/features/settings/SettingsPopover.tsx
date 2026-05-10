@@ -95,6 +95,7 @@ export function SettingsPopover({
   const [draftMaxParallel, setDraftMaxParallel] = useState<number>(2);
   const [draftBaseBranch, setDraftBaseBranch] = useState<string>("");
   const [draftCostLimit, setDraftCostLimit] = useState<string>("0");
+  const [draftAutoMerge, setDraftAutoMerge] = useState<boolean>(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -115,6 +116,7 @@ export function SettingsPopover({
         setDraftMaxParallel(c.defaults.max_parallel);
         setDraftBaseBranch(c.defaults.base_branch ?? "");
         setDraftCostLimit(String(c.defaults.cost_limit_usd ?? 0));
+        setDraftAutoMerge(!!c.defaults.auto_merge);
       })
       .catch((e: Error) => {
         if (cancelled) return;
@@ -201,7 +203,8 @@ export function SettingsPopover({
   const dirty = cfg
     ? clampedMaxParallel !== cfg.defaults.max_parallel ||
       trimmedBase !== (cfg.defaults.base_branch ?? "") ||
-      parsedCost !== cfg.defaults.cost_limit_usd
+      parsedCost !== cfg.defaults.cost_limit_usd ||
+      draftAutoMerge !== !!cfg.defaults.auto_merge
     : false;
   const canSave = dirty && baseValid && costValid;
 
@@ -215,12 +218,14 @@ export function SettingsPopover({
           max_parallel: clampedMaxParallel,
           default_base_branch: trimmedBase,
           cost_limit_usd: parsedCost,
+          auto_merge: draftAutoMerge,
         },
       });
       setCfg(next);
       setDraftMaxParallel(next.defaults.max_parallel);
       setDraftBaseBranch(next.defaults.base_branch ?? "");
       setDraftCostLimit(String(next.defaults.cost_limit_usd ?? 0));
+      setDraftAutoMerge(!!next.defaults.auto_merge);
       onSaved?.(next);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -346,6 +351,28 @@ export function SettingsPopover({
         style={{ ...inputStyle, width: 120, marginBottom: 6 }}
       />
       <div style={hintStyle}>0 = 無限。超過上限會擋下新的 /run 並發 notif。</div>
+
+      <label
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 4,
+          cursor: busy ? "not-allowed" : "pointer",
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={draftAutoMerge}
+          onChange={(e) => setDraftAutoMerge(e.target.checked)}
+          disabled={busy}
+        />
+        <span style={{ fontWeight: 500 }}>新 pipeline 預設啟用「自動 merge」</span>
+      </label>
+      <div style={hintStyle}>
+        全 ticket done 進 ready 後,backend 自動 append merge ticket 走既有 runner 流程,不用人按。
+        失敗(working tree 髒 / merge ticket FAIL)走原本錯誤路徑,不重試。每條 pipeline 也可單獨切換。
+      </div>
 
       <div
         style={{

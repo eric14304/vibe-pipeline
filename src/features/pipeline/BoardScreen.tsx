@@ -45,6 +45,7 @@ export function BoardScreen({
   const [openTicket, setOpenTicket] = useState<Ticket | null>(null);
   const [branches, setBranches] = useState<string[]>([]);
   const [maxParallel, setMaxParallel] = useState<number>(0);
+  const [defaultAutoMerge, setDefaultAutoMerge] = useState<boolean>(false);
 
   const [inboxState, setInboxState] = useState<InboxState>("collapsed");
   const [filter, setFilter] = useState<InboxFilter>("all");
@@ -219,6 +220,7 @@ export function BoardScreen({
       .then((c) => {
         if (cancelled) return;
         setMaxParallel(c.defaults.max_parallel);
+        setDefaultAutoMerge(!!c.defaults.auto_merge);
       })
       .catch(() => {});
     return () => {
@@ -267,7 +269,15 @@ export function BoardScreen({
     [activeId, pipelines]
   );
 
-  async function handleCreate({ name, baseBranch }: { name: string; baseBranch: string }) {
+  async function handleCreate({
+    name,
+    baseBranch,
+    autoMerge,
+  }: {
+    name: string;
+    baseBranch: string;
+    autoMerge: boolean;
+  }) {
     if (!project) return;
     const body = {
       name,
@@ -275,6 +285,7 @@ export function BoardScreen({
       baseBranch,
       state: "planning" as const,
       tickets: [],
+      autoMerge,
     };
     try {
       const created = (await api.createPipeline(project.hash, body)) as Pipeline;
@@ -311,7 +322,10 @@ export function BoardScreen({
       settingsSlot={
         <SettingsButton
           hash={hash}
-          onConfigSaved={(cfg) => setMaxParallel(cfg.defaults.max_parallel)}
+          onConfigSaved={(cfg) => {
+            setMaxParallel(cfg.defaults.max_parallel);
+            setDefaultAutoMerge(!!cfg.defaults.auto_merge);
+          }}
         />
       }
     />
@@ -589,6 +603,7 @@ export function BoardScreen({
               onSubmit={handleCreate}
               existingNames={pipelines.map((p) => p.name)}
               branches={branches}
+              defaultAutoMerge={defaultAutoMerge}
             />
           }
         />
@@ -731,6 +746,26 @@ export function BoardScreen({
                 setActionError(`觸發 AI 同步失敗: ${e instanceof Error ? e.message : String(e)}`);
               }
             }}
+            onToggleAutoMerge={async (pid, nextValue) => {
+              if (!project) return;
+              const target = pipelines.find((p) => p.id === pid);
+              if (!target) return;
+              const next: Pipeline = { ...target, autoMerge: nextValue };
+              // optimistic 先更
+              setPipelines((arr) => arr.map((p) => (p.id === pid ? next : p)));
+              try {
+                await api.savePipeline(project.hash, pid, next);
+                setActionError(
+                  nextValue
+                    ? "✓ 已啟用 auto-merge(ready 後自動合併)"
+                    : "✓ 已關閉 auto-merge"
+                );
+              } catch (e) {
+                // rollback
+                setPipelines((arr) => arr.map((p) => (p.id === pid ? target : p)));
+                setActionError(`切換 auto-merge 失敗: ${e instanceof Error ? e.message : String(e)}`);
+              }
+            }}
           />
         )
       }
@@ -747,6 +782,9 @@ const SEV_BY_EVENT: Record<string, "block" | "info" | "muted"> = {
   pipeline_ready_to_merge: "info",
   pipeline_failed: "block",
   pipeline_merged: "info",
+  pipeline_auto_merge_started: "info",
+  merge_started: "muted",
+  merge_blocked: "block",
   ticket_started: "muted",
   ticket_done: "info",
   ticket_failed: "block",

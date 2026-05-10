@@ -440,6 +440,14 @@ async function spawnDirect(opts: {
     } finally {
       running.delete(k);
       ticketWatcher.stop({ projectHash, pipelineId });
+      // Auto-merge:pipeline 收尾後若 state=ready && autoMerge → 直接觸發 AI merge。
+      // 必須在 running.delete 之後,讓 triggerMerge 內的 orchestrator.start 看得到空 slot。
+      // 不擋 dispatch — 即使 auto-merge spawn 自己也走 start(若 slot 滿會自己進 queue)。
+      try {
+        await maybeAutoMerge({ projectPath, projectHash, pipelineId });
+      } catch (e) {
+        console.error(`[runner ${pipelineId}] maybeAutoMerge failed:`, e);
+      }
       // slot 釋出,看看 queue 有沒有 pending 接棒
       dispatch(projectPath, projectHash).catch((e) =>
         console.error(`[runner ${pipelineId}] dispatch after exit failed:`, e)
@@ -448,6 +456,76 @@ async function spawnDirect(opts: {
   })();
 
   return { ok: true };
+}
+
+// Pipeline 進入 ready 後,若 autoMerge=true 且當前 state=ready → 自動觸發 AI 合併。
+// 走跟手動 /merge 同一條 triggerMerge,因此 slot 滿會自然進 queue。
+// 失敗(working tree 髒 / spawn 失敗等)→ 寫 lastAutoMergeError + emit notif,不重試。
+// 用 dynamic import 避免 orchestrator <-> pipelineMerge 循環(pipelineMerge 也 import 本檔)。
+async function maybeAutoMerge(opts: {
+  projectPath: string;
+  projectHash: string;
+  pipelineId: string;
+}): Promise<void> {
+  const { projectPath, projectHash, pipelineId } = opts;
+  const pipeline = (await pipelineDir.readPipeline(projectPath, pipelineId)) as {
+    state?: string;
+    name?: string;
+    autoMerge?: boolean;
+    [k: string]: unknown;
+  } | null;
+  if (!pipeline) return;
+  // 自動 merge 觸發條件:autoMerge=true && state===ready && 不在 merged/merging/failed
+  // (merged 已合過、merging 沒這個 state、failed 不重試)
+  if (!pipeline.autoMerge) return;
+  if (pipeline.state !== "ready") return;
+
+  const name = pipeline.name || pipelineId;
+  notifs.emit(projectPath, {
+    type: "pipeline_auto_merge_started",
+    title: `${name} 自動合併已觸發`,
+    sub: "全 ticket done → autoMerge=true",
+    pipelineId,
+  });
+
+  // 清掉之前的 lastAutoMergeError(重新嘗試)
+  if (pipeline.lastAutoMergeError !== undefined) {
+    await pipelineDir.writePipeline(projectPath, pipelineId, {
+      ...pipeline,
+      lastAutoMergeError: undefined,
+    });
+  }
+
+  try {
+    // dynamic import 拆循環依賴
+    const { triggerMerge } = await import("../pipelineMerge");
+    const r = await triggerMerge({
+      projectPath,
+      projectHash,
+      pipelineId,
+      hasGit: true, // ready 時必然有 git(否則跑不到這一刻)
+    });
+    if (!r.ok) {
+      // 把錯誤回寫進 pipeline,前端可顯示 + emit merge_blocked
+      const cur = (await pipelineDir.readPipeline(projectPath, pipelineId)) as {
+        [k: string]: unknown;
+      } | null;
+      if (cur) {
+        await pipelineDir.writePipeline(projectPath, pipelineId, {
+          ...cur,
+          lastAutoMergeError: r.error,
+        });
+      }
+      notifs.emit(projectPath, {
+        type: "merge_blocked",
+        title: `${name} 自動合併失敗`,
+        sub: r.error,
+        pipelineId,
+      });
+    }
+  } catch (e) {
+    console.error(`[autoMerge ${pipelineId}] failed:`, e);
+  }
 }
 
 // Pause: 標 pipeline.state = "stopping",主 agent 跑完當前 ticket 看到後自己標 paused 退出
@@ -633,6 +711,11 @@ async function startMockRunner(opts: {
     } finally {
       running.delete(k);
       ticketWatcher.stop({ projectHash, pipelineId });
+      try {
+        await maybeAutoMerge({ projectPath, projectHash, pipelineId });
+      } catch (e) {
+        console.error(`[mock runner ${pipelineId}] maybeAutoMerge failed:`, e);
+      }
       dispatch(projectPath, projectHash).catch((e) =>
         console.error(`[mock runner ${pipelineId}] dispatch after exit failed:`, e)
       );

@@ -139,6 +139,7 @@ export function FocusColumn({
   onRevealWorktree,
   onMerge,
   onSync,
+  onToggleAutoMerge,
   existingNames = [],
   onTicketClick,
   projectHash,
@@ -156,6 +157,7 @@ export function FocusColumn({
   onRevealWorktree?: (pipelineId: string) => void;
   onMerge?: (pipelineId: string) => void;
   onSync?: (pipelineId: string) => void;
+  onToggleAutoMerge?: (pipelineId: string, next: boolean) => void;
   existingNames?: string[];
   onTicketClick?: (ticket: Ticket) => void;
   projectHash?: string;
@@ -382,6 +384,34 @@ export function FocusColumn({
           </button>
 
           <span style={{ flex: 1 }} />
+
+          {onToggleAutoMerge && (
+            <label
+              className="chip mono"
+              title={
+                pipeline.autoMerge
+                  ? "ready 後自動 merge(關掉)"
+                  : "ready 後自動 merge(打開)"
+              }
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                cursor: "pointer",
+                fontSize: 11,
+                color: pipeline.autoMerge ? "var(--done)" : "var(--fg-mute)",
+                borderColor: pipeline.autoMerge ? "var(--done)" : "var(--line)",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={!!pipeline.autoMerge}
+                onChange={(e) => onToggleAutoMerge(pipeline.id, e.target.checked)}
+                style={{ margin: 0 }}
+              />
+              auto-merge
+            </label>
+          )}
 
           <RunButton
             pipeline={pipeline}

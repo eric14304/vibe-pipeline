@@ -49,6 +49,7 @@ export type ProjectConfig = {
     base_branch: string;
     max_parallel: number;
     cost_limit_usd: number;
+    auto_merge: boolean;
   };
 };
 
@@ -57,6 +58,7 @@ export type ProjectConfigPatch = {
     max_parallel?: number;
     default_base_branch?: string;
     cost_limit_usd?: number;
+    auto_merge?: boolean;
   };
 };
 

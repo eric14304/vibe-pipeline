@@ -213,6 +213,10 @@ export type Pipeline = {
   baseBranch?: string;
   mergedAt?: number;
   mergeCommit?: { hash: string; subject: string; ts: number };
+  // Pipeline ready 後是否自動觸發 AI 合併。建 pipeline 時若 body 未指定就讀 project config defaults.auto_merge
+  autoMerge?: boolean;
+  // 上一次自動 merge 嘗試失敗的訊息(preflight 失敗 / runner FAIL 都可寫)。重觸發時清掉
+  lastAutoMergeError?: string;
 };
 
 // ─── Run log(.runtime/logs/<pipelineId>-<ts>.log 解析結果) ───
@@ -288,6 +292,7 @@ export type NotifEventType =
   | "pipeline_ready_to_merge"
   | "merge_started"
   | "merge_blocked"
+  | "pipeline_auto_merge_started"
   | "pipeline_merged"
   | "pipeline_failed"
   | "budget_warn"
@@ -337,6 +342,7 @@ export const NOTIF_EVENTS: Record<NotifEventType, NotifEventMeta> = {
   pipeline_ready_to_merge: { sev: "info", phase: "P2", label: "Pipeline ready to merge" },
   merge_started: { sev: "muted", phase: "P2", label: "AI 合併開始" },
   merge_blocked: { sev: "block", phase: "P2", label: "AI 合併失敗,需處理" },
+  pipeline_auto_merge_started: { sev: "info", phase: "P2", label: "Pipeline 自動合併已觸發" },
   pipeline_merged: { sev: "info", phase: "P2", label: "Pipeline merge 完成" },
   pipeline_failed: { sev: "block", phase: "P2", label: "Pipeline failed" },
   budget_warn: { sev: "info", phase: "P2", label: "Budget 80% 警告" },
