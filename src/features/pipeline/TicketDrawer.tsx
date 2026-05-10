@@ -295,7 +295,7 @@ function IterLimitField({
     return <span>上限 {value} 輪</span>;
   }
   function commit() {
-    const n = Math.max(1, Math.min(20, Math.floor(Number(draft) || value)));
+    const n = Math.max(1, Math.min(5, Math.floor(Number(draft) || value)));
     setDraft(String(n));
     if (n !== value) onChange?.(ticket.id, n);
   }
@@ -305,7 +305,7 @@ function IterLimitField({
       <input
         type="number"
         min={1}
-        max={20}
+        max={5}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
@@ -318,7 +318,7 @@ function IterLimitField({
             (e.target as HTMLInputElement).blur();
           }
         }}
-        title="迭代上限輪數 (1-20),Enter 送 / Esc 還原"
+        title="迭代上限輪數 (1-5),Enter 送 / Esc 還原"
         className="tdrw-iter-limit"
       />
       <span style={{ color: "var(--fg-mute)" }}>輪</span>
