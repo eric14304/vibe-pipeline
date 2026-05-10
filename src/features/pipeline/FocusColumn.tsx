@@ -598,7 +598,7 @@ function OverflowMenu({
           )}
           {onPruneWorktree && (
             <MenuItem
-              icon={<span>🧹</span>}
+              icon={<span>⊘</span>}
               label="清除 worktree"
               hint={lockedByState ? "running 中" : "git worktree remove + 刪 dir"}
               disabled={lockedByState}
@@ -650,7 +650,7 @@ function OverflowMenu({
             <MenuItem
               icon={<span>⌫</span>}
               label="刪除 pipeline"
-              hint={lockedByState ? "running 中" : "worktree 不動"}
+              hint={lockedByState ? "running 中" : "順手 prune worktree"}
               disabled={lockedByState}
               danger
               onClick={async () => {
