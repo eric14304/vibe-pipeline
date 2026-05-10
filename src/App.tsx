@@ -5,6 +5,7 @@ import { BoardScreen } from "./features/pipeline/BoardScreen";
 import { InitScreen } from "./features/init/InitScreen";
 import { DrawerStage, type DrawerState } from "./features/drawer/DrawerStage";
 import { QAScreen, type QAVariant } from "./features/qa/QAScreen";
+import { StatesGallery } from "./features/dev/StatesGallery";
 import type { InboxFilter, InboxState } from "./types/notif";
 
 // Theme priority: URL ?theme=  →  localStorage  →  default light
@@ -67,6 +68,11 @@ function QARoute() {
   return <QAScreen variant={variant} autoplay={autoplay} />;
 }
 
+function StatesRoute() {
+  useTheme();
+  return <StatesGallery />;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -77,6 +83,7 @@ export default function App() {
         <Route path="/init" element={<InitRoute />} />
         <Route path="/drawer" element={<DrawerRoute />} />
         <Route path="/qa" element={<QARoute />} />
+        <Route path="/dev/states" element={<StatesRoute />} />
       </Routes>
     </BrowserRouter>
   );

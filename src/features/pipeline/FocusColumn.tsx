@@ -5,7 +5,9 @@ import type { IterStage, Pipeline, Ticket, TicketStatus } from "../../types/pipe
 import * as api from "../../api/projects";
 import type { RunSummary } from "../../api/projects";
 
-function RunButton({
+// RunButton 狀態決策表(authoritative)— 加新 PipelineState 一定要在 switch 補,
+// 不然 TS exhaustive `never` 編譯就 fail。
+export function RunButton({
   pipeline,
   onRun,
   onPause,
@@ -18,63 +20,70 @@ function RunButton({
 }) {
   const s = pipeline.state;
   const noTickets = pipeline.tickets.length === 0;
-  if (s === "running") {
-    return (
-      <button className="btn" onClick={() => onPause?.(pipeline.id)} title="暫停">
-        ⏸ 暫停
-      </button>
-    );
-  }
-  if (s === "stopping") {
-    return (
-      <button className="btn" disabled title="停止中…">
-        <span className="qadr-thinking-dots" style={{ display: "inline-flex", verticalAlign: "middle" }}>
-          <span /><span /><span />
-        </span>{" "}
-        停止中
-      </button>
-    );
-  }
-  if (s === "ready") {
-    return (
-      <button className="btn" disabled title="所有 ticket 已完成">
-        ✓ 全部完成
-      </button>
-    );
-  }
-  if (s === "merged") {
-    return (
-      <button className="btn" disabled title="Pipeline 已合併進 base branch,要再跑開新 pipeline">
-        ✓ 已合併
-      </button>
-    );
-  }
-  // planning / paused / failed → run / continue
-  // noTickets 時改顯示「先建 ticket」並用 ghost 樣式(視覺上不顯眼,引導去 + ticket)
-  if (noTickets) {
-    return (
-      <button className="btn" disabled title="按上方「+ ticket」開 QA 建第一張">
-        無ticket可執行
-      </button>
-    );
-  }
   const lastDur = lastRun?.durationMs ? fmtRunDur(lastRun.durationMs) : null;
-  const titleBase = s === "paused" ? "繼續" : "開始運行";
-  const title = lastDur ? `${titleBase}(上次 ${lastDur})` : titleBase;
-  return (
-    <button
-      className="btn btn-primary"
-      onClick={() => onRun?.(pipeline.id)}
-      title={title}
-    >
-      ▶ {s === "paused" ? "繼續" : "開始運行"}
-      {lastDur && (
-        <span className="mono" style={{ opacity: 0.7, marginLeft: 6, fontSize: 11 }}>
-          ~{lastDur}
-        </span>
-      )}
-    </button>
-  );
+
+  switch (s) {
+    case "running":
+      return (
+        <button className="btn" onClick={() => onPause?.(pipeline.id)} title="暫停">
+          ⏸ 暫停
+        </button>
+      );
+    case "stopping":
+      return (
+        <button className="btn" disabled title="停止中…">
+          <span className="qadr-thinking-dots" style={{ display: "inline-flex", verticalAlign: "middle" }}>
+            <span /><span /><span />
+          </span>{" "}
+          停止中
+        </button>
+      );
+    case "ready":
+      return (
+        <button className="btn" disabled title="所有 ticket 已完成">
+          ✓ 全部完成
+        </button>
+      );
+    case "merged":
+      return (
+        <button className="btn" disabled title="Pipeline 已合併進 base branch,要再跑開新 pipeline">
+          ✓ 已合併
+        </button>
+      );
+    case "planning":
+    case "paused":
+    case "failed": {
+      if (noTickets) {
+        return (
+          <button className="btn" disabled title="按上方「+ ticket」開 QA 建第一張">
+            無ticket可執行
+          </button>
+        );
+      }
+      const titleBase = s === "paused" ? "繼續" : s === "failed" ? "重試" : "開始運行";
+      const title = lastDur ? `${titleBase}(上次 ${lastDur})` : titleBase;
+      return (
+        <button
+          className="btn btn-primary"
+          onClick={() => onRun?.(pipeline.id)}
+          title={title}
+        >
+          ▶ {titleBase}
+          {lastDur && (
+            <span className="mono" style={{ opacity: 0.7, marginLeft: 6, fontSize: 11 }}>
+              ~{lastDur}
+            </span>
+          )}
+        </button>
+      );
+    }
+    default: {
+      // exhaustive check:加新 PipelineState 沒在上面 case 補,這裡會 type error
+      const _exhaustive: never = s;
+      void _exhaustive;
+      return null;
+    }
+  }
 }
 
 function fmtRunDur(ms: number): string {
