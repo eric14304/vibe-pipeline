@@ -221,7 +221,20 @@ export async function finalize(hash: string, draftId: string, req: Request): Pro
   await pipelineDir.writePipeline(project.path, draft.pipelineId, updatedPipeline);
   await draftStore.deleteDraft(project.path, draftId);
 
-  return ok({ ticket, pipeline: updatedPipeline });
+  // 自動 split-check:跑一次 splitTicketSpec 評估這 spec 是否該拆。
+  // 同步等結果(finalize 多 5-15s,可接受);失敗(claude 缺 / parse 異常)安靜跳過,不擋 ticket 落地。
+  // N >= 2 → 回 splitSuggestion 給前端,讓 user 看 toast 決定要不要走拆分流程。
+  let splitSuggestion: { count: number; ticketId: string } | undefined;
+  try {
+    const splits = await splitTicketSpec({ cwd: project.path, spec: finalSpec as TicketSpec });
+    if (splits.length >= 2) {
+      splitSuggestion = { count: splits.length, ticketId: ticket.id };
+    }
+  } catch (e) {
+    console.warn(`[finalize] split-check 失敗,跳過: ${e instanceof Error ? e.message : String(e)}`);
+  }
+
+  return ok({ ticket, pipeline: updatedPipeline, splitSuggestion });
 }
 
 export async function cancel(hash: string, draftId: string): Promise<Response> {

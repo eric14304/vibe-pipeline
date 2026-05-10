@@ -33,7 +33,12 @@ async function call<T>(path: string, init?: CallInit): Promise<T> {
 
 type StartResp = { draft: Draft; reply: QAReply };
 type TurnResp = { draft: Draft; reply: QAReply };
-type FinalizeResp = { ticket: unknown; pipeline: unknown };
+type FinalizeResp = {
+  ticket: unknown;
+  pipeline: unknown;
+  // backend 在 finalize 時自動跑 split-check;若 spec 太大可拆,這欄位帶建議
+  splitSuggestion?: { count: number; ticketId: string };
+};
 
 export function startQA(hash: string, pipelineId: string): Promise<StartResp> {
   return call<StartResp>(`/api/projects/${hash}/pipelines/${pipelineId}/qa/start`, {

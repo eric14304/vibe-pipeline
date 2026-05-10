@@ -435,12 +435,47 @@ export function BoardScreen({
       onClose={qa.close}
       onFinalize={async (edits) => {
         const result = (await qa.finalize(edits)) as
-          | { pipeline: Pipeline; ticket: unknown }
+          | {
+              pipeline: Pipeline;
+              ticket: { id: string; title: string };
+              splitSuggestion?: { count: number; ticketId: string };
+            }
           | null;
         if (result) {
           setPipelines((arr) =>
             arr.map((p) => (p.id === result.pipeline.id ? result.pipeline : p))
           );
+          if (result.splitSuggestion) {
+            // AI 評估覺得這 spec 含多件事,跳 confirm 讓 user 選拆 / 不拆
+            const ok = await triConfirm({
+              title: `AI 認為這張 ticket 含 ${result.splitSuggestion.count} 件事`,
+              description: `已先存成 1 張(原樣)。要立刻 AI 拆成 ${result.splitSuggestion.count} 張獨立 ticket 嗎?(預估再多花 ~$0.05-0.20)`,
+              confirmLabel: "立刻拆分",
+              tertiaryLabel: "保留 1 張",
+              cancelLabel: "稍後決定",
+            });
+            if (ok === "confirm") {
+              try {
+                const r = await qaApi.splitTicket(
+                  project.hash,
+                  result.pipeline.id,
+                  result.splitSuggestion.ticketId
+                );
+                setReloadKey((k) => k + 1);
+                if ("nothingToSplit" in r) {
+                  setActionError("✓ AI 重新評估後認為不需拆");
+                } else {
+                  setActionError(`✓ 已拆成 ${r.count} 張 ticket`);
+                }
+              } catch (e) {
+                setActionError(`AI 拆分失敗: ${e instanceof Error ? e.message : String(e)}`);
+              }
+            } else {
+              setActionError(`✓ ticket 已建立(可隨時點 ticket → 操作 → AI 拆分)`);
+            }
+          } else {
+            setActionError("✓ ticket 已建立");
+          }
         }
       }}
     />
