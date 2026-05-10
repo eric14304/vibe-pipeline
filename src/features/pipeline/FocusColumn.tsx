@@ -365,24 +365,17 @@ export function FocusColumn({
           {behind !== null && behind > 0 && (
             <button
               type="button"
-              className="chip mono"
+              className="sync-chip"
               title={
                 lockedByState
                   ? `落後 ${pipeline.baseBranch || "base"} ${behind} commit(pipeline 在跑,等 pause/ready 才能 sync)`
                   : `落後 ${pipeline.baseBranch || "base"} ${behind} commit · 點擊讓 AI 把 base 同步進 worktree`
               }
-              style={{
-                fontSize: 11,
-                cursor: lockedByState ? "not-allowed" : "pointer",
-                border: "1px solid var(--queued)",
-                background: "color-mix(in srgb, var(--queued) 12%, transparent)",
-                color: "var(--queued)",
-                opacity: lockedByState ? 0.55 : 1,
-              }}
               disabled={lockedByState}
               onClick={() => onSync?.(pipeline.id)}
             >
-              ⇣ 落後 {behind}
+              <span className="sync-chip-arrow" aria-hidden>⇣</span>
+              落後 {behind} · 同步
             </button>
           )}
 

@@ -124,6 +124,34 @@
 .icon-btn { position: relative; }
 .icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+/* sync chip — 看起來是 button 不只是 chip。focus-head 上點擊觸發 AI sync。
+   queued 色(teal-ish)區隔於 +N -M 的 fg-mute 灰、btn-primary 的 accent 橘 */
+.sync-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 11.5px; font-weight: 600;
+  padding: 4px 10px; border-radius: 6px;
+  border: 1.5px solid var(--queued);
+  background: color-mix(in srgb, var(--queued) 14%, transparent);
+  color: var(--queued);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 120ms, transform 80ms, box-shadow 120ms;
+}
+.sync-chip:hover {
+  background: color-mix(in srgb, var(--queued) 24%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--queued) 18%, transparent);
+}
+.sync-chip:active { transform: translateY(0.5px); }
+.sync-chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  box-shadow: none;
+}
+.sync-chip .sync-chip-arrow {
+  font-size: 13px;
+  line-height: 1;
+}
+
 /* ─── body grid ─── */
 .board-body {
   flex: 1; min-height: 0;
