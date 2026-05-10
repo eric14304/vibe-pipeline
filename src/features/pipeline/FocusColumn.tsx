@@ -50,14 +50,21 @@ function RunButton({
     );
   }
   // planning / paused / failed → run / continue
+  // noTickets 時改顯示「先建 ticket」並用 ghost 樣式(視覺上不顯眼,引導去 + ticket)
+  if (noTickets) {
+    return (
+      <button className="btn" disabled title="按上方「+ ticket」開 QA 建第一張">
+        先建 ticket
+      </button>
+    );
+  }
   const lastDur = lastRun?.durationMs ? fmtRunDur(lastRun.durationMs) : null;
-  const titleBase = noTickets ? "先建一張 ticket" : s === "paused" ? "繼續" : "開始運行";
+  const titleBase = s === "paused" ? "繼續" : "開始運行";
   const title = lastDur ? `${titleBase}(上次 ${lastDur})` : titleBase;
   return (
     <button
       className="btn btn-primary"
       onClick={() => onRun?.(pipeline.id)}
-      disabled={noTickets}
       title={title}
     >
       ▶ {s === "paused" ? "繼續" : "開始運行"}
