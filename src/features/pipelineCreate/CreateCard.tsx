@@ -93,14 +93,7 @@ export function CreateCard({
       </div>
 
       <label
-        className="create-field"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          cursor: "pointer",
-          fontSize: 12,
-        }}
+        className={"toggle-pill mono" + (autoMerge ? " is-on" : "")}
         title="全 ticket done → backend 自動 append merge ticket 走 runner 流程,不用人按"
       >
         <input
@@ -108,7 +101,10 @@ export function CreateCard({
           checked={autoMerge}
           onChange={(e) => setAutoMerge(e.target.checked)}
         />
-        <span>ready 後自動 merge</span>
+        <span className="toggle-pill-track" aria-hidden>
+          <span className="toggle-pill-thumb" />
+        </span>
+        ready 後自動 merge
       </label>
 
       <div className="create-actions">

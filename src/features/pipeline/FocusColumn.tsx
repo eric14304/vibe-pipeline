@@ -389,28 +389,21 @@ export function FocusColumn({
 
           {onToggleAutoMerge && (
             <label
-              className="chip mono"
+              className={"toggle-pill mono" + (pipeline.autoMerge ? " is-on" : "")}
               title={
                 pipeline.autoMerge
                   ? "ready 後自動 merge(關掉)"
                   : "ready 後自動 merge(打開)"
               }
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                cursor: "pointer",
-                fontSize: 11,
-                color: pipeline.autoMerge ? "var(--done)" : "var(--fg-mute)",
-                borderColor: pipeline.autoMerge ? "var(--done)" : "var(--line)",
-              }}
             >
               <input
                 type="checkbox"
                 checked={!!pipeline.autoMerge}
                 onChange={(e) => onToggleAutoMerge(pipeline.id, e.target.checked)}
-                style={{ margin: 0 }}
               />
+              <span className="toggle-pill-track" aria-hidden>
+                <span className="toggle-pill-thumb" />
+              </span>
               auto-merge
             </label>
           )}
