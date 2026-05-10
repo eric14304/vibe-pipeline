@@ -61,8 +61,12 @@ test("Esc 取消建立 → CreateCard 收起,Rail 不變", async ({ page }) => {
   await page.goto(`/board?project=${proj.hash}`);
 
   await page.locator(".rail-add").click();
-  await page.locator(".create-card input.mono").fill("never-saved");
-  await page.keyboard.press("Escape");
+  // 等 CreateCard 真的出現再 fill,避免 race
+  const input = page.locator(".create-card input.mono");
+  await expect(input).toBeVisible();
+  await input.fill("never-saved");
+  // Esc 從 input 上送
+  await input.press("Escape");
 
   // CreateCard 消失,「新 pipeline」CTA 回來
   await expect(page.locator(".create-card")).toHaveCount(0);
