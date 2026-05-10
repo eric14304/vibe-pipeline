@@ -46,8 +46,9 @@ export default defineConfig({
       command: "bun run server",
       url: "http://127.0.0.1:3001/api/health",
       timeout: 30_000,
-      // bun server 必須有 mock env 才能用,不能 reuse 不確定狀態的 server
-      reuseExistingServer: false,
+      // 本地開發 reuse 之前 playwright 起的 mock server(env 會延續);CI 永遠重啟。
+      // 注意:user 不該手動跑 bun run server 跟 e2e 撞,撞到先 taskkill。
+      reuseExistingServer: !process.env.CI,
       env: TEST_ENV,
     },
   ],

@@ -10,6 +10,8 @@ export class ClaudeCliError extends Error {
 }
 
 export async function checkAvailable(): Promise<boolean> {
+  // Mock 模式:跳過 spawn,假裝 claude 在,讓 e2e 不依賴 user 機器有沒有裝
+  if (isTestMode()) return true;
   try {
     const proc = Bun.spawn(["claude", "--version"], { stdout: "pipe", stderr: "pipe" });
     await proc.exited;
