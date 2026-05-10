@@ -104,7 +104,7 @@ export function CreateCard({
         <span className="toggle-pill-track" aria-hidden>
           <span className="toggle-pill-thumb" />
         </span>
-        ready 後自動 merge
+        ready 後自動合併
       </label>
 
       <div className="create-actions">

@@ -392,8 +392,8 @@ export function FocusColumn({
               className={"toggle-pill mono" + (pipeline.autoMerge ? " is-on" : "")}
               title={
                 pipeline.autoMerge
-                  ? "ready 後自動 merge(關掉)"
-                  : "ready 後自動 merge(打開)"
+                  ? "ready 後自動合併(關掉)"
+                  : "ready 後自動合併(打開)"
               }
             >
               <input
@@ -404,7 +404,7 @@ export function FocusColumn({
               <span className="toggle-pill-track" aria-hidden>
                 <span className="toggle-pill-thumb" />
               </span>
-              auto-merge
+              自動合併
             </label>
           )}
 

@@ -767,13 +767,13 @@ export function BoardScreen({
                 await api.savePipeline(project.hash, pid, next);
                 setActionError(
                   nextValue
-                    ? "✓ 已啟用 auto-merge(ready 後自動合併)"
-                    : "✓ 已關閉 auto-merge"
+                    ? "✓ 已啟用自動合併(ready 後自動合併)"
+                    : "✓ 已關閉自動合併"
                 );
               } catch (e) {
                 // rollback
                 setPipelines((arr) => arr.map((p) => (p.id === pid ? target : p)));
-                setActionError(`切換 auto-merge 失敗: ${e instanceof Error ? e.message : String(e)}`);
+                setActionError(`切換自動合併失敗: ${e instanceof Error ? e.message : String(e)}`);
               }
             }}
           />

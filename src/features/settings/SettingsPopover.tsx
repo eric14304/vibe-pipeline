@@ -367,7 +367,7 @@ export function SettingsPopover({
           onChange={(e) => setDraftAutoMerge(e.target.checked)}
           disabled={busy}
         />
-        <span style={{ fontWeight: 500 }}>新 pipeline 預設啟用「自動 merge」</span>
+        <span style={{ fontWeight: 500 }}>新 pipeline 預設啟用「自動合併」</span>
       </label>
       <div style={hintStyle}>
         全 ticket done 進 ready 後,backend 自動 append merge ticket 走既有 runner 流程,不用人按。
