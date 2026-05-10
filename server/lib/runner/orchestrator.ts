@@ -430,18 +430,38 @@ async function mutateTicket(
   await pipelineDir.writePipeline(projectPath, pipelineId, { ...p, tickets });
 }
 
-// Crash recovery:server 啟動時,任何 pipeline.state="running"/"stopping" 但 process 不在 → 標 paused
+// Crash recovery:server 啟動時掃 pipelines。兩種 inconsistency 都修:
+// (a) pipeline.state="running"/"stopping" 但 process 不在 → 標 paused
+// (b) ticket.status="running" 但 pipeline 不是 running(任何 state)→ 標 paused
+//
+// (b) 處理上一次 server 死前 ticket 已寫 running,但 pipeline state 改回 paused 後沒同步 ticket
+// 的殘留(畫面會出現 RunButton 顯「繼續」+ TicketCard 卻仍顯「執行中」的錯位)。
 export async function recoverStale(projectPath: string): Promise<void> {
   const pipelines = (await pipelineDir.listPipelines(projectPath)) as Array<{
     id?: string;
     state?: string;
+    tickets?: Array<{ status?: string; [k: string]: unknown }>;
     [k: string]: unknown;
   }>;
   for (const p of pipelines) {
     if (!p.id) continue;
-    if (p.state === "running" || p.state === "stopping") {
-      await pipelineDir.writePipeline(projectPath, p.id, { ...p, state: "paused" });
-      console.log(`[runner] recovered stale pipeline ${p.id} → paused`);
-    }
+    const isStaleRunning = p.state === "running" || p.state === "stopping";
+    const hasOrphanTicket =
+      !isStaleRunning && p.state !== "running" &&
+      (p.tickets ?? []).some((t) => t.status === "running");
+    if (!isStaleRunning && !hasOrphanTicket) continue;
+
+    const nextState = isStaleRunning ? "paused" : p.state;
+    const tickets = (p.tickets ?? []).map((t) =>
+      t.status === "running" ? { ...t, status: "paused" } : t
+    );
+    await pipelineDir.writePipeline(projectPath, p.id, {
+      ...p,
+      state: nextState,
+      tickets,
+    });
+    console.log(
+      `[runner] recovered stale pipeline ${p.id}: state=${nextState}, orphan tickets fixed`
+    );
   }
 }

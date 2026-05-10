@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { CheckCircleIcon, FolderIcon, MergeIcon, PlusIcon } from "../../ui/icons";
 import { STATE_COLOR, STATE_LABEL, fmtElapsed } from "../../data/pipelines";
+import { MODE_LABELS } from "../../api/qa";
+import { useConfirm } from "../../ui/ConfirmDialog";
 import type { IterStage, Pipeline, Ticket, TicketStatus } from "../../types/pipeline";
 import * as api from "../../api/projects";
 import type { RunSummary } from "../../api/projects";
@@ -53,9 +55,19 @@ export function RunButton({
     case "planning":
     case "paused":
     case "failed": {
-      if (noTickets) {
+      // 沒「可跑」的 ticket = 沒 ticket 或 ticket 都已收尾(done / failed_*)。
+      // 後者通常是失敗 merge ticket 卡住,讓 user 走 ReadyBanner 重試;runner 不接這些。
+      const noRunnable =
+        noTickets ||
+        !pipeline.tickets.some(
+          (t) => t.status === "draft" || t.status === "ready" || t.status === "paused"
+        );
+      if (noRunnable) {
+        const title = noTickets
+          ? "按上方「+ ticket」開 QA 建第一張"
+          : "沒可跑的 ticket(失敗 / done 不算可跑;看 banner 處理 merge)";
         return (
-          <button type="button" className="btn" disabled title="按上方「+ ticket」開 QA 建第一張">
+          <button type="button" className="btn" disabled title={title}>
             無ticket可執行
           </button>
         );
@@ -112,6 +124,7 @@ export function FocusColumn({
   existingNames = [],
   onTicketClick,
   projectHash,
+  mergeStrategy,
 }: {
   pipeline: Pipeline;
   tick: number;
@@ -127,6 +140,7 @@ export function FocusColumn({
   existingNames?: string[];
   onTicketClick?: (ticket: Ticket) => void;
   projectHash?: string;
+  mergeStrategy?: string;
 }) {
   // Runs summary 給 head chip + RunButton 預估用。pipeline.id / state 變動就 refetch
   // (state 變表示可能新跑完一次)。失敗安靜忽略 — 純資訊性。
@@ -145,6 +159,33 @@ export function FocusColumn({
       cancelled = true;
     };
   }, [projectHash, pipeline.id, pipeline.state]);
+
+  // Worktree diff stat — fetch once on mount(讓 paused/ready 也看得到歷史 diff),
+  // running/stopping 時 poll 每 3s 看即時進度。merged 後不打(已合進 base 沒意義)。
+  const [diffStat, setDiffStat] = useState<api.DiffStat | null>(null);
+  useEffect(() => {
+    if (!projectHash || pipeline.state === "merged" || pipeline.state === "planning") {
+      setDiffStat(null);
+      return;
+    }
+    let cancelled = false;
+    const tick = () => {
+      api
+        .getDiffStat(projectHash, pipeline.id)
+        .then((d) => {
+          if (!cancelled) setDiffStat(d);
+        })
+        .catch(() => {});
+    };
+    tick();
+    // 只 running/stopping 時持續 poll;paused/ready/failed 一次抓完就好
+    const live = pipeline.state === "running" || pipeline.state === "stopping";
+    const id = live ? setInterval(tick, 3000) : null;
+    return () => {
+      cancelled = true;
+      if (id) clearInterval(id);
+    };
+  }, [projectHash, pipeline.id, pipeline.state]);
   const totalCost = runs.reduce((sum, r) => sum + (r.costUsd ?? 0), 0);
   const lastRun = runs[0] ?? null;
   const stateColor = STATE_COLOR[pipeline.state];
@@ -152,6 +193,17 @@ export function FocusColumn({
   const done = pipeline.tickets.filter((t) => t.status === "done").length;
   const total = pipeline.tickets.length;
   const allDone = done === total && pipeline.state === "ready";
+  // 看是否有失敗 / paused 的 merge ticket(讓 banner 顯重試,不靠 RunButton 的繼續)
+  const failedMergeTicket = pipeline.tickets.find(
+    (t) =>
+      t.mode === "merge" &&
+      (t.status === "failed" ||
+        t.status === "failed_iter_limit" ||
+        t.status === "failed_transient" ||
+        t.status === "paused")
+  );
+  // ready = 全 ticket done 還沒合併;merged = 已合併;有失敗 merge → 也顯 banner 給 user 重試。
+  const showMergeBanner = allDone || pipeline.state === "merged" || !!failedMergeTicket;
   const hasResettable = pipeline.tickets.some((t) =>
     t.status === "done" ||
     t.status === "failed" ||
@@ -196,6 +248,18 @@ export function FocusColumn({
               {totalCost.toFixed(2)}
             </span>
           )}
+          {diffStat && (diffStat.files > 0 || diffStat.added > 0 || diffStat.deleted > 0) && (
+            <span
+              className="chip mono"
+              title={`worktree vs ${pipeline.baseBranch || "base"}:${diffStat.files} files,+${diffStat.added} -${diffStat.deleted}`}
+              style={{ fontSize: 11 }}
+            >
+              <span style={{ color: "var(--done)" }}>+{diffStat.added}</span>
+              <span style={{ color: "var(--fg-faint)", margin: "0 4px" }}>·</span>
+              <span style={{ color: "var(--failed)" }}>-{diffStat.deleted}</span>
+              <span style={{ color: "var(--fg-mute)", marginLeft: 6 }}>{diffStat.files}f</span>
+            </span>
+          )}
 
           <button type="button" className="btn" onClick={() => onAddTicket?.(pipeline.id)}>
             <PlusIcon /> {hasActiveDraft ? "接續 QA" : "ticket"}
@@ -214,11 +278,12 @@ export function FocusColumn({
           />
         </div>
 
-        {allDone && (
+        {showMergeBanner && (
           <ReadyBanner
             pipeline={pipeline}
             onMerge={onMerge}
             onRevealWorktree={onRevealWorktree}
+            mergeStrategy={mergeStrategy}
           />
         )}
       </div>
@@ -291,7 +356,7 @@ function EmptyTickets({
 }
 
 // Pipeline 級操作的 overflow menu(原本一字排開太擠,收進 ⋯ 內)。
-// 各 action 仍會用 window.confirm 二次確認(刪除 / 重跑全部);reveal 不需要。
+// 各 action 用 useConfirm() 二次確認(刪除 / 重跑全部);reveal 不需要。
 function OverflowMenu({
   pipeline,
   hasResettable,
@@ -307,6 +372,7 @@ function OverflowMenu({
   onRevealWorktree?: (id: string) => void;
   onDelete?: (id: string) => void;
 }) {
+  const confirm = useConfirm();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -377,7 +443,7 @@ function OverflowMenu({
               label="重跑全部"
               hint={lockedByState ? "running 中" : "重置 done/failed → draft"}
               disabled={lockedByState}
-              onClick={() => {
+              onClick={async () => {
                 setOpen(false);
                 const ndone = pipeline.tickets.filter((t) => t.status === "done").length;
                 const nfail = pipeline.tickets.filter((t) =>
@@ -385,13 +451,18 @@ function OverflowMenu({
                   t.status === "failed_iter_limit" ||
                   t.status === "failed_transient"
                 ).length;
-                const msg =
-                  `重跑全部?會把以下 ticket 狀態回到 draft:\n` +
-                  ` · ${ndone} done\n` +
-                  ` · ${nfail} failed\n\n` +
-                  `清掉 iter rounds / commits 紀錄;worktree 內已 commit 的程式碼留著。\n` +
-                  `下次按「開始運行」會把 draft 全跑一遍。`;
-                if (window.confirm(msg)) onResetAll(pipeline.id);
+                const ok = await confirm({
+                  title: "重跑全部?",
+                  description:
+                    `會把以下 ticket 狀態回到 draft:\n` +
+                    ` · ${ndone} done\n` +
+                    ` · ${nfail} failed\n\n` +
+                    `清掉 iter rounds / commits 紀錄;worktree 內已 commit 的程式碼留著。\n` +
+                    `下次按「開始運行」會把 draft 全跑一遍。`,
+                  confirmLabel: "重跑全部",
+                  danger: true,
+                });
+                if (ok) onResetAll(pipeline.id);
               }}
             />
           )}
@@ -402,12 +473,16 @@ function OverflowMenu({
               hint={lockedByState ? "running 中" : "worktree 不動"}
               disabled={lockedByState}
               danger
-              onClick={() => {
+              onClick={async () => {
                 setOpen(false);
-                const msg =
-                  `確定刪除 pipeline "${pipeline.name}"?\n\n` +
-                  `pipeline.json 會清掉,但 worktree (~/.vibe-pipeline/worktrees/...) 留著。`;
-                if (window.confirm(msg)) onDelete(pipeline.id);
+                const ok = await confirm({
+                  title: `刪除 pipeline "${pipeline.name}"?`,
+                  description:
+                    `pipeline.json 會清掉,但 worktree (~/.vibe-pipeline/worktrees/...) 留著。`,
+                  confirmLabel: "刪除",
+                  danger: true,
+                });
+                if (ok) onDelete(pipeline.id);
               }}
             />
           )}
@@ -605,23 +680,56 @@ export function ReadyBanner({
   pipeline,
   onMerge,
   onRevealWorktree,
+  mergeStrategy,
 }: {
   pipeline: Pipeline;
   onMerge?: (id: string) => void;
   onRevealWorktree?: (id: string) => void;
+  mergeStrategy?: string;
 }) {
+  const confirm = useConfirm();
   const commitCount = pipeline.tickets.reduce(
     (sum, t) => sum + (t.commits?.length ?? 0),
     0
   );
   const baseBranch = pipeline.baseBranch || "main";
+  const isMerged = pipeline.state === "merged";
+  const failedMerge = pipeline.tickets.find(
+    (t) =>
+      t.mode === "merge" &&
+      (t.status === "failed" ||
+        t.status === "failed_iter_limit" ||
+        t.status === "failed_transient" ||
+        t.status === "paused")
+  );
+
   return (
-    <div className="banner banner-ready fade-up">
-      <span className="banner-icon" style={{ color: "var(--done)" }}>
+    <div
+      className={
+        "banner fade-up " +
+        (isMerged ? "banner-ready" : failedMerge ? "banner-paused" : "banner-ready")
+      }
+    >
+      <span
+        className="banner-icon"
+        style={{
+          color: isMerged
+            ? "var(--fg-mute)"
+            : failedMerge
+            ? "var(--failed)"
+            : "var(--done)",
+        }}
+      >
         <CheckCircleIcon />
       </span>
       <div className="banner-body">
-        <div className="banner-title">所有 ticket 都 ✓ — pipeline 可以合併進 {baseBranch}</div>
+        <div className="banner-title">
+          {isMerged
+            ? `已合併入 ${baseBranch}`
+            : failedMerge
+            ? `AI 合併失敗 — 點下方重試或先處理 working tree`
+            : `所有 ticket 都 ✓ — 可以 AI 合併進 ${baseBranch}`}
+        </div>
         <div className="banner-desc mono">
           {pipeline.branch} → {baseBranch} · {commitCount} commit{commitCount === 1 ? "" : "s"}
         </div>
@@ -630,24 +738,43 @@ export function ReadyBanner({
         <button type="button"
           className="btn"
           onClick={() => onRevealWorktree(pipeline.id)}
-          title="開啟 worktree(在裡面 git diff main..HEAD 看完整 diff)"
+          title="開啟 worktree(裡面 git status / git diff 看現場)"
         >
-          View diff
+          看現場
         </button>
       )}
-      {onMerge && (
+      {onMerge && !isMerged && (
         <button type="button"
           className="btn btn-primary"
-          onClick={() => {
-            const msg =
-              `Merge ${pipeline.branch} → ${baseBranch}?\n\n` +
-              `策略走 project config(預設 squash)。\n` +
-              `衝突會 abort 不留痕,需要你手動 resolve。`;
-            if (window.confirm(msg)) onMerge(pipeline.id);
+          onClick={async () => {
+            const strategyLabel =
+              mergeStrategy === "squash"
+                ? "squash(壓成一個 commit)"
+                : mergeStrategy === "ff-only"
+                ? "ff-only(線性,base 沒前進才行)"
+                : "merge --no-ff(保留 ticket commit + 加 merge commit)";
+            const isRetry = !!failedMerge;
+            const ok = await confirm({
+              title: isRetry
+                ? `重試 AI 合併 ${pipeline.branch} → ${baseBranch}?`
+                : `AI 合併 ${pipeline.branch} → ${baseBranch}?`,
+              description:
+                `策略:${strategyLabel}\n\n` +
+                (isRetry
+                  ? `會 reset 失敗的 merge ticket 重跑(prompt 會用最新 strategy 重灌)。\n` +
+                    `若是 working tree 髒導致失敗,先 commit / stash 再重試,不然又 FAIL。`
+                  : `會 append 一張 merge ticket 進 pipeline 由 runner 派 sub-agent 處理(checkout / merge / 解衝突 / 跑驗證 / commit)。`),
+              confirmLabel: isRetry ? "重試合併" : `AI 合併入 ${baseBranch}`,
+            });
+            if (ok) onMerge(pipeline.id);
           }}
-          title={`Merge ${pipeline.branch} into ${baseBranch}`}
+          title={
+            failedMerge
+              ? "重試 AI 合併"
+              : `AI 合併 ${pipeline.branch} into ${baseBranch}`
+          }
         >
-          <MergeIcon /> Merge to {baseBranch}
+          <MergeIcon /> {failedMerge ? "重試 AI 合併" : `AI 合併入 ${baseBranch}`}
         </button>
       )}
     </div>
@@ -665,7 +792,8 @@ function TicketCard({
   index: number;
   onClick?: () => void;
 }) {
-  const isIter = ticket.mode === "iter";
+  // merge ticket 也跟 iter 一樣有 iter.rounds 結構,渲染走同分支
+  const isIter = ticket.mode === "iter" || ticket.mode === "merge";
   const isRunning = ticket.status === "running";
   const isPaused = ticket.status === "paused";
   const isDraft = ticket.status === "draft";
@@ -712,7 +840,9 @@ function TicketCard({
         <span className="ticket-num mono">{String(ticket.n).padStart(2, "0")}</span>
         <div className="ticket-title">{ticket.title}</div>
 
-        <span className={"chip ticket-mode" + (isIter ? " is-iter" : "")}>{ticket.mode}</span>
+        <span className={"chip ticket-mode" + (isIter ? " is-iter" : "")}>
+          {MODE_LABELS[ticket.mode as "step" | "iter"] ?? ticket.mode}
+        </span>
 
         <StatusPill status={ticket.status} />
 
@@ -721,13 +851,90 @@ function TicketCard({
 
       {ticket.goal && <div className="ticket-goal">{ticket.goal}</div>}
 
-      {isIter && ticket.iter && (
-        <div className="ticket-iter">
-          <IterStages stage={ticket.iter.stage} status={ticket.status} />
-          <Verdicts list={ticket.iter.verdicts} blink={isPaused} />
-          <span className="iter-meta mono">
-            iter <strong>{iterCurrentLabel}</strong> · {fmtElapsed(elapsed)} elapsed
-          </span>
+      {isIter && ticket.iter && (() => {
+        const rounds = ticket.iter.rounds ?? [];
+        const inProgress =
+          (ticket.status === "running" || ticket.status === "paused") &&
+          // stage 不是 ✓:那 round 還沒收尾,顯示 in-progress 列
+          ticket.iter.stage !== "✓" &&
+          ticket.iter.stage !== "done";
+        return (
+          <>
+            {rounds.map((r) => (
+              <div key={r.n} className="ticket-iter ticket-iter-row">
+                <span className="iter-round-num mono">#{r.n}</span>
+                <IterStages
+                  stage="✓"
+                  status="done"
+                  lastVerdict={r.criticVerdict}
+                />
+                <span className="iter-meta mono">
+                  {r.endedAt && r.startedAt
+                    ? fmtElapsed(Math.round((r.endedAt - r.startedAt) / 1000))
+                    : "—"}
+                </span>
+              </div>
+            ))}
+            {inProgress && (
+              <div className="ticket-iter ticket-iter-row">
+                <span className="iter-round-num mono">
+                  #{(ticket.iter.current ?? 0) + 1}
+                </span>
+                <IterStages
+                  stage={ticket.iter.stage}
+                  status={ticket.status}
+                />
+                <span className="iter-meta mono">
+                  {fmtElapsed(tick)}
+                </span>
+              </div>
+            )}
+            {rounds.length === 0 && !inProgress && (
+              // 還沒跑(ready 但 mode=iter 也屬此情形)
+              <div className="ticket-iter ticket-iter-row">
+                <span className="iter-round-num mono">#1</span>
+                <IterStages
+                  stage="doer"
+                  status={ticket.status}
+                />
+              </div>
+            )}
+            <div className="ticket-iter-summary mono">
+              iter <strong>{iterCurrentLabel}</strong> · {fmtElapsed(elapsed)} elapsed
+            </div>
+          </>
+        );
+      })()}
+
+      {!isIter && (ticket.status === "running" || ticket.status === "paused" ||
+                   ticket.status === "done" || ticket.status === "failed" ||
+                   ticket.status === "failed_iter_limit" || ticket.status === "failed_transient") && (
+        <div className="ticket-iter ticket-iter-row">
+          <span className="iter-round-num mono">#1</span>
+          <IterStages
+            stage={ticket.status === "done" ? "✓" : "doer"}
+            status={ticket.status}
+            stages={["doer", "✓"]}
+            lastVerdict={
+              ticket.status === "done"
+                ? "PASS"
+                : ticket.status.startsWith("failed")
+                ? "FAIL"
+                : undefined
+            }
+          />
+          {(() => {
+            const sa = ticket.startedAt;
+            const ea = ticket.endedAt;
+            if (!sa) return null;
+            const ms = (ea ?? Date.now()) - sa;
+            const live = ticket.status === "running" ? tick : 0;
+            return (
+              <span className="iter-meta mono">
+                {fmtElapsed(Math.round(ms / 1000) + live)}
+              </span>
+            );
+          })()}
         </div>
       )}
 
@@ -763,12 +970,31 @@ function StatusPill({ status }: { status: TicketStatus }) {
 const STAGE_LABEL: Record<IterStage, string> = {
   doer: "執行",
   critic: "審核",
-  "✓": "✓",
-  done: "✓",
+  "✓": "結果",
+  done: "結果",
 };
 
-function IterStages({ stage, status }: { stage: IterStage; status: TicketStatus }) {
-  const stages: IterStage[] = ["doer", "critic", "✓"];
+// 顯示 PASS/FAIL/PARTIAL 簡短版,擺在「結果」階段裡
+function fmtVerdict(v: unknown): string {
+  if (v == null) return "?";
+  const k = typeof v === "string" ? v.toUpperCase() : String(v);
+  if (k === "PASS" || k === "1") return "PASS";
+  if (k === "FAIL" || k === "-1") return "FAIL";
+  if (k === "PARTIAL" || k === "0") return "PART";
+  return "?";
+}
+
+function IterStages({
+  stage,
+  status,
+  stages = ["doer", "critic", "✓"],
+  lastVerdict,
+}: {
+  stage: IterStage;
+  status: TicketStatus;
+  stages?: IterStage[];
+  lastVerdict?: unknown;
+}) {
   // runner 可能寫不同字面("executing" / "reviewing" / "done" 等),做同義 normalize
   const raw = String(stage);
   const normalized: IterStage =
@@ -784,51 +1010,50 @@ function IterStages({ stage, status }: { stage: IterStage; status: TicketStatus 
   const idx = stages.indexOf(normalized === "done" ? "✓" : normalized);
   return (
     <div className="iter-stages">
-      {stages.map((s, i) => (
-        <span key={s} style={{ display: "contents" }}>
-          <span
-            className={
-              "iter-stage" +
-              (i < idx ? " is-past" : "") +
-              (i === idx ? " is-active" : "") +
-              (status === "paused" && i === idx ? " is-paused" : "")
-            }
-          >
-            {STAGE_LABEL[s]}
-            {status === "paused" && i === idx && " ⏸"}
-            {/* pulse 只給「進行中」階段(doer / critic);✓ 是 round 結束 marker,不該脈衝 */}
-            {status === "running" && i === idx && s !== "✓" && (
-              <span className="iter-stage-pulse pulse" />
-            )}
+      {stages.map((s, i) => {
+        const isPast = i < idx;
+        const isCurrent = i === idx;
+        const isFuture = i > idx;
+        const isResult = s === "✓"; // 結果階段
+        // 結果階段的內容:past 用 ✓、current 顯示 verdict(critic 已收尾)、future 用 ?
+        let mark: { text: string; cls: string } | null = null;
+        if (isPast) {
+          mark = { text: "✓", cls: "is-past-mark" };
+        } else if (isCurrent) {
+          if (isResult) {
+            const v = fmtVerdict(lastVerdict);
+            mark = { text: v, cls: "is-result-" + v.toLowerCase() };
+          } else if (status === "running") {
+            mark = { text: "▶", cls: "is-running" };
+          } else if (status === "paused") {
+            mark = { text: "⏸", cls: "is-paused" };
+          }
+        } else if (isFuture) {
+          mark = { text: "?", cls: "is-future-mark" };
+        }
+        return (
+          <span key={s} style={{ display: "contents" }}>
+            <span
+              className={
+                "iter-stage" +
+                (isPast ? " is-past" : "") +
+                (isCurrent ? " is-active" : "") +
+                (isFuture ? " is-future" : "") +
+                (status === "paused" && isCurrent ? " is-paused" : "")
+              }
+            >
+              {STAGE_LABEL[s]}
+              {mark && (
+                <span className={"iter-stage-mark " + mark.cls} aria-hidden>
+                  {mark.text}
+                </span>
+              )}
+            </span>
+            {i < stages.length - 1 && <span className="iter-stage-arrow">→</span>}
           </span>
-          {i < stages.length - 1 && <span className="iter-stage-arrow">→</span>}
-        </span>
-      ))}
+        );
+      })}
     </div>
   );
 }
 
-// 接受兩種格式:
-// - 舊 prototype mock 用 1 / 0 / -1 (PASS / WARN / FAIL)
-// - runner 寫回字串 "PASS" / "FAIL" / "PARTIAL"
-type VerdictItem = 1 | 0 | -1 | string;
-function Verdicts({ list, blink }: { list: VerdictItem[]; blink: boolean }) {
-  return (
-    <span className="verdicts mono">
-      <span className="verdicts-label">結果</span>
-      {list.map((v, i) => {
-        const last = i === list.length - 1;
-        const k = typeof v === "string" ? v.toUpperCase() : v;
-        const isPass = k === 1 || k === "PASS";
-        const isFail = k === -1 || k === "FAIL";
-        const cls =
-          "verdict-pip " +
-          (isPass ? "is-pass" : isFail ? "is-fail" : "is-warn") +
-          (last && blink ? " blink" : "");
-        // append-only iter verdict 序列,沒 stable id 且值會重複(PASS/FAIL/PASS),index 是正確答案
-        // biome-ignore lint/suspicious/noArrayIndexKey: append-only verdict list with repeating values
-        return <span key={i} className={cls} />;
-      })}
-    </span>
-  );
-}

@@ -33,7 +33,13 @@ JSON 結構:
 2. 看 pipeline.state:
    - "stopping" → 標 pipeline.state = "paused",寫回,結束
    - 其他 → 繼續
-3. 從 tickets[] 找第一張 status = "draft" 或 "ready" 的
+3. 從 tickets[] 找第一張 status = "draft" / "ready" / "paused" 的
+   - **paused = pause 後接續**,**不要歸零 iter.rounds 或 iter.current**;整段 iter 進度延續上次。
+   - paused iter ticket 接續行為(看 iter.stage):
+     - stage="doer" → 從 iter 步驟 1 開始(派 executor 走當前 round)
+     - stage="critic" → executor 上次已跑完(worktree 有改動),**直接從 iter 步驟 3 派 critic**(不再花 token 重派 executor)。executorSummary 寫 "(resumed from pause; prior executor 工作保留在 worktree)" 即可,critic 仍照 acceptance 驗 worktree 現狀
+     - stage="✓" 或 "done" → 此 round 已 PASS 但 ticket 沒收尾(罕見 race),直接視為 ticket done
+   - paused step ticket → 重派 executor;worktree 上次的改動還在,executor 會接著做。
 4. 沒找到 → 標 pipeline.state = "ready",寫回,結束 (全部跑完)
 5. 找到 ticket → 標 ticket.status = "running",寫回 JSON
 6. 跑該 ticket (見下「跑 ticket」)
@@ -43,9 +49,35 @@ JSON 結構:
 ## 跑 ticket 流程
 
 ### mode = "step" (單次任務)
+- Bash "date +%s%3N" 抓 startedAt,寫進 ticket.startedAt(unix ms),寫回 JSON
 - 用 Task 派 sub-agent,prompt = ticket.prompt + 「驗收條件:<acceptance 列點>」
 - Task 回後,你判斷是否符合 acceptance (你可以 Read / Bash 看 worktree 確認)
+- Bash "date +%s%3N" 抓 endedAt,寫進 ticket.endedAt
 - 標 ticket.status = "done" 或 "failed"
+
+### mode = "merge" (AI 合併 ticket — synthetic,/merge endpoint append)
+這張 ticket 的 prompt 已寫好完整 AI merge 指令,sub-agent 會操作 main repo(用 git -C 顯式指定,不依賴 cwd)。
+跑法跟 iter 類似但簡化(不用「執行 + 審核」二段,sub-agent 自己做完整流程):
+
+讓 N = ticket.iterLimit ?? 2(merge ticket 預設 2 輪,給一次 retry 機會)。
+
+迴圈最多 N 輪:
+1. Bash "date +%s%3N" 抓 startedAt;標 stage="doer";派 Task sub-agent(prompt = ticket.prompt + 上輪 feedback 如有);寫回 JSON
+2. sub-agent 回應開頭應該是 "PASS\\n..." 或 "FAIL\\n<reason>";解析:
+   - PASS → 從回應抽 MERGE_COMMIT_HASH=<hash> / MERGE_COMMIT_SUBJECT=<subject>(若 sub-agent 沒寫,用 Bash 'git -C "<projectPath>" rev-parse HEAD' 抓);verdict="PASS"
+   - FAIL → verdict="FAIL",feedback = sub-agent 給的 reason
+3. Bash "date +%s%3N" 抓 endedAt;append round { n, startedAt, endedAt, executorSummary, criticVerdict, criticFeedback };current+=1;寫回 JSON
+4. PASS →
+   - 標 ticket.status = "done"
+   - 標 pipeline.state = "merged",寫 mergedAt = <Bash "date +%s%3N">,mergeCommit = { hash, subject, ts }
+   - 寫回 JSON,跳出迴圈,結束 session
+5. FAIL → 下輪繼續,feedback 加進下輪 prompt
+
+跑完 N 輪還沒 PASS:
+- 標 ticket.status = "failed_iter_limit",pipeline.state = "paused"(merge ticket 也走 iterStopAtLimit=true 邏輯)
+- 結束 session
+
+**merge ticket 不跑「ticket commit」流程**(merge commit 已在 main repo 由 sub-agent commit 完;worktree 不會有改動)。
 
 ### mode = "iter" (迭代任務)
 讓 N = ticket.iterLimit ?? 5,iterStop = ticket.iterStopAtLimit ?? true。
@@ -78,7 +110,9 @@ JSON 結構:
 
 ## ticket commit 流程 (ticket.status 變 done 後立刻做)
 
-每張 ticket 跑完(done)在 commit 一次,作為這張 ticket 的成果快照:
+**只 step / iter ticket 走這流程。merge ticket 跳過(commit 已在 main repo,worktree 不會有改動)。**
+
+每張 step / iter ticket 跑完(done)在 commit 一次,作為這張 ticket 的成果快照:
 
 1. cwd 是 worktree。先 Bash "git -C . status --porcelain" 看有沒有改動
 2. 沒改動 → 跳過(可能該 ticket 純讀/驗證,沒寫程式)

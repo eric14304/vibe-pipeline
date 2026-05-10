@@ -7,6 +7,7 @@ import * as orchestrator from "../lib/runner/orchestrator";
 import * as worktree from "../lib/git/worktree";
 import * as runLog from "../lib/runner/runLog";
 import * as notifs from "../lib/notifs/store";
+import { mergeTicketPrompt } from "../lib/runner/mergeTicketPrompt";
 import { pickFolder, revealFolder } from "../lib/dialog";
 import { projectHash } from "../lib/hash";
 import type { ApiResponse, ApiErrorCode, Project } from "../../shared/types";
@@ -68,7 +69,17 @@ export async function openProject(req: Request): Promise<Response> {
 export async function status(hash: string): Promise<Response> {
   const project = await projectStore.findByHash(hash);
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);
-  return ok(project satisfies Project);
+  // 順帶夾 config 摘要(merge_strategy 等),前端要顯示動態 confirm 文字、Settings 用
+  let mergeStrategy: string | undefined;
+  if (project.hasInit) {
+    try {
+      const cfg = await pipelineDir.readConfig(project.path);
+      mergeStrategy = cfg.defaults?.merge_strategy as string | undefined;
+    } catch {
+      // ignore — config 讀失敗就 fallback
+    }
+  }
+  return ok({ ...project, mergeStrategy } satisfies Project & { mergeStrategy?: string });
 }
 
 export async function init(hash: string): Promise<Response> {
@@ -216,6 +227,21 @@ export async function runPipeline(hash: string, pipelineId: string): Promise<Res
   return ok({ ok: true });
 }
 
+// GET /api/projects/:hash/pipelines/:id/diff-stat
+// 給 UI polling 顯示「+N -M / K files」用,讓 user 在 runner 跑大任務時看到 worktree 真的有在改
+export async function pipelineDiffStat(hash: string, pipelineId: string): Promise<Response> {
+  const project = await projectStore.findByHash(hash);
+  if (!project) return err("not_found", `Project not found: ${hash}`, 404);
+  if (!project.hasGit) return ok(null);
+  const pipeline = (await pipelineDir.readPipeline(project.path, pipelineId)) as {
+    baseBranch?: string;
+  } | null;
+  if (!pipeline) return err("not_found", `Pipeline not found: ${pipelineId}`, 404);
+  const baseBranch = pipeline.baseBranch || "main";
+  const stat = await worktree.diffStat(project.path, pipelineId, baseBranch);
+  return ok(stat);
+}
+
 export async function pausePipeline(hash: string, pipelineId: string): Promise<Response> {
   const project = await projectStore.findByHash(hash);
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);
@@ -228,6 +254,37 @@ export async function pausePipeline(hash: string, pipelineId: string): Promise<R
   return ok({ ok: true });
 }
 
+// 跑 git -C <path> status --porcelain 判 working tree 乾淨。
+// 回 { ok: true } 表示乾淨可動;{ ok: false, modified, untracked, files } 表示髒,給 UI 顯示。
+async function checkWorkingTreeDirty(projectPath: string): Promise<
+  | { ok: true }
+  | { ok: false; modified: number; untracked: number; files: string[] }
+> {
+  const proc = Bun.spawn(["git", "-C", projectPath, "status", "--porcelain"], {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const out = (await new Response(proc.stdout).text()).trim();
+  await proc.exited;
+  if (out.length === 0) return { ok: true };
+  const lines = out.split(/\r?\n/);
+  let modified = 0;
+  let untracked = 0;
+  const files: string[] = [];
+  for (const line of lines) {
+    // porcelain format: "XY filename" 兩個 status code
+    const code = line.slice(0, 2);
+    const file = line.slice(3);
+    if (code.startsWith("??")) untracked++;
+    else modified++;
+    if (files.length < 12) files.push(file); // 前 12 個給 UI 顯示
+  }
+  return { ok: false, modified, untracked, files };
+}
+
+// AI merge(ticket-based):append 一張 mode=merge synthetic ticket 進 pipeline,
+// 然後觸發 runner 接管。merge ticket 由 sub-agent 在 main repo 跑(不在 worktree)。
+// 完成後 runner 主 agent 看到 mode=merge done,把 pipeline.state 設 merged + mergeCommit。
 export async function mergePipeline(hash: string, pipelineId: string): Promise<Response> {
   const project = await projectStore.findByHash(hash);
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);
@@ -236,60 +293,79 @@ export async function mergePipeline(hash: string, pipelineId: string): Promise<R
     return err("invalid_path", "Pipeline 在跑,先 pause 才能 merge", 409);
   }
 
+  // Preflight:main repo working tree 必須乾淨。
+  // AI merge agent 在 main repo 動 git checkout,如果有未 commit 的東西會撞;
+  // 直接擋下,要 user 先 commit 比 AI 試錯燒 token 後失敗划算。
+  const dirty = await checkWorkingTreeDirty(project.path);
+  if (!dirty.ok) {
+    return Response.json(
+      {
+        ok: false,
+        error: {
+          code: "invalid_path",
+          message:
+            `main repo 有 ${dirty.modified} 個 modified + ${dirty.untracked} 個 untracked,` +
+            `先 commit 或 stash 再 AI 合併(避免 merge 動到 user 沒存的工作)。`,
+          details: { modified: dirty.modified, untracked: dirty.untracked, files: dirty.files },
+        },
+      },
+      { status: 409 }
+    );
+  }
+
   const pipeline = (await pipelineDir.readPipeline(project.path, pipelineId)) as {
     name?: string;
     branch?: string;
     baseBranch?: string;
     state?: string;
-    tickets?: Array<{ status?: string }>;
     [k: string]: unknown;
   } | null;
   if (!pipeline) return err("not_found", `Pipeline not found: ${pipelineId}`, 404);
-
-  const allDone = (pipeline.tickets ?? []).every((t) => t.status === "done");
-  if (!allDone) {
-    return err("invalid_path", "還有 ticket 未 done,先跑完再 merge", 409);
-  }
-  if (pipeline.state === "merged") {
-    return err("invalid_path", "Pipeline 已 merge 過", 409);
-  }
 
   const branch = pipeline.branch || `pipeline/${pipeline.name || pipelineId}`;
   const baseBranch = pipeline.baseBranch || "main";
 
   // strategy 從 project config 拿
   const cfg = await pipelineDir.readConfig(project.path);
-  const strategyRaw = cfg.defaults?.merge_strategy ?? "squash";
-  const strategy: git.MergeStrategy =
-    strategyRaw === "merge" || strategyRaw === "ff-only" ? strategyRaw : "squash";
+  const strategyRaw = (cfg.defaults?.merge_strategy as string | undefined) ?? "merge";
+  const strategy = (["merge", "squash", "ff-only"] as const).find((s) => s === strategyRaw) ?? "merge";
 
-  const r = await git.merge(project.path, branch, baseBranch, strategy);
-  if (!r.ok) {
-    const msg =
-      r.reason === "conflict"
-        ? `Merge 衝突 — 手動 resolve 後 commit:\n${r.stderr}`
-        : r.reason === "not_fast_forward"
-        ? `不能 fast-forward(strategy=${strategy}),改用 merge / squash:\n${r.stderr}`
-        : r.stderr;
-    return err("invalid_path", msg, 409);
-  }
-
-  // 標 merged + 寫 mergedAt + 記錄 merge commit
-  await pipelineDir.writePipeline(project.path, pipelineId, {
-    ...pipeline,
-    state: "merged",
-    mergedAt: Date.now(),
-    mergeCommit: { hash: r.commitHash, subject: r.commitSubject, ts: Date.now() },
+  const prompt = mergeTicketPrompt({
+    projectPath: project.path,
+    branch,
+    baseBranch,
+    strategy,
   });
 
-  notifs.emit(project.path, {
-    type: "pipeline_merged",
-    title: `${pipeline.name || pipelineId} merged → ${baseBranch}`,
-    sub: r.commitHash.slice(0, 7),
+  const appendRes = await pipelineDir.appendMergeTicket({
+    projectPath: project.path,
+    pipelineId,
+    prompt,
+  });
+  if (!appendRes.ok) return err("invalid_path", appendRes.error, 409);
+
+  // 觸發 runner;runner 主迴圈會挑到剛 append 的 merge ticket。
+  // pipeline.state 此刻可能是 "ready"(全 done 後 runner 標的);orchestrator.start state guard
+  // 會把 state 改回 running 並 spawn。
+  // 注意:state guard 內 ready 會檢查 hasRunnable(draft/ready);merge ticket status=ready 會被認列。
+  const startRes = await orchestrator.start({
+    projectPath: project.path,
+    projectHash: hash,
     pipelineId,
   });
-
-  return ok({ ok: true, commitHash: r.commitHash, commitSubject: r.commitSubject });
+  if (!startRes.ok) {
+    // 補救:append 了但 spawn 失敗,把 merge ticket 拔掉避免之後干擾
+    const cur = (await pipelineDir.readPipeline(project.path, pipelineId)) as {
+      tickets?: Array<{ id?: string; mode?: string }>;
+      [k: string]: unknown;
+    } | null;
+    if (cur?.tickets) {
+      const filtered = cur.tickets.filter((t) => t.mode !== "merge" || t.id !== appendRes.ticket.id);
+      await pipelineDir.writePipeline(project.path, pipelineId, { ...cur, tickets: filtered });
+    }
+    return err("invalid_path", `append OK but spawn failed: ${startRes.error}`, 500);
+  }
+  return ok({ ok: true, ticketId: appendRes.ticket.id });
 }
 
 export async function listNotifs(hash: string): Promise<Response> {

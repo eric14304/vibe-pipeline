@@ -242,10 +242,23 @@
 .inbox-item.is-muted { opacity: 0.72; }
 .inbox-item.is-muted:hover { opacity: 1; }
 
-.inbox-item-unread-dot {
-  position: absolute; left: 4px; top: 16px;
-  width: 6px; height: 6px; border-radius: 50%;
-  background: var(--accent);
+/* 單 dot:同時表 sev(顏色)+ read 狀態(實心/空心)。原本的 icon box + unread-dot 兩個合一。 */
+.inbox-item-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  margin-top: 5px;
+  transition: background 120ms, border-color 120ms, opacity 120ms;
+}
+.inbox-item-dot.is-unread {
+  background: var(--item-color);
+  border: 1px solid var(--item-color);
+}
+.inbox-item-dot.is-read {
+  background: transparent;
+  border: 1px solid var(--item-color);
+  opacity: 0.5;
 }
 .inbox-item-x {
   position: absolute;
@@ -276,17 +289,7 @@
 .inbox-item-head {
   display: flex; align-items: flex-start; gap: 9px;
 }
-.inbox-item-icon {
-  width: 24px; height: 24px;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--item-color) 14%, transparent);
-  color: var(--item-color);
-  display: inline-flex; align-items: center; justify-content: center;
-  font-size: 12px;
-  flex-shrink: 0;
-  margin-top: 1px;
-}
-.inbox-item.is-muted .inbox-item-icon { background: transparent; color: var(--fg-faint); }
+/* .inbox-item-icon dead — 改用單一 .inbox-item-dot */
 .inbox-item-title {
   flex: 1; min-width: 0;
   font-size: 12.5px;
@@ -308,14 +311,15 @@
   pointer-events: none;
 }
 .inbox-item.is-unread .inbox-item-ts { color: var(--accent); }
+/* sub / actions 對齊 title:dot 8px + gap 9px = 17px */
 .inbox-item-sub {
   font-size: 11px; color: var(--fg-mute);
-  padding-left: 33px;
+  padding-left: 17px;
   line-height: 1.4;
 }
 .inbox-item-actions {
   display: flex; gap: 6px;
-  padding-left: 33px;
+  padding-left: 17px;
   margin-top: 6px;
 }
 .inbox-item:not(.is-block) .inbox-item-actions {

@@ -7,7 +7,8 @@ export type TicketStatus =
   | "failed"
   | "failed_iter_limit"
   | "failed_transient";
-export type TicketMode = "step" | "iter";
+// "merge" 是 synthetic ticket(/merge endpoint append),不在 QA / TicketSpec 列表
+export type TicketMode = "step" | "iter" | "merge";
 export type IterStage = "doer" | "critic" | "✓" | "done";
 
 // 1/0/-1 是舊 prototype mock 格式;runner 寫回是字串 "PASS"/"FAIL"/"PARTIAL"
@@ -45,6 +46,9 @@ export type Ticket = {
   goal?: string;
   mode: TicketMode;
   status: TicketStatus;
+  // step / iter 共用:runner 寫 unix ms,給 UI 算 elapsed 用
+  startedAt?: number;
+  endedAt?: number;
   meta?: string;
   iter?: IterState;
   liveLog?: string;

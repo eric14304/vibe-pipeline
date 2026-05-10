@@ -8,6 +8,7 @@ export type Project = {
   hasGit: boolean; // .git/ 是否存在(runner 階段需要)
   lastOpenedAt: number; // unix ms
   currentBranch?: string; // 當前 git HEAD 短名(`git symbolic-ref --short HEAD`),非 git repo 為 undefined
+  mergeStrategy?: string; // 從 .vibe-pipeline/config.json defaults.merge_strategy 來,給前端 confirm 顯示用
 };
 
 // ─── QA / Ticket spec ─────────────────────────────────────────────
@@ -118,6 +119,8 @@ export type NotifEventType =
   | "ticket_done"
   | "ticket_failed"
   | "pipeline_ready_to_merge"
+  | "merge_started"
+  | "merge_blocked"
   | "pipeline_merged"
   | "pipeline_failed"
   | "budget_warn"
@@ -152,6 +155,8 @@ export const NOTIF_EVENTS: Record<NotifEventType, NotifEventMeta> = {
   ticket_done: { sev: "info", phase: "P2", label: "Ticket done" },
   ticket_failed: { sev: "block", phase: "P2", label: "Ticket failed" },
   pipeline_ready_to_merge: { sev: "info", phase: "P2", label: "Pipeline ready to merge" },
+  merge_started: { sev: "muted", phase: "P2", label: "AI 合併開始" },
+  merge_blocked: { sev: "block", phase: "P2", label: "AI 合併失敗,需處理" },
   pipeline_merged: { sev: "info", phase: "P2", label: "Pipeline merge 完成" },
   pipeline_failed: { sev: "block", phase: "P2", label: "Pipeline failed" },
   budget_warn: { sev: "info", phase: "P2", label: "Budget 80% 警告" },

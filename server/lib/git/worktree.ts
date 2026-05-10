@@ -74,3 +74,34 @@ export async function remove(projectPath: string, pipelineId: string): Promise<v
 export async function prune(projectPath: string): Promise<void> {
   await spawnGit(["worktree", "prune"], projectPath);
 }
+
+// 看當下 worktree 跟 base 的 diff stat(已 commit + working tree 都算)。
+// 給 UI polling 顯示「+N -M / K files」用,讓 user 知道 runner 正在改東西。
+// 沒 worktree / git 異常 → 回 null,UI 隱藏即可。
+export type DiffStat = { files: number; added: number; deleted: number };
+
+export async function diffStat(
+  projectPath: string,
+  pipelineId: string,
+  baseBranch: string
+): Promise<DiffStat | null> {
+  const wt = worktreePath(projectPath, pipelineId);
+  if (!existsSync(wt)) return null;
+  // --shortstat:" 12 files changed, 234 insertions(+), 45 deletions(-)"
+  // 有可能 0 deletion → 沒那段;也可能 0 file → 整行空。
+  // 比 baseBranch (no triple-dot) → working tree 對 base 的所有差異(含 uncommit)。
+  const res = await spawnGit(["diff", "--shortstat", baseBranch], wt);
+  if (!res.ok) return null;
+  return parseShortstat(res.out);
+}
+
+function parseShortstat(s: string): DiffStat {
+  const files = /(\d+) files? changed/.exec(s)?.[1];
+  const added = /(\d+) insertions?\(\+\)/.exec(s)?.[1];
+  const deleted = /(\d+) deletions?\(-\)/.exec(s)?.[1];
+  return {
+    files: files ? Number(files) : 0,
+    added: added ? Number(added) : 0,
+    deleted: deleted ? Number(deleted) : 0,
+  };
+}

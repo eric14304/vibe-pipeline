@@ -1,7 +1,7 @@
 {
   "defaults": {
     "base_branch": "main",
-    "merge_strategy": "squash"
+    "merge_strategy": "merge"
   },
   "scripts": {
     "setup": "",

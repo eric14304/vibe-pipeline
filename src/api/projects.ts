@@ -87,11 +87,19 @@ export function pausePipeline(hash: string, id: string): Promise<{ ok: true }> {
   return call<{ ok: true }>(`/api/projects/${hash}/pipelines/${id}/pause`, { method: "POST" });
 }
 
-export function mergePipeline(hash: string, id: string): Promise<{ ok: true; commitHash: string; commitSubject: string }> {
-  return call<{ ok: true; commitHash: string; commitSubject: string }>(
+// AI 合併:後端 append 一張 mode=merge ticket + 觸發 runner;立即 return,不等合併完。
+// 前端靠 polling pipeline 看 ticket 進度 + 最終 pipeline.state=merged。
+export function mergePipeline(hash: string, id: string): Promise<{ ok: true; ticketId: string }> {
+  return call<{ ok: true; ticketId: string }>(
     `/api/projects/${hash}/pipelines/${id}/merge`,
     { method: "POST" }
   );
+}
+
+export type DiffStat = { files: number; added: number; deleted: number };
+
+export function getDiffStat(hash: string, id: string): Promise<DiffStat | null> {
+  return call<DiffStat | null>(`/api/projects/${hash}/pipelines/${id}/diff-stat`);
 }
 
 export type NotifRecord = {

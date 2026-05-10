@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useSearchParams } from "react-router-dom";
 import { BoardScreen } from "./features/pipeline/BoardScreen";
 import { StatesGallery } from "./features/dev/StatesGallery";
+import { ConfirmProvider } from "./ui/ConfirmDialog";
 
 // Theme priority: URL ?theme=  →  localStorage  →  default light
 function useTheme() {
@@ -41,11 +42,13 @@ function StatesRoute() {
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Navigate to="/board" replace />} />
-        <Route path="/board" element={<BoardRoute />} />
-        <Route path="/dev/states" element={<StatesRoute />} />
-      </Routes>
+      <ConfirmProvider>
+        <Routes>
+          <Route path="/" element={<Navigate to="/board" replace />} />
+          <Route path="/board" element={<BoardRoute />} />
+          <Route path="/dev/states" element={<StatesRoute />} />
+        </Routes>
+      </ConfirmProvider>
     </BrowserRouter>
   );
 }

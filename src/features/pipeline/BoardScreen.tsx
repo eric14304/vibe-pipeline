@@ -498,6 +498,7 @@ export function BoardScreen({
             pipeline={active}
             tick={tick}
             projectHash={project.hash}
+            mergeStrategy={project.mergeStrategy}
             onAddTicket={(pid) => qa.open(pid)}
             hasActiveDraft={!!qa.draftFor(active.id)}
             onTicketClick={(t) => setOpenTicket(t)}
@@ -586,14 +587,11 @@ export function BoardScreen({
             onMerge={async (pid) => {
               if (!project) return;
               try {
-                const r = await api.mergePipeline(project.hash, pid);
+                await api.mergePipeline(project.hash, pid);
                 setReloadKey((k) => k + 1);
                 setActionError(null);
-                // 用 actionError pattern 顯示成功訊息(臨時 toast,6s 自動消)
-                // 沒專門 success toast,借 actionError channel 但訊息用「✓」前綴
-                setActionError(`✓ Merged → ${r.commitHash.slice(0, 7)} ${r.commitSubject}`);
               } catch (e) {
-                setActionError(`Merge 失敗: ${e instanceof Error ? e.message : String(e)}`);
+                setActionError(`觸發 AI 合併失敗: ${e instanceof Error ? e.message : String(e)}`);
               }
             }}
           />

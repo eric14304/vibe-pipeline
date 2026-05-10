@@ -98,8 +98,68 @@ function RailItem({ p, active, onClick, muted, hasDraft }: { p: Pipeline; active
         })}
       </div>
       <div className="rail-item-meta">
-        <span className="mono">⎇ {p.branch.replace("pipeline/", "")}</span>
+        <span className="mono">{railSecondary(p)}</span>
       </div>
     </button>
   );
+}
+
+// 第二行 state-aware:用明確中文表 merge 狀態,不用「→」避免被當「已合併」。
+function railSecondary(p: Pipeline): string {
+  const base = p.baseBranch || "main";
+  const branchSuffix = p.branch.replace(/^pipeline\//, "");
+  const ago = fmtAgo(lastActivityAt(p));
+  const agoSuffix = ago ? ` · ${ago}` : "";
+
+  if (p.state === "running") {
+    const t = p.tickets.find((x) => x.status === "running");
+    if (t) {
+      const title = t.title.length > 18 ? t.title.slice(0, 17) + "…" : t.title;
+      return `▶ #${t.n} ${title}${agoSuffix}`;
+    }
+    return `執行中${agoSuffix}`;
+  }
+  if (p.state === "stopping") return `停止中${agoSuffix}`;
+  if (p.state === "merged") return `已併入 ${base}${agoSuffix}`;
+  if (p.state === "ready") return `可合併入 ${base}${agoSuffix}`;
+  if (p.state === "failed") return `失敗${agoSuffix}`;
+  if (p.state === "paused") {
+    const last = [...p.tickets].reverse().find(
+      (x) => x.status === "paused" || x.status === "running"
+    );
+    if (last) return `⏸ #${last.n}${agoSuffix}`;
+    return `暫停${agoSuffix}`;
+  }
+  // planning(或未知 state):只顯時間,branch 跟 name 不同才補 branch
+  if (branchSuffix !== p.name) return `⎇ ${branchSuffix}${agoSuffix}`;
+  return ago ?? "草稿";
+}
+
+function lastActivityAt(p: Pipeline): number | null {
+  let max = 0;
+  for (const t of p.tickets) {
+    if (typeof t.endedAt === "number") max = Math.max(max, t.endedAt);
+    if (typeof t.startedAt === "number") max = Math.max(max, t.startedAt);
+    if (t.iter?.rounds) {
+      for (const r of t.iter.rounds) {
+        if (typeof r.endedAt === "number") max = Math.max(max, r.endedAt);
+        if (typeof r.startedAt === "number") max = Math.max(max, r.startedAt);
+      }
+    }
+    if (t.commits) {
+      for (const c of t.commits) {
+        if (typeof c.ts === "number") max = Math.max(max, c.ts);
+      }
+    }
+  }
+  return max > 0 ? max : null;
+}
+
+function fmtAgo(ms: number | null): string | null {
+  if (!ms) return null;
+  const since = Math.floor((Date.now() - ms) / 1000);
+  if (since < 60) return "剛剛";
+  if (since < 3600) return `${Math.floor(since / 60)}分鐘前`;
+  if (since < 86400) return `${Math.floor(since / 3600)}小時前`;
+  return `${Math.floor(since / 86400)}天前`;
 }

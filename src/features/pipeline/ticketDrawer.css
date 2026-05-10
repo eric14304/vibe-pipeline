@@ -39,6 +39,12 @@
   font-size: 11.5px;
   font-weight: 500;
   border: 1px solid;
+  line-height: 1.4;
+}
+.tdrw-status-chip .dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .tdrw-body {
@@ -90,6 +96,84 @@
   white-space: pre-wrap;
   word-break: break-word;
   overflow-x: auto;
+}
+
+/* prompt 用 markdown 渲染:標準文章排版,code 用 mono 區塊 */
+.tdrw-prompt-md {
+  padding: 10px 14px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--fg);
+  word-break: break-word;
+}
+.tdrw-prompt-md > :first-child { margin-top: 0; }
+.tdrw-prompt-md > :last-child { margin-bottom: 0; }
+.tdrw-prompt-md h1,
+.tdrw-prompt-md h2,
+.tdrw-prompt-md h3,
+.tdrw-prompt-md h4 {
+  margin: 14px 0 6px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--fg);
+}
+.tdrw-prompt-md h1 { font-size: 16px; }
+.tdrw-prompt-md h2 { font-size: 14.5px; }
+.tdrw-prompt-md h3 { font-size: 13.5px; color: var(--fg-mute); }
+.tdrw-prompt-md h4 { font-size: 13px; color: var(--fg-mute); }
+.tdrw-prompt-md p { margin: 6px 0; }
+.tdrw-prompt-md ul,
+.tdrw-prompt-md ol {
+  margin: 6px 0;
+  padding-left: 22px;
+}
+.tdrw-prompt-md li { margin: 2px 0; }
+.tdrw-prompt-md code {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--bg);
+  border: 1px solid var(--line-2);
+  color: var(--fg);
+}
+.tdrw-prompt-md pre {
+  margin: 8px 0;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+.tdrw-prompt-md pre code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+.tdrw-prompt-md blockquote {
+  margin: 8px 0;
+  padding: 4px 12px;
+  border-left: 3px solid var(--line-2);
+  color: var(--fg-mute);
+}
+.tdrw-prompt-md a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.tdrw-prompt-md strong {
+  font-weight: 600;
+  color: var(--fg);
+}
+.tdrw-prompt-md hr {
+  margin: 12px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
 }
 
 /* Run history */

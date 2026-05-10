@@ -1,5 +1,5 @@
-import { BannerIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon, InboxEmptyIcon } from "../../ui/icons";
-// BannerIcon 仍用在 expanded panel 的 InboxItem;ChevronLeft 用在 strip。
+import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, InboxEmptyIcon } from "../../ui/icons";
+// ChevronLeft 用在 strip。InboxItem 已改用單 dot(.inbox-item-dot)取代 icon box,不再需要 BannerIcon。
 import { SEV_COLOR } from "../../data/notifications";
 import type { InboxFilter, InboxState, NotifItem } from "../../types/notif";
 
@@ -215,7 +215,6 @@ function InboxItem({
       role="button"
       tabIndex={0}
     >
-      {item.unread && <span className="inbox-item-unread-dot" />}
       <button type="button"
         className="inbox-item-x"
         title="移除"
@@ -228,9 +227,7 @@ function InboxItem({
         <CloseIcon />
       </button>
       <div className="inbox-item-head">
-        <span className="inbox-item-icon">
-          <BannerIcon kind={item.iconKind} small />
-        </span>
+        <span className={"inbox-item-dot" + (item.unread ? " is-unread" : " is-read")} />
         <span className="inbox-item-title">{item.title}</span>
       </div>
       <div className="inbox-item-sub">{item.sub}</div>

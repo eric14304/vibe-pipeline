@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
+import ReactMarkdown from "react-markdown";
 import "../../styles/drawer.css";
 import "./ticketDrawer.css";
 import type { Ticket, IterRound, CommitRef } from "../../types/pipeline";
 import { MODE_LABELS } from "../../api/qa";
 import { STATE_COLOR } from "../../data/pipelines";
+import { useConfirm } from "../../ui/ConfirmDialog";
 import { RunHistory } from "./RunHistory";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -34,6 +36,7 @@ export function TicketDrawer({
   onClose: () => void;
   onResetTicket?: (ticketId: string) => Promise<void> | void;
 }) {
+  const confirm = useConfirm();
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -97,13 +100,11 @@ export function TicketDrawer({
               <span className="dot" style={{ background: accent }} />
               {statusLabel}
             </span>
-            <span className="sep">·</span>
-            <span>{modeLabel}</span>
+            <span className={"chip ticket-mode" + (ticket.mode === "iter" ? " is-iter" : "")}>
+              {modeLabel}
+            </span>
             {ticket.mode === "iter" && spec.iterLimit != null && (
-              <>
-                <span className="sep">·</span>
-                <span>上限 {spec.iterLimit} 輪</span>
-              </>
+              <span>上限 {spec.iterLimit} 輪</span>
             )}
           </div>
         </div>
@@ -124,7 +125,13 @@ export function TicketDrawer({
             )}
           </Section>
           <Section label="prompt">
-            <pre className="tdrw-prompt">{spec.prompt || "(空)"}</pre>
+            {spec.prompt ? (
+              <div className="tdrw-prompt-md">
+                <ReactMarkdown>{spec.prompt}</ReactMarkdown>
+              </div>
+            ) : (
+              <span className="tdrw-empty">(空)</span>
+            )}
           </Section>
           {ticket.iter && (
             <Section label="iter 概況">
@@ -160,12 +167,16 @@ export function TicketDrawer({
             <Section label="操作">
               <button type="button"
                 className="btn btn-ghost"
-                onClick={() => {
-                  const msg =
-                    `重置 ticket "${ticket.title}" 狀態到 draft?\n\n` +
-                    `會清掉:iter rounds / verdicts / commits 紀錄;但 worktree 內已 commit 的程式碼會留著。\n` +
-                    `下次執行 pipeline 會重新跑這張(可能再產生新 commit)。`;
-                  if (window.confirm(msg)) onResetTicket(ticket.id);
+                onClick={async () => {
+                  const ok = await confirm({
+                    title: `重置 ticket "${ticket.title}" 狀態到 draft?`,
+                    description:
+                      `會清掉:iter rounds / verdicts / commits 紀錄;但 worktree 內已 commit 的程式碼會留著。\n` +
+                      `下次執行 pipeline 會重新跑這張(可能再產生新 commit)。`,
+                    confirmLabel: "重置",
+                    danger: true,
+                  });
+                  if (ok) onResetTicket(ticket.id);
                 }}
               >
                 ↺ 重置 ticket 狀態(可重跑)

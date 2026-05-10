@@ -20,18 +20,18 @@ export const STATE_COLOR: Record<string, string> = {
 
 export const STATE_LABEL: Record<string, string> = {
   // pipeline states
-  paused: "paused",
-  running: "running",
-  stopping: "stopping",
-  ready: "ready to merge",
-  planning: "planning",
-  failed: "failed",
-  merged: "merged",
+  paused: "暫停",
+  running: "執行中",
+  stopping: "停止中",
+  ready: "可合併",
+  planning: "規劃中",
+  failed: "失敗",
+  merged: "已合併",
   // ticket statuses
-  done: "done",
-  draft: "draft",
-  failed_iter_limit: "iter 上限",
-  failed_transient: "transient 失敗",
+  done: "完成",
+  draft: "草稿",
+  failed_iter_limit: "達 iter 上限",
+  failed_transient: "暫時錯誤",
 };
 
 export function fmtElapsed(s: number): string {

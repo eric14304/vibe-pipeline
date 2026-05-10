@@ -67,7 +67,8 @@ html.light .drawer {
 .drawer-meta {
   margin-top: 8px;
   font-size: 11px; color: var(--fg-mute);
-  display: flex; gap: 12px; flex-wrap: wrap;
+  display: flex; gap: 8px; flex-wrap: wrap;
+  align-items: center;
 }
 .drawer-meta .sep { color: var(--fg-faint); }
 

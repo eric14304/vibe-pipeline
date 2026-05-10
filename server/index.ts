@@ -81,6 +81,11 @@ async function handle(req: Request): Promise<Response> {
       return projects.revealWorktree(hash, worktreeRevealMatch[1]);
     }
 
+    const diffStatMatch = rest.match(/^\/pipelines\/([a-z0-9_-]+)\/diff-stat$/);
+    if (diffStatMatch && method === "GET") {
+      return projects.pipelineDiffStat(hash, diffStatMatch[1]);
+    }
+
     const pipelineRunsListMatch = rest.match(/^\/pipelines\/([a-z0-9_-]+)\/runs$/);
     if (pipelineRunsListMatch && method === "GET") {
       return projects.listPipelineRuns(hash, pipelineRunsListMatch[1]);

@@ -374,11 +374,70 @@
 }
 .iter-stage.is-paused { color: var(--paused); border-color: var(--paused); background: var(--paused-soft); }
 .iter-stage-arrow { color: var(--fg-faint); font-size: 11px; }
+/* iter rounds 多 row 排列 */
+.ticket-iter-row {
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 4px;
+}
+.iter-round-num {
+  font-size: 10px; color: var(--fg-faint);
+  min-width: 24px;
+}
+.ticket-iter-summary {
+  margin-top: 6px;
+  font-size: 10.5px;
+  color: var(--fg-mute);
+  font-family: var(--font-mono);
+}
+
+/* legacy:.iter-stage-pulse 留著怕別處還用到,不再被 IterStages 渲染 */
 .iter-stage-pulse {
   position: absolute; top: -2px; right: -2px;
   width: 6px; height: 6px; border-radius: 50%;
   background: var(--iter);
   border: 1.5px solid var(--bg-elevated);
+}
+
+/* 階段標記:past=✓ / current=▶或⏸或 verdict / future=? */
+.iter-stage-mark {
+  margin-left: 5px;
+  display: inline-block;
+  font-size: 9px;
+  line-height: 1;
+  vertical-align: 1px;
+  font-family: var(--font-mono);
+}
+.iter-stage-mark.is-running {
+  color: var(--iter);
+  animation: iter-stage-mark-pulse 1.2s ease-in-out infinite;
+}
+.iter-stage-mark.is-paused {
+  color: var(--paused);
+  opacity: 0.9;
+}
+.iter-stage-mark.is-past-mark {
+  color: var(--done);
+  opacity: 0.85;
+}
+.iter-stage-mark.is-future-mark {
+  color: var(--fg-faint);
+  opacity: 0.55;
+}
+.iter-stage-mark.is-result-pass {
+  color: var(--done);
+  font-weight: 600;
+}
+.iter-stage-mark.is-result-fail {
+  color: var(--failed);
+  font-weight: 600;
+}
+.iter-stage-mark.is-result-part {
+  color: var(--paused);
+  font-weight: 600;
+}
+@keyframes iter-stage-mark-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.18); }
 }
 
 .verdicts { display: inline-flex; align-items: center; gap: 4px; }
