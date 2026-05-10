@@ -50,7 +50,7 @@ export async function runTurn({
   }
   args.push(userMessage);
 
-  let proc;
+  let proc: ReturnType<typeof Bun.spawn>;
   try {
     proc = Bun.spawn(args, { cwd, stdout: "pipe", stderr: "pipe" });
   } catch (e) {
@@ -70,7 +70,7 @@ export async function runTurn({
   }
 
   // --output-format json wraps result in: { type:"result", result:"<actual text>", session_id, ... }
-  let outerJson;
+  let outerJson: { result?: string; text?: string; session_id?: string; [k: string]: unknown };
   try {
     outerJson = JSON.parse(stdoutText);
   } catch {

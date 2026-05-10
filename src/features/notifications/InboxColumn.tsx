@@ -57,7 +57,7 @@ function InboxStrip({
 
   return (
     <div className="inbox-strip">
-      <button className="inbox-strip-expand" onClick={onExpand} title="展開 inbox" aria-label="展開">
+      <button type="button" className="inbox-strip-expand" onClick={onExpand} title="展開 inbox" aria-label="展開">
         <ChevronLeftIcon />
       </button>
       <div className={"inbox-strip-count" + (unreadCount > 0 ? " has-unread" : "")}>{unreadCount}</div>
@@ -65,7 +65,7 @@ function InboxStrip({
 
       <div className="inbox-strip-pips">
         {visible.map((it) => (
-          <button
+          <button type="button"
             key={it.id}
             className={
               "inbox-strip-pip" +
@@ -117,7 +117,7 @@ function InboxPanel({
         <h3>Inbox</h3>
         {unreadCount > 0 && <span className="inbox-head-count mono">{unreadCount} 未讀</span>}
         <div className="inbox-head-actions">
-          <button className="icon-btn" title="收合" onClick={onCollapse} aria-label="收合">
+          <button type="button" className="icon-btn" title="收合" onClick={onCollapse} aria-label="收合">
             <ChevronRightIcon />
           </button>
         </div>
@@ -131,7 +131,7 @@ function InboxPanel({
             ["blocking", "阻斷", blockCount],
           ] as const
         ).map(([key, label, count]) => (
-          <button
+          <button type="button"
             key={key}
             className={"inbox-filter-btn" + (filter === key ? " is-active" : "")}
             onClick={() => setFilter(key as InboxFilter)}
@@ -168,7 +168,7 @@ function InboxPanel({
         <span>共 {items.length} 通知{unreadCount > 0 ? ` · ${unreadCount} 未讀` : ""}</span>
         <span style={{ flex: 1 }} />
         {items.length > 0 && unreadCount > 0 && (
-          <button
+          <button type="button"
             className="inbox-foot-link"
             onClick={(e) => {
               e.preventDefault();
@@ -199,15 +199,24 @@ function InboxItem({
   void onMarkRead;
   const c = SEV_COLOR[item.sev];
   return (
+    // 整張 card 點擊 → 跳該 pipeline。card 內含 X 按鈕和 action 按鈕,不能用 <button> wrap(invalid HTML),
+    // 改 div + role="button" + onKeyDown 是務實解。
+    // biome-ignore lint/a11y/useSemanticElements: nested action buttons block <button> wrapper
     <div
       className={"inbox-item is-" + item.sev + (item.unread ? " is-unread" : "") + (highlight ? " fade-up" : "")}
       style={{ ["--item-color" as string]: c } as React.CSSProperties}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
       role="button"
       tabIndex={0}
     >
       {item.unread && <span className="inbox-item-unread-dot" />}
-      <button
+      <button type="button"
         className="inbox-item-x"
         title="移除"
         aria-label="移除"
@@ -229,7 +238,7 @@ function InboxItem({
       {(item.primary || item.secondary) && (
         <div className="inbox-item-actions">
           {item.secondary && (
-            <button
+            <button type="button"
               className="inbox-item-action"
               onClick={(e) => {
                 e.stopPropagation();
@@ -240,7 +249,7 @@ function InboxItem({
             </button>
           )}
           {item.primary && (
-            <button
+            <button type="button"
               className={
                 "inbox-item-action" +
                 (item.primary.kind === "block"

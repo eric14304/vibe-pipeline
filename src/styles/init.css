@@ -80,10 +80,10 @@
   padding: 12px 14px;
   font-size: 13px;
 }
-html.light .init-cmd { background: #1c1916; color: #fbf8f1; }
-html.light .init-cmd .init-cmd-prompt { color: #d8a25a; }
 .init-cmd-prompt { color: #6b7077; font-weight: 600; }
 .init-cmd-text { flex: 1; min-width: 0; color: #e8e3d6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html.light .init-cmd { background: #1c1916; color: #fbf8f1; }
+html.light .init-cmd .init-cmd-prompt { color: #d8a25a; }
 html.light .init-cmd-text { color: #fbf8f1; }
 .init-cmd-copy {
   display: inline-flex; align-items: center; gap: 5px;

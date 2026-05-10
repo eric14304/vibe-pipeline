@@ -67,6 +67,8 @@ export function TopBar({
   }, [open]);
 
   // ⌘O / Ctrl+O 開選資料夾(對應 menu 裡的 kbd hint)
+  // pickAndOpen 用 closure capture state(busy),不放進 deps 避免每 render 重綁
+  // biome-ignore lint/correctness/useExhaustiveDependencies: pickAndOpen 不放 deps 避免每 render 重綁聽器
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const isMod = e.metaKey || e.ctrlKey;
@@ -77,8 +79,6 @@ export function TopBar({
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-    // pickAndOpen 用 closure capture state(busy),不放進 deps 避免每 render 重綁
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const active = recents.find((p) => p.hash === hash) ?? null;
@@ -127,7 +127,7 @@ export function TopBar({
         <span className="topbar-sep" />
 
         <div className="proj-switcher" ref={wrapRef}>
-          <button
+          <button type="button"
             className={"proj-trigger" + (open ? " is-open" : "")}
             onClick={() => setOpen((o) => !o)}
             title="切換專案"
@@ -146,7 +146,7 @@ export function TopBar({
                 </div>
               )}
               {recents.map((p) => (
-                <button
+                <button type="button"
                   key={p.hash}
                   className={"proj-menu-item" + (p.hash === hash ? " is-active" : "")}
                   onClick={() => selectExisting(p)}
@@ -168,7 +168,7 @@ export function TopBar({
                 </button>
               ))}
               <div className="proj-menu-divider" />
-              <button
+              <button type="button"
                 className="proj-menu-item proj-menu-item-action"
                 onClick={pickAndOpen}
                 disabled={busy}
@@ -202,7 +202,7 @@ export function TopBar({
                 {active.currentBranch ?? "(detached)"}
               </span>
             )}
-            <button
+            <button type="button"
               className="chip"
               title="在檔案總管中開啟"
               onClick={() => api.reveal(active.hash).catch(() => {})}
@@ -218,7 +218,7 @@ export function TopBar({
       <span style={{ flex: 1 }} />
 
       <div className="topbar-right">
-        <button
+        <button type="button"
           className="icon-btn topbar-theme-toggle"
           onClick={toggleTheme}
           title={isDark ? "切到亮色" : "切到暗色"}
@@ -226,7 +226,7 @@ export function TopBar({
         >
           {isDark ? <SunIcon /> : <MoonIcon />}
         </button>
-        <button
+        <button type="button"
           className={"icon-btn" + (notifActive ? " is-active" : "")}
           title={unreadCount > 0 ? `${unreadCount} 則未讀通知` : "通知"}
           onClick={onBellClick}
@@ -239,7 +239,7 @@ export function TopBar({
             </span>
           )}
         </button>
-        <button className="icon-btn" title="設定 (尚未實作)" disabled>
+        <button type="button" className="icon-btn" title="設定 (尚未實作)" disabled>
           <GearIcon />
         </button>
       </div>

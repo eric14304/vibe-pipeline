@@ -26,6 +26,8 @@ export function QADrawer({
   onClose: () => void;
 }) {
   const transcriptRef = useRef<HTMLDivElement>(null);
+  // turns 增加時自動 scroll 到底,turns.length 是觸發訊號(effect 內讀 ref 不算 dep)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: turns.length is the intentional trigger
   useEffect(() => {
     transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight });
   }, [draft?.turns.length]);
@@ -40,7 +42,12 @@ export function QADrawer({
 
   return (
     <div className="drawer-stage qadr-stage">
-      <div className="drawer-scrim" onClick={onClose} />
+      <button
+        type="button"
+        className="drawer-scrim"
+        onClick={onClose}
+        aria-label="關閉"
+      />
       <div className="drawer qadr-drawer">
         <div className="drawer-head">
           <div className="drawer-crumb">
@@ -48,7 +55,7 @@ export function QADrawer({
             <span className="sep">/</span>
             <span>新 ticket</span>
             <span className="drawer-crumb-spacer" />
-            <button
+            <button type="button"
               className="create-x"
               onClick={onClose}
               title="關閉 (Esc) — draft 保留"
@@ -99,9 +106,9 @@ export function QADrawer({
               {!draft && error && <div className="qadr-error">{error}</div>}
               {draft && (
                 <>
-                  <Bubble role="ai" message={FIRST_AI_MESSAGE} />
-                  {draft.turns.map((t, i) => (
-                    <Bubble key={i} role={t.role} message={t.message} />
+                  <Bubble kind="ai" message={FIRST_AI_MESSAGE} />
+                  {draft.turns.map((t) => (
+                    <Bubble key={t.ts + ":" + t.role} kind={t.role} message={t.message} />
                   ))}
                   {busy && (
                     <div className="qadr-loading mono">
@@ -225,8 +232,8 @@ function SpecChecklist({ spec }: { spec: Partial<TicketSpec> | null }) {
               <span className="qadr-chip-panel-empty">(未填)</span>
             ) : Array.isArray(expandedValue) ? (
               <ul className="qadr-chip-panel-list">
-                {expandedValue.map((v, i) => (
-                  <li key={i}>{v}</li>
+                {expandedValue.map((v) => (
+                  <li key={String(v)}>{v}</li>
                 ))}
               </ul>
             ) : (
@@ -251,7 +258,7 @@ function lastAiOptions(
 
 function ThinkingDots() {
   return (
-    <span className="qadr-thinking-dots" aria-label="loading">
+    <span className="qadr-thinking-dots" role="status" aria-label="loading">
       <span />
       <span />
       <span />
@@ -259,10 +266,10 @@ function ThinkingDots() {
   );
 }
 
-function Bubble({ role, message }: { role: "user" | "ai"; message: string }) {
+function Bubble({ kind, message }: { kind: "user" | "ai"; message: string }) {
   return (
-    <div className={"qadr-bubble qadr-bubble-" + role}>
-      <div className="qadr-bubble-role mono">{role === "user" ? "you" : "ai"}</div>
+    <div className={"qadr-bubble qadr-bubble-" + kind}>
+      <div className="qadr-bubble-role mono">{kind === "user" ? "you" : "ai"}</div>
       <div className="qadr-bubble-msg">{message}</div>
     </div>
   );
@@ -285,6 +292,7 @@ function Composer({
   const [picked, setPicked] = useState<Set<number>>(new Set());
 
   // reset multi selection when options change (new AI turn)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: options is the intentional trigger; setPicked is stable
   useEffect(() => {
     setPicked(new Set());
   }, [options]);
@@ -318,9 +326,9 @@ function Composer({
     <div className="qadr-composer">
       {options.length > 0 && optionsMode === "single" && (
         <div className="qadr-options">
-          {options.map((o, i) => (
-            <button
-              key={i}
+          {options.map((o) => (
+            <button type="button"
+              key={o}
               className="btn qadr-option"
               onClick={() => send(o)}
               disabled={busy}
@@ -335,7 +343,7 @@ function Composer({
           <div className="qadr-options qadr-options-multi">
             {options.map((o, i) => (
               <button
-                key={i}
+                key={o}
                 type="button"
                 className={
                   "btn qadr-option qadr-option-multi" + (picked.has(i) ? " is-picked" : "")
@@ -375,7 +383,7 @@ function Composer({
           }}
           disabled={busy}
         />
-        <button
+        <button type="button"
           className="qadr-send"
           onClick={() => send(text)}
           disabled={busy || !text.trim()}
@@ -506,11 +514,11 @@ function SpecReview({
         </>
       )}
       <div className="qadr-spec-actions">
-        <button className="btn" onClick={onCancel} disabled={busy}>
+        <button type="button" className="btn" onClick={onCancel} disabled={busy}>
           取消 draft
         </button>
         <span style={{ flex: 1 }} />
-        <button className="btn btn-primary" onClick={() => onFinalize(edited)} disabled={busy}>
+        <button type="button" className="btn btn-primary" onClick={() => onFinalize(edited)} disabled={busy}>
           送出建立 ticket
         </button>
       </div>

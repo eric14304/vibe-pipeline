@@ -112,12 +112,12 @@ export function InitPopup({
         {error && <div className="init-popup-error">{error}</div>}
 
         <div className="init-foot">
-          <button className="btn" onClick={onDismiss} disabled={busy}>
+          <button type="button" className="btn" onClick={onDismiss} disabled={busy}>
             稍後再說
           </button>
           <span className="init-foot-spacer" />
           <div className="init-popup-actions">
-            <button className="btn btn-primary" onClick={autoInit} disabled={busy}>
+            <button type="button" className="btn btn-primary" onClick={autoInit} disabled={busy}>
               {busy ? (
                 <>
                   <SpinnerIcon /> 建立中…

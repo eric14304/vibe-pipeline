@@ -17,23 +17,15 @@
     "rules": {
       "recommended": true,
       "a11y": {
-        "noSvgWithoutTitle": "off",
-        "useButtonType": "off",
-        "useKeyWithClickEvents": "off",
-        "noStaticElementInteractions": "off",
-        "useSemanticElements": "off",
-        "useValidAriaRole": "off",
-        "useAriaPropsSupportedByRole": "off"
+        "noSvgWithoutTitle": "off"
       },
       "style": {
         "useTemplate": "off",
         "noNonNullAssertion": "off",
-        "noDescendingSpecificity": "off"
+        "noDescendingSpecificity": "warn"
       },
       "suspicious": {
-        "noExplicitAny": "warn",
-        "noArrayIndexKey": "off",
-        "noImplicitAnyLet": "off"
+        "noExplicitAny": "warn"
       },
       "correctness": {
         "noUnusedImports": "error",

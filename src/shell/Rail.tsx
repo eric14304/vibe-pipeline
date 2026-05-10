@@ -28,7 +28,7 @@ export function Rail({
         {creating ? (
           createSlot
         ) : (
-          <button className="rail-add" onClick={onStartCreate}>
+          <button type="button" className="rail-add" onClick={onStartCreate}>
             <PlusIcon /> <span>{addLabel}</span>
           </button>
         )}
@@ -54,7 +54,7 @@ function RailItem({ p, active, onClick, muted, hasDraft }: { p: Pipeline; active
   const done = p.tickets.filter((t) => t.status === "done").length;
   const total = p.tickets.length;
   return (
-    <button className={"rail-item" + (active ? " is-active" : "") + (muted ? " is-muted" : "")} onClick={onClick}>
+    <button type="button" className={"rail-item" + (active ? " is-active" : "") + (muted ? " is-muted" : "")} onClick={onClick}>
       <div className="rail-item-row">
         <span className="rail-state-dot" style={{ background: STATE_COLOR[p.state] }} />
         <span className="rail-item-name">{p.name}</span>
@@ -79,7 +79,7 @@ function RailItem({ p, active, onClick, muted, hasDraft }: { p: Pipeline; active
         </span>
       </div>
       <div className="rail-mini">
-        {p.tickets.map((t, i) => {
+        {p.tickets.map((t) => {
           const fill =
             t.status === "done"
               ? "var(--done)"
@@ -94,7 +94,7 @@ function RailItem({ p, active, onClick, muted, hasDraft }: { p: Pipeline; active
               : t.status === "ready"
               ? "var(--running-soft)"
               : "var(--line-2)";
-          return <span key={i} className={"rail-mini-cell" + (t.status === "running" ? " is-running" : "")} style={{ background: fill }} />;
+          return <span key={t.id} className={"rail-mini-cell" + (t.status === "running" ? " is-running" : "")} style={{ background: fill }} />;
         })}
       </div>
       <div className="rail-item-meta">

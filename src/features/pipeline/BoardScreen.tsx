@@ -155,11 +155,15 @@ export function BoardScreen({
     };
   }, [project, pipelines, items, unreadCount]);
 
+  // hash 切換時 reset 該 project 專屬 UI state
+  // biome-ignore lint/correctness/useExhaustiveDependencies: hash is the intentional trigger
   useEffect(() => {
     setPopupDismissed(false);
     setActionError(null);
   }, [hash]);
 
+  // reloadKey 是手動 force-refetch counter,改變即使內容沒變也要重抓
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reloadKey is a force-refetch trigger
   useEffect(() => {
     if (!hash) {
       setProject(null);
@@ -199,6 +203,8 @@ export function BoardScreen({
       .catch(() => setBranches([]));
   }, [project]);
 
+  // reloadKey 同上 — force-refetch trigger
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reloadKey is a force-refetch trigger
   useEffect(() => {
     if (!project?.hasInit) {
       setPipelines([]);
@@ -290,7 +296,7 @@ export function BoardScreen({
       }}
     >
       <span style={{ flex: 1, wordBreak: "break-word" }}>{actionError}</span>
-      <button
+      <button type="button"
         onClick={() => setActionError(null)}
         title="關閉"
         aria-label="關閉"

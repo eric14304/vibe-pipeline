@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 
 const LS_KEY = "vibe-pipeline:lastProjectHash";
 
@@ -8,7 +8,6 @@ export function useActiveProjectHash(): {
   setHash: (next: string | null) => void;
 } {
   const [params, setParams] = useSearchParams();
-  const navigate = useNavigate();
   const urlHash = params.get("project");
   const [fallback, setFallback] = useState<string | null>(() => {
     if (urlHash) return urlHash;
@@ -44,7 +43,7 @@ export function useActiveProjectHash(): {
       }
       setParams(p, { replace: false });
     },
-    [params, setParams, navigate]
+    [params, setParams]
   );
 
   return { hash: urlHash ?? fallback, setHash };

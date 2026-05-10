@@ -124,7 +124,7 @@ export async function turn(hash: string, draftId: string, req: Request): Promise
   const userTurns = draft.turns.filter((t) => t.role === "user").length;
   const progressHint = !isFirstTurn ? buildProgressHint(draft.spec, userTurns + 1) : undefined;
 
-  let reply;
+  let reply: Awaited<ReturnType<typeof cli.runTurn>>;
   try {
     reply = await cli.runTurn({
       cwd: project.path,

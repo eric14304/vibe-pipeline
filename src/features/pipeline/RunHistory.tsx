@@ -109,7 +109,7 @@ function RunCard({
     : "—";
   return (
     <div className="tdrw-run-card">
-      <button
+      <button type="button"
         className="tdrw-run-head"
         onClick={onToggle}
         aria-expanded={open}

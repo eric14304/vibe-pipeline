@@ -25,13 +25,13 @@ export function RunButton({
   switch (s) {
     case "running":
       return (
-        <button className="btn" onClick={() => onPause?.(pipeline.id)} title="暫停">
+        <button type="button" className="btn" onClick={() => onPause?.(pipeline.id)} title="暫停">
           ⏸ 暫停
         </button>
       );
     case "stopping":
       return (
-        <button className="btn" disabled title="停止中…">
+        <button type="button" className="btn" disabled title="停止中…">
           <span className="qadr-thinking-dots" style={{ display: "inline-flex", verticalAlign: "middle" }}>
             <span /><span /><span />
           </span>{" "}
@@ -40,13 +40,13 @@ export function RunButton({
       );
     case "ready":
       return (
-        <button className="btn" disabled title="所有 ticket 已完成">
+        <button type="button" className="btn" disabled title="所有 ticket 已完成">
           ✓ 全部完成
         </button>
       );
     case "merged":
       return (
-        <button className="btn" disabled title="Pipeline 已合併進 base branch,要再跑開新 pipeline">
+        <button type="button" className="btn" disabled title="Pipeline 已合併進 base branch,要再跑開新 pipeline">
           ✓ 已合併
         </button>
       );
@@ -55,7 +55,7 @@ export function RunButton({
     case "failed": {
       if (noTickets) {
         return (
-          <button className="btn" disabled title="按上方「+ ticket」開 QA 建第一張">
+          <button type="button" className="btn" disabled title="按上方「+ ticket」開 QA 建第一張">
             無ticket可執行
           </button>
         );
@@ -63,7 +63,7 @@ export function RunButton({
       const titleBase = s === "paused" ? "繼續" : s === "failed" ? "重試" : "開始運行";
       const title = lastDur ? `${titleBase}(上次 ${lastDur})` : titleBase;
       return (
-        <button
+        <button type="button"
           className="btn btn-primary"
           onClick={() => onRun?.(pipeline.id)}
           title={title}
@@ -131,6 +131,7 @@ export function FocusColumn({
   // Runs summary 給 head chip + RunButton 預估用。pipeline.id / state 變動就 refetch
   // (state 變表示可能新跑完一次)。失敗安靜忽略 — 純資訊性。
   const [runs, setRuns] = useState<RunSummary[]>([]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: pipeline.state is the refetch trigger (state change ≈ new run)
   useEffect(() => {
     if (!projectHash) return;
     let cancelled = false;
@@ -196,7 +197,7 @@ export function FocusColumn({
             </span>
           )}
 
-          <button className="btn" onClick={() => onAddTicket?.(pipeline.id)}>
+          <button type="button" className="btn" onClick={() => onAddTicket?.(pipeline.id)}>
             <PlusIcon /> {hasActiveDraft ? "接續 QA" : "ticket"}
           </button>
 
@@ -278,7 +279,7 @@ function EmptyTickets({
           ? "之前開了 QA 但沒收尾,點下方按鈕接續對話。"
           : "用「+ ticket」開 QA drawer,跟 AI 對話收斂出 goal / acceptance / prompt,完成後加進 pipeline。"}
       </div>
-      <button
+      <button type="button"
         className="btn btn-primary"
         onClick={onAddTicket}
         style={{ marginTop: 4 }}
@@ -329,7 +330,7 @@ function OverflowMenu({
 
   return (
     <div ref={wrapRef} style={{ position: "relative", display: "inline-block" }}>
-      <button
+      <button type="button"
         className="btn btn-ghost"
         onClick={() => setOpen((o) => !o)}
         title="更多操作"
@@ -432,7 +433,7 @@ function MenuItem({
   onClick: () => void;
 }) {
   return (
-    <button
+    <button type="button"
       role="menuitem"
       onClick={onClick}
       disabled={disabled}
@@ -495,6 +496,8 @@ function FocusTitle({
   const [draft, setDraft] = useState(pipeline.name);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // 切 pipeline(id) 或 name 從外部變動時 reset draft / 退出編輯模式
+  // biome-ignore lint/correctness/useExhaustiveDependencies: pipeline.id forces reset on pipeline switch even if name happens to match
   useEffect(() => {
     setDraft(pipeline.name);
     setEditing(false);
@@ -550,7 +553,7 @@ function FocusTitle({
             minWidth: 200,
           }}
         />
-        <button
+        <button type="button"
           className="btn btn-primary"
           onClick={commit}
           disabled={!valid || trimmed === pipeline.name}
@@ -564,7 +567,7 @@ function FocusTitle({
         >
           ↵
         </button>
-        <button
+        <button type="button"
           className="btn"
           onClick={() => {
             setEditing(false);
@@ -584,7 +587,7 @@ function FocusTitle({
     >
       {pipeline.name}
       {onRename && (
-        <button
+        <button type="button"
           className="btn btn-ghost"
           onClick={() => setEditing(true)}
           disabled={lockedByState}
@@ -624,7 +627,7 @@ export function ReadyBanner({
         </div>
       </div>
       {onRevealWorktree && (
-        <button
+        <button type="button"
           className="btn"
           onClick={() => onRevealWorktree(pipeline.id)}
           title="開啟 worktree(在裡面 git diff main..HEAD 看完整 diff)"
@@ -633,7 +636,7 @@ export function ReadyBanner({
         </button>
       )}
       {onMerge && (
-        <button
+        <button type="button"
           className="btn btn-primary"
           onClick={() => {
             const msg =
@@ -683,6 +686,9 @@ function TicketCard({
   const accent = STATE_COLOR[ticket.status] || "var(--draft)";
 
   return (
+    // ticket card 內含 chips + action button,不能用 <button> wrap(invalid HTML),
+    // 改 div + role="button" + onKeyDown 已具備鍵盤可達性
+    // biome-ignore lint/a11y/noStaticElementInteractions: clickable card with nested buttons
     <div
       className={"ticket" + (isDraft ? " is-draft" : "") + (isPaused ? " is-paused" : "")}
       style={{ animationDelay: `${index * 40}ms`, cursor: onClick ? "pointer" : undefined }}
@@ -732,8 +738,8 @@ function TicketCard({
       {isPaused && (
         <div className="ticket-paused-actions">
           <span className="paused-reason">{ticket.reason}</span>
-          <button className="btn btn-ghost">retry as-is</button>
-          <button className="btn btn-primary">介入 →</button>
+          <button type="button" className="btn btn-ghost">retry as-is</button>
+          <button type="button" className="btn btn-primary">介入 →</button>
         </div>
       )}
     </div>
@@ -817,6 +823,8 @@ function Verdicts({ list, blink }: { list: VerdictItem[]; blink: boolean }) {
           "verdict-pip " +
           (isPass ? "is-pass" : isFail ? "is-fail" : "is-warn") +
           (last && blink ? " blink" : "");
+        // append-only iter verdict 序列,沒 stable id 且值會重複(PASS/FAIL/PASS),index 是正確答案
+        // biome-ignore lint/suspicious/noArrayIndexKey: append-only verdict list with repeating values
         return <span key={i} className={cls} />;
       })}
     </span>

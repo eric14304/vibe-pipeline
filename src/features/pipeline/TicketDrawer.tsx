@@ -55,7 +55,12 @@ export function TicketDrawer({
 
   return (
     <div className="drawer-stage tdrw-stage">
-      <div className="drawer-scrim" onClick={onClose} />
+      <button
+        type="button"
+        className="drawer-scrim"
+        onClick={onClose}
+        aria-label="關閉"
+      />
       <div className="drawer tdrw-drawer">
         <div className="drawer-head">
           <div className="drawer-crumb">
@@ -65,7 +70,7 @@ export function TicketDrawer({
               ⎇ {pipelineBranch}
             </span>
             <span className="drawer-crumb-spacer" />
-            <button
+            <button type="button"
               className="create-x"
               onClick={onClose}
               title="關閉 (Esc)"
@@ -110,8 +115,8 @@ export function TicketDrawer({
           <Section label="acceptance">
             {Array.isArray(spec.acceptance) && spec.acceptance.length > 0 ? (
               <ul className="tdrw-list">
-                {spec.acceptance.map((a, i) => (
-                  <li key={i}>{a}</li>
+                {spec.acceptance.map((a) => (
+                  <li key={a}>{a}</li>
                 ))}
               </ul>
             ) : (
@@ -153,7 +158,7 @@ export function TicketDrawer({
           </Section>
           {onResetTicket && isTerminalStatus(ticket.status) && (
             <Section label="操作">
-              <button
+              <button type="button"
                 className="btn btn-ghost"
                 onClick={() => {
                   const msg =
@@ -259,7 +264,7 @@ function Commits({ commits }: { commits: CommitRef[] }) {
     <div className="tdrw-commits">
       {commits.map((c) => (
         <div key={c.hash} className="tdrw-commit">
-          <button
+          <button type="button"
             className="mono tdrw-commit-hash tdrw-commit-hash-btn"
             title={copiedHash === c.hash ? "已複製!" : `點擊複製完整 hash\n${c.hash}`}
             onClick={() => copy(c.hash)}

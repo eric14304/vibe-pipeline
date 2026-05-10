@@ -6,12 +6,6 @@
   z-index: 200;
   pointer-events: none;
 }
-.qadr-stage > .drawer-scrim {
-  pointer-events: auto;
-}
-.qadr-stage > .qadr-drawer {
-  pointer-events: auto;
-}
 
 .qadr-drawer {
   position: absolute;
@@ -25,6 +19,12 @@
   display: flex;
   flex-direction: column;
   box-shadow: var(--shadow-lg);
+}
+.qadr-stage > .drawer-scrim {
+  pointer-events: auto;
+}
+.qadr-stage > .qadr-drawer {
+  pointer-events: auto;
 }
 
 .qadr-body {
@@ -276,10 +276,6 @@
   align-items: stretch;
   width: 100%;
 }
-.qadr-composer-row .qadr-input {
-  flex: 1;
-  min-width: 0;
-}
 .qadr-send {
   display: inline-flex;
   align-items: center;
@@ -332,6 +328,10 @@
 .qadr-input:focus {
   outline: none;
   border-color: var(--accent);
+}
+.qadr-composer-row .qadr-input {
+  flex: 1;
+  min-width: 0;
 }
 .qadr-textarea {
   font-family: inherit;

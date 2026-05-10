@@ -399,8 +399,6 @@ html.light .drawer {
   flex-direction: row;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--running) 10%, transparent);
 }
-.iter-row.iter-row-expanded .live-stream { max-height: 280px; border-radius: 0; }
-.iter-row.iter-row-expanded .live-foot { border-radius: 0; }
 .live-iter {
   display: inline-flex; align-items: center; gap: 7px;
   font-weight: 600;
@@ -480,6 +478,8 @@ html.light .drawer {
   font-size: 11px; color: var(--fg-mute);
   background: var(--panel-2);
 }
+.iter-row.iter-row-expanded .live-stream { max-height: 280px; border-radius: 0; }
+.iter-row.iter-row-expanded .live-foot { border-radius: 0; }
 .live-foot .left {
   display: inline-flex; align-items: center; gap: 6px;
 }
