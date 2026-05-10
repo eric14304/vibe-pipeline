@@ -32,7 +32,10 @@ export function RunButton({
   const lastDur = lastRun?.durationMs ? fmtRunDur(lastRun.durationMs) : null;
 
   // spawning 期間統一顯「啟動中…」覆蓋掉原本的「開始/繼續/重試」狀態
-  if (spawning && (s === "planning" || s === "paused" || s === "failed")) {
+  if (
+    spawning &&
+    (s === "planning" || s === "paused" || s === "failed" || s === "ready" || s === "merged")
+  ) {
     return (
       <button type="button" className="btn" disabled title="啟動 runner session…">
         <span className="qadr-thinking-dots" style={{ display: "inline-flex", verticalAlign: "middle" }}>
@@ -73,39 +76,31 @@ export function RunButton({
         </button>
       );
     }
-    case "ready":
-      return (
-        <button type="button" className="btn" disabled title="所有 ticket 已完成">
-          ✓ 全部完成
-        </button>
-      );
-    case "merged":
-      return (
-        <button type="button" className="btn" disabled title="Pipeline 已合併進 base branch,要再跑開新 pipeline">
-          ✓ 已合併
-        </button>
-      );
     case "planning":
     case "paused":
-    case "failed": {
-      // 沒「可跑」的 real ticket = 沒 ticket / 都 done / 只剩 merge ticket。
-      // merge ticket 不認列(它的 retry 走 ReadyBanner,RunButton 是 step/iter 用的)。
+    case "failed":
+    case "ready":
+    case "merged": {
+      // 沒「可跑」的 real ticket = 沒 ticket / 都 done / 只剩 merge ticket(retry 走 banner)。
+      // merge / sync ticket 不認列(synthetic,各自有 banner / chip 觸發)。
       const hasRunnableReal = pipeline.tickets.some(
         (t) =>
           t.mode !== "merge" &&
+          t.mode !== "sync" &&
           (t.status === "draft" || t.status === "ready" || t.status === "paused")
       );
       if (noTickets || !hasRunnableReal) {
         const title = noTickets
           ? "按上方「+ ticket」開 QA 建第一張"
-          : "沒可跑的 ticket(失敗 / done 不算可跑;merge 處理走 banner)";
+          : "沒可跑的 ticket(失敗 / done 不算可跑;merge / sync 處理走 banner / chip)";
         return (
           <button type="button" className="btn" disabled title={title}>
             無ticket可執行
           </button>
         );
       }
-      const titleBase = s === "paused" ? "繼續" : s === "failed" ? "重試" : "開始運行";
+      const titleBase =
+        s === "paused" ? "繼續" : s === "failed" ? "重試" : s === "merged" ? "再跑一輪" : "開始運行";
       const title = lastDur ? `${titleBase}(上次 ${lastDur})` : titleBase;
       return (
         <button type="button"

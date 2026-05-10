@@ -7,8 +7,8 @@ export type TicketStatus =
   | "failed"
   | "failed_iter_limit"
   | "failed_transient";
-// "merge" 是 synthetic ticket(/merge endpoint append),不在 QA / TicketSpec 列表
-export type TicketMode = "step" | "iter" | "merge";
+// "merge" / "sync" 是 synthetic ticket(/merge / /sync endpoint append),不在 QA / TicketSpec 列表
+export type TicketMode = "step" | "iter" | "merge" | "sync";
 export type IterStage = "doer" | "critic" | "✓" | "done";
 
 // 1/0/-1 是舊 prototype mock 格式;runner 寫回是字串 "PASS"/"FAIL"/"PARTIAL"
