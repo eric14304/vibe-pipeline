@@ -386,7 +386,11 @@ export function FocusColumn({
             </button>
           )}
 
-          <button type="button" className="btn" onClick={() => onAddTicket?.(pipeline.id)}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => onAddTicket?.(pipeline.id)}
+          >
             <PlusIcon /> {hasActiveDraft ? "接續 QA" : "ticket"}
           </button>
 
