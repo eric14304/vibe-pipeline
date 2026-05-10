@@ -82,11 +82,18 @@ test("iter ticket FAIL → PASS chain on vp-autotest($1.5 估)", async () => {
   console.log(`[real] QA draft: ${draftId}`);
 
   // 3. 走 QA turns 到 complete(逐輪推 claude 補齊 spec)
-  // 用一個會讓 critic 第一輪不過的 task:多 acceptance + 模糊細節 → executor 容易漏
+  // 設計上要讓 first attempt 容易踩到 forbidden pattern,critic 有明確檢查依據
   const opener =
-    "iter mode。在 src/util.ts 新增 add(a, b) 函式:" +
-    "兩個 number → 相加 / 兩個 string → concat / 其他 type → throw TypeError。" +
-    "請收齊 spec(title/goal/acceptance/prompt/mode=iter,iterLimit=3),iter mode 必填。";
+    "iter mode,iterLimit=3。在 src/jsonStringify.ts 新增 default export `stringify(v: unknown): string`。" +
+    "嚴格規格(critic 要逐項驗,缺一項就 FAIL,critic 必須讀檔內容檢查):" +
+    "(A) 行為要跟 JSON.stringify 一致(null / number / string / bool / array / plain object / nested)。" +
+    "(B) 禁止呼叫 JSON.stringify / JSON.parse / 任何 JSON.*(critic 必須 grep 確認檔案內無 'JSON.' 出現,有就 FAIL)。" +
+    "(C) 字串需 escape:\\\\、\\\"、\\n、\\t、\\r、\\b、\\f,以及 control char (< 0x20) 用 \\uXXXX(4 位 hex,小寫)。" +
+    "(D) Object key 不保證順序但 array 順序保留。" +
+    "(E) circular reference → throw TypeError 'circular structure'(精確訊息)。" +
+    "(F) function / undefined value 在 array 中應變 'null',在 object 中應省略該 key。" +
+    "(G) acceptance 必須完整列出 A-F,critic 必須 Bash grep 'JSON\\\\.' src/jsonStringify.ts 確認 forbidden pattern 不在,有就 FAIL。" +
+    "請收齊 spec 並設 mode=iter,iterLimit=3,iterStopAtLimit=true。";
   let reply = await api<{ reply: { complete: boolean; options: string[] } }>(
     `/projects/${VP_AUTOTEST_HASH}/qa/${draftId}/turn`,
     {
