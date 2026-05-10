@@ -30,6 +30,7 @@ export function TicketDrawer({
   onSplitTicket,
   onDeleteTicket,
   onToggleMode,
+  onChangeIterLimit,
 }: {
   ticket: Ticket;
   pipelineName: string;
@@ -41,6 +42,7 @@ export function TicketDrawer({
   onSplitTicket?: (ticketId: string) => Promise<void> | void;
   onDeleteTicket?: (ticketId: string) => Promise<void> | void;
   onToggleMode?: (ticketId: string, nextMode: "step" | "iter") => Promise<void> | void;
+  onChangeIterLimit?: (ticketId: string, limit: number) => Promise<void> | void;
 }) {
   const confirm = useConfirm();
   useEffect(() => {
@@ -139,8 +141,12 @@ export function TicketDrawer({
                 </span>
               );
             })()}
-            {ticket.mode === "iter" && spec.iterLimit != null && (
-              <span>上限 {spec.iterLimit} 輪</span>
+            {ticket.mode === "iter" && (
+              <IterLimitField
+                ticket={ticket}
+                value={spec.iterLimit ?? 5}
+                onChange={onChangeIterLimit}
+              />
             )}
           </div>
           {(onResetTicket || onSplitTicket || onDeleteTicket) &&
@@ -261,6 +267,62 @@ export function TicketDrawer({
         </div>
       </div>
     </div>
+  );
+}
+
+// 迭代上限欄位:draft / ready 狀態的 iter ticket 顯 number input,點 ▲▼ / 直接打字改;
+// 失焦或 Enter 才送(避免每按一下都打 API)。其他狀態 read-only 顯「上限 N 輪」。
+function IterLimitField({
+  ticket,
+  value,
+  onChange,
+}: {
+  ticket: Ticket;
+  value: number;
+  onChange?: (ticketId: string, limit: number) => Promise<void> | void;
+}) {
+  const editable =
+    !!onChange &&
+    ticket.mode === "iter" &&
+    (ticket.status === "draft" || ticket.status === "ready");
+  const [draft, setDraft] = useState(String(value));
+  // ticket value 從外部變化(別人改 / refetch)→ 同步進來
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+
+  if (!editable) {
+    return <span>上限 {value} 輪</span>;
+  }
+  function commit() {
+    const n = Math.max(1, Math.min(20, Math.floor(Number(draft) || value)));
+    setDraft(String(n));
+    if (n !== value) onChange?.(ticket.id, n);
+  }
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+      <span style={{ color: "var(--fg-mute)" }}>上限</span>
+      <input
+        type="number"
+        min={1}
+        max={20}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            (e.target as HTMLInputElement).blur();
+          }
+          if (e.key === "Escape") {
+            setDraft(String(value));
+            (e.target as HTMLInputElement).blur();
+          }
+        }}
+        title="迭代上限輪數 (1-20),Enter 送 / Esc 還原"
+        className="tdrw-iter-limit"
+      />
+      <span style={{ color: "var(--fg-mute)" }}>輪</span>
+    </span>
   );
 }
 

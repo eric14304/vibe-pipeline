@@ -20,6 +20,29 @@
   box-shadow: var(--shadow-lg);
 }
 
+/* iter 上限 input — 跟 drawer-meta 內 chip 共處,小巧,只露數字 */
+.tdrw-iter-limit {
+  width: 44px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  padding: 2px 4px;
+  border-radius: 4px;
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--fg);
+}
+.tdrw-iter-limit:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+/* 隱藏 number input 的上下 spinner 預設樣式(各瀏覽器醜) */
+.tdrw-iter-limit::-webkit-inner-spin-button,
+.tdrw-iter-limit::-webkit-outer-spin-button {
+  opacity: 0.5;
+}
+
 /* 操作 toolbar — 按鈕橫向 stretch 撐滿整行(每顆 flex:1),不留左側空白。
    跟 board 上 + ticket / RunButton 一樣的 .btn 視覺。 */
 .tdrw-actions {
