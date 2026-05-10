@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { existsSync, statSync } from "node:fs";
+import { existsSync } from "node:fs";
 import * as projectStore from "../lib/projectStore";
 import * as pipelineDir from "../lib/pipelineDir";
 import * as git from "../lib/git";
@@ -11,7 +11,8 @@ import { mergeTicketPrompt } from "../lib/runner/mergeTicketPrompt";
 import { syncTicketPrompt } from "../lib/runner/syncTicketPrompt";
 import { pickFolder, revealFolder } from "../lib/dialog";
 import { projectHash } from "../lib/hash";
-import { requireJsonUtf8 } from "../lib/http";
+import { isExistingDirectory } from "../lib/fs";
+import { requireJsonUtf8 } from "./_http";
 import type { ApiResponse, ApiErrorCode, Project } from "../../shared/types";
 
 function ok<T>(data: T): Response {
@@ -32,16 +33,8 @@ async function readJson(req: Request): Promise<Record<string, unknown>> {
   }
 }
 
-function validProjectPath(p: string): boolean {
-  if (!p || typeof p !== "string") return false;
-  const abs = resolve(p);
-  if (!existsSync(abs)) return false;
-  try {
-    return statSync(abs).isDirectory();
-  } catch {
-    return false;
-  }
-}
+// validProjectPath 是 isExistingDirectory 在 routes 層的 alias,維持原本呼叫點不動。
+const validProjectPath = isExistingDirectory;
 
 export async function listRecent(): Promise<Response> {
   const items = await projectStore.listRecent();
@@ -325,34 +318,6 @@ export async function pausePipeline(hash: string, pipelineId: string): Promise<R
   return ok({ ok: true });
 }
 
-// 跑 git -C <path> status --porcelain 判 working tree 乾淨。
-// 回 { ok: true } 表示乾淨可動;{ ok: false, modified, untracked, files } 表示髒,給 UI 顯示。
-async function checkWorkingTreeDirty(projectPath: string): Promise<
-  | { ok: true }
-  | { ok: false; modified: number; untracked: number; files: string[] }
-> {
-  const proc = Bun.spawn(["git", "-C", projectPath, "status", "--porcelain"], {
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  const out = (await new Response(proc.stdout).text()).trim();
-  await proc.exited;
-  if (out.length === 0) return { ok: true };
-  const lines = out.split(/\r?\n/);
-  let modified = 0;
-  let untracked = 0;
-  const files: string[] = [];
-  for (const line of lines) {
-    // porcelain format: "XY filename" 兩個 status code
-    const code = line.slice(0, 2);
-    const file = line.slice(3);
-    if (code.startsWith("??")) untracked++;
-    else modified++;
-    if (files.length < 12) files.push(file); // 前 12 個給 UI 顯示
-  }
-  return { ok: false, modified, untracked, files };
-}
-
 // AI merge(ticket-based):append 一張 mode=merge synthetic ticket 進 pipeline,
 // 然後觸發 runner 接管。merge ticket 由 sub-agent 在 main repo 跑(不在 worktree)。
 // 完成後 runner 主 agent 看到 mode=merge done,把 pipeline.state 設 merged + mergeCommit。
@@ -367,8 +332,8 @@ export async function mergePipeline(hash: string, pipelineId: string): Promise<R
   // Preflight:main repo working tree 必須乾淨。
   // AI merge agent 在 main repo 動 git checkout,如果有未 commit 的東西會撞;
   // 直接擋下,要 user 先 commit 比 AI 試錯燒 token 後失敗划算。
-  const dirty = await checkWorkingTreeDirty(project.path);
-  if (!dirty.ok) {
+  const dirty = await git.workingTreeStatus(project.path);
+  if (!dirty.clean) {
     return Response.json(
       {
         ok: false,

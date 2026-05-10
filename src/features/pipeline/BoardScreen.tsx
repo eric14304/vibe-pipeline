@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "../../shell/AppShell";
 import { Rail } from "../../shell/Rail";
 import { TopBar } from "../../shell/TopBar";
@@ -10,6 +10,8 @@ import { InitPopup } from "../init/InitPopup";
 import { InboxColumn } from "../notifications/InboxColumn";
 import { QADrawer } from "../qa/QADrawer";
 import { useQA } from "../qa/useQA";
+import { SettingsPopover } from "../settings/SettingsPopover";
+import { GearIcon } from "../../ui/icons";
 import type { NotifItem } from "../../types/notif";
 import { useActiveProjectHash } from "../../hooks/useActiveProject";
 import * as api from "../../api/projects";
@@ -306,7 +308,12 @@ export function BoardScreen({
     <TopBar
       runningCount={runningCount}
       maxParallel={maxParallel}
-      onConfigSaved={(cfg) => setMaxParallel(cfg.defaults.max_parallel)}
+      settingsSlot={
+        <SettingsButton
+          hash={hash}
+          onConfigSaved={(cfg) => setMaxParallel(cfg.defaults.max_parallel)}
+        />
+      }
     />
   );
   // actionError 用右下角小 toast 浮現,別用 NotifBanner(那是 prototype 用,真 notif 走 inbox)
@@ -763,6 +770,46 @@ function fmtTs(ms: number): { ts: string; since: number } {
   if (since < 3600) return { ts: `${Math.floor(since / 60)} min`, since };
   if (since < 86400) return { ts: `${Math.floor(since / 3600)} h`, since };
   return { ts: `${Math.floor(since / 86400)} d`, since };
+}
+
+// Gear button + Settings popover。原本在 shell/TopBar 內,因為 SettingsPopover 屬 features/
+// 不該被 shell 認識,改由 BoardScreen 注入 TopBar 的 settingsSlot。
+function SettingsButton({
+  hash,
+  onConfigSaved,
+}: {
+  hash: string | null;
+  onConfigSaved?: (cfg: api.ProjectConfig) => void;
+}) {
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  return (
+    <span style={{ position: "relative", display: "inline-block" }}>
+      <button
+        ref={btnRef}
+        type="button"
+        className={"icon-btn" + (open ? " is-active" : "")}
+        title={hash ? "設定" : "選擇 project 後可開設定"}
+        onClick={() => hash && setOpen((o) => !o)}
+        disabled={!hash}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+      >
+        <GearIcon />
+      </button>
+      {hash && (
+        <SettingsPopover
+          hash={hash}
+          open={open}
+          onClose={() => setOpen(false)}
+          onSaved={(cfg) => {
+            onConfigSaved?.(cfg);
+          }}
+          anchorRef={btnRef}
+        />
+      )}
+    </span>
+  );
 }
 
 function toNotifItem(r: api.NotifRecord): NotifItem {

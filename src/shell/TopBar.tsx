@@ -1,20 +1,21 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Logo } from "../ui/Logo";
-import { CheckIconSm, ChevronIcon, FolderIcon, GearIcon, MoonIcon, PlusIcon, SunIcon } from "../ui/icons";
+import { CheckIconSm, ChevronIcon, FolderIcon, MoonIcon, PlusIcon, SunIcon } from "../ui/icons";
 import * as api from "../api/projects";
 import { useActiveProjectHash } from "../hooks/useActiveProject";
 import type { Project } from "../../shared/types";
-import { SettingsPopover } from "../features/settings/SettingsPopover";
 
 export function TopBar({
   runningCount = 0,
   maxParallel = 0,
-  onConfigSaved,
+  settingsSlot,
 }: {
   runningCount?: number;
   maxParallel?: number;
-  onConfigSaved?: (cfg: api.ProjectConfig) => void;
+  // shell 是版型容器,settings 屬於 features/ → 由外部(BoardScreen)注入,
+  // TopBar 自己不認識 features/settings,維持 shell↛features 的 layering
+  settingsSlot?: ReactNode;
 } = {}) {
   const { hash, setHash } = useActiveProjectHash();
   const [recents, setRecents] = useState<Project[]>([]);
@@ -230,10 +231,7 @@ export function TopBar({
         >
           {isDark ? <SunIcon /> : <MoonIcon />}
         </button>
-        <SettingsButton
-          hash={hash}
-          onConfigSaved={onConfigSaved}
-        />
+        {settingsSlot}
       </div>
     </div>
   );
@@ -262,44 +260,6 @@ function ParallelChip({ running, max }: { running: number; max: number }) {
       <span style={{ color: "var(--fg-mute)" }}>▶</span>
       {running}/{max}
       {overload && <span style={{ color: "var(--failed)" }}>!</span>}
-    </span>
-  );
-}
-
-function SettingsButton({
-  hash,
-  onConfigSaved,
-}: {
-  hash: string | null;
-  onConfigSaved?: (cfg: api.ProjectConfig) => void;
-}) {
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const [open, setOpen] = useState(false);
-  return (
-    <span style={{ position: "relative", display: "inline-block" }}>
-      <button
-        ref={btnRef}
-        type="button"
-        className={"icon-btn" + (open ? " is-active" : "")}
-        title={hash ? "設定" : "選擇 project 後可開設定"}
-        onClick={() => hash && setOpen((o) => !o)}
-        disabled={!hash}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-      >
-        <GearIcon />
-      </button>
-      {hash && (
-        <SettingsPopover
-          hash={hash}
-          open={open}
-          onClose={() => setOpen(false)}
-          onSaved={(cfg) => {
-            onConfigSaved?.(cfg);
-          }}
-          anchorRef={btnRef}
-        />
-      )}
     </span>
   );
 }

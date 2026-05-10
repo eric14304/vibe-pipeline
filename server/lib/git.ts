@@ -32,6 +32,36 @@ export async function currentBranch(projectPath: string): Promise<string | null>
   return trimmed.length > 0 ? trimmed : null;
 }
 
+// 跑 git -C <path> status --porcelain 判 working tree 乾淨。
+// 回 { clean: true } 表示乾淨可動;{ clean: false, modified, untracked, files } 表示髒。
+// AI merge / runner spawn 前呼叫,避免動到 user 沒 commit 的工作。
+export type WorkingTreeStatus =
+  | { clean: true }
+  | { clean: false; modified: number; untracked: number; files: string[] };
+
+export async function workingTreeStatus(projectPath: string): Promise<WorkingTreeStatus> {
+  const proc = Bun.spawn(["git", "-C", projectPath, "status", "--porcelain"], {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const out = (await new Response(proc.stdout).text()).trim();
+  await proc.exited;
+  if (out.length === 0) return { clean: true };
+  const lines = out.split(/\r?\n/);
+  let modified = 0;
+  let untracked = 0;
+  const files: string[] = [];
+  for (const line of lines) {
+    // porcelain format: "XY filename" 兩個 status code
+    const code = line.slice(0, 2);
+    const file = line.slice(3);
+    if (code.startsWith("??")) untracked++;
+    else modified++;
+    if (files.length < 12) files.push(file); // 前 12 個給 UI 顯示
+  }
+  return { clean: false, modified, untracked, files };
+}
+
 // list local branches (for CreateCard base branch picker)
 // 過濾掉 pipeline/* (vibe-pipeline 自家建的 worktree branch)避免 base 撞自己
 export async function listBranches(projectPath: string): Promise<string[]> {

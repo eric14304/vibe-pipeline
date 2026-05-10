@@ -3,7 +3,7 @@ import * as pipelineDir from "../lib/pipelineDir";
 import * as draftStore from "../lib/qa/draftStore";
 import * as cli from "../lib/qa/claudeCli";
 import { splitTicketSpec, SplitError } from "../lib/qa/splitTicket";
-import { requireJsonUtf8 } from "../lib/http";
+import { requireJsonUtf8 } from "./_http";
 import type { ApiResponse, ApiErrorCode, PartialSpec, TicketSpec } from "../../shared/types";
 
 const REQUIRED_FIELDS: { key: keyof PartialSpec; label: string }[] = [
