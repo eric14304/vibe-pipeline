@@ -41,3 +41,29 @@ export function fmtElapsed(s: number): string {
     sec = s % 60;
   return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
 }
+
+// 把 runner 寫進 ticket.iter.rounds[].criticVerdict 的 verdict 同義 normalize 成
+// PASS / FAIL / PARTIAL / UNKNOWN 四種規範值。runner 歷史上有 string("PASS"/"FAIL"/"PARTIAL")
+// 跟 number(1 / -1 / 0)兩種寫法,UI 端統一靠這個 helper 收。
+export type NormalizedVerdict = "PASS" | "FAIL" | "PARTIAL" | "UNKNOWN";
+
+export function normalizeVerdict(v: unknown): NormalizedVerdict {
+  if (v == null) return "UNKNOWN";
+  const k = typeof v === "string" ? v.toUpperCase() : String(v);
+  if (k === "PASS" || k === "1") return "PASS";
+  if (k === "FAIL" || k === "-1") return "FAIL";
+  if (k === "PARTIAL" || k === "0") return "PARTIAL";
+  return "UNKNOWN";
+}
+
+// ms → 人類可讀短字串:`30s` / `2m 5s` / `1h 12m`(0 秒省略)。
+// 給 RunHistory / TicketDrawer iter rounds / FocusColumn last-run chip 共用。
+export function fmtDuration(ms: number): string {
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  if (m < 60) return sec ? `${m}m ${sec}s` : `${m}m`;
+  const h = Math.floor(m / 60);
+  return `${h}h ${m % 60}m`;
+}

@@ -1,7 +1,5 @@
 import type {
-  ApiResponse,
   Project,
-  ApiErrorCode,
   NotifRecord,
   RunSummary,
   RunDetail,
@@ -9,28 +7,10 @@ import type {
   DiffFile,
   FullDiff,
 } from "../../shared/types";
+import { call, ApiError } from "./_client";
 
 export type { NotifRecord, RunSummary, RunDetail, DiffStat, DiffFile, FullDiff };
-
-export class ApiError extends Error {
-  constructor(public code: ApiErrorCode, message: string) {
-    super(message);
-  }
-}
-
-type CallInit = { method?: string; body?: unknown; headers?: Record<string, string> };
-
-async function call<T>(path: string, init?: CallInit): Promise<T> {
-  const opts: RequestInit = { method: init?.method, headers: init?.headers };
-  if (init?.body !== undefined) {
-    opts.body = typeof init.body === "string" ? init.body : JSON.stringify(init.body);
-    opts.headers = { "Content-Type": "application/json; charset=utf-8", ...(init.headers || {}) };
-  }
-  const res = await fetch(path, opts);
-  const json = (await res.json()) as ApiResponse<T>;
-  if (!json.ok) throw new ApiError(json.error.code, json.error.message);
-  return json.data;
-}
+export { ApiError };
 
 export function listRecent(): Promise<Project[]> {
   return call<Project[]>("/api/projects");

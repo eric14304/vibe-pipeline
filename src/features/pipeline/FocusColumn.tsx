@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { CheckCircleIcon, FolderIcon, MergeIcon, PlusIcon } from "../../ui/icons";
-import { STATE_COLOR, STATE_LABEL, fmtElapsed } from "../../data/pipelines";
+import { STATE_COLOR, STATE_LABEL, fmtElapsed, fmtDuration, normalizeVerdict } from "../../data/pipelines";
 import { MODE_LABELS } from "../../api/qa";
 import { useConfirm } from "../../ui/ConfirmDialog";
 import { DiffModal } from "./DiffModal";
@@ -29,7 +29,7 @@ export function RunButton({
 }) {
   const s = pipeline.state;
   const noTickets = pipeline.tickets.length === 0;
-  const lastDur = lastRun?.durationMs ? fmtRunDur(lastRun.durationMs) : null;
+  const lastDur = lastRun?.durationMs ? fmtDuration(lastRun.durationMs) : null;
 
   // spawning 期間統一顯「啟動中…」覆蓋掉原本的「開始/繼續/重試」狀態
   if (
@@ -125,17 +125,6 @@ export function RunButton({
     }
   }
 }
-
-function fmtRunDur(ms: number): string {
-  const s = Math.round(ms / 1000);
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  const sec = s % 60;
-  if (m < 60) return `${m}m${sec ? ` ${sec}s` : ""}`;
-  const h = Math.floor(m / 60);
-  return `${h}h ${m % 60}m`;
-}
-
 
 export function FocusColumn({
   pipeline,
@@ -1097,14 +1086,13 @@ const STAGE_LABEL: Record<IterStage, string> = {
   done: "結果",
 };
 
-// 顯示 PASS/FAIL/PARTIAL 簡短版,擺在「結果」階段裡
+// 顯示 PASS/FAIL/PARTIAL 簡短版,擺在「結果」階段裡。base 走 normalizeVerdict,
+// 這層只負責 UNKNOWN→? 與 PARTIAL→PART 的顯示縮寫。
 function fmtVerdict(v: unknown): string {
-  if (v == null) return "?";
-  const k = typeof v === "string" ? v.toUpperCase() : String(v);
-  if (k === "PASS" || k === "1") return "PASS";
-  if (k === "FAIL" || k === "-1") return "FAIL";
-  if (k === "PARTIAL" || k === "0") return "PART";
-  return "?";
+  const n = normalizeVerdict(v);
+  if (n === "UNKNOWN") return "?";
+  if (n === "PARTIAL") return "PART";
+  return n;
 }
 
 function IterStages({

@@ -4,7 +4,7 @@ import "../../styles/drawer.css";
 import "./ticketDrawer.css";
 import type { Ticket, IterRound, CommitRef } from "../../types/pipeline";
 import { MODE_LABELS } from "../../api/qa";
-import { STATE_COLOR } from "../../data/pipelines";
+import { STATE_COLOR, fmtDuration, normalizeVerdict } from "../../data/pipelines";
 import { useConfirm } from "../../ui/ConfirmDialog";
 import { RunHistory } from "./RunHistory";
 
@@ -366,16 +366,16 @@ function IterRounds({ rounds }: { rounds: IterRound[] }) {
   return (
     <div className="tdrw-iter-rounds">
       {rounds.map((r) => {
-        const v = String(r.criticVerdict ?? "").toUpperCase();
+        const n = normalizeVerdict(r.criticVerdict);
         const cls =
-          v === "PASS"
+          n === "PASS"
             ? "is-pass"
-            : v === "FAIL"
+            : n === "FAIL"
             ? "is-fail"
             : "is-partial";
         const dur =
           r.endedAt && r.startedAt
-            ? fmtDur(r.endedAt - r.startedAt)
+            ? fmtDuration(r.endedAt - r.startedAt)
             : "—";
         return (
           <div key={r.n} className="tdrw-iter-round">
@@ -443,12 +443,6 @@ function Commits({ commits }: { commits: CommitRef[] }) {
       ))}
     </div>
   );
-}
-
-function fmtDur(ms: number): string {
-  const s = Math.round(ms / 1000);
-  if (s < 60) return `${s}s`;
-  return `${Math.floor(s / 60)}m ${s % 60}s`;
 }
 
 function fmtTimeShort(ms: number): string {

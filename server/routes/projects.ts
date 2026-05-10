@@ -12,26 +12,8 @@ import { syncTicketPrompt } from "../lib/runner/syncTicketPrompt";
 import { pickFolder, revealFolder } from "../lib/dialog";
 import { projectHash } from "../lib/hash";
 import { isExistingDirectory } from "../lib/fs";
-import { requireJsonUtf8 } from "./_http";
-import type { ApiResponse, ApiErrorCode, Project } from "../../shared/types";
-
-function ok<T>(data: T): Response {
-  return Response.json({ ok: true, data } satisfies ApiResponse<T>);
-}
-
-function err(code: ApiErrorCode, message: string, status = 400): Response {
-  return Response.json({ ok: false, error: { code, message } } satisfies ApiResponse<never>, {
-    status,
-  });
-}
-
-async function readJson(req: Request): Promise<Record<string, unknown>> {
-  try {
-    return (await req.json()) as Record<string, unknown>;
-  } catch {
-    return {};
-  }
-}
+import { requireJsonUtf8, ok, err, readJson } from "./_http";
+import type { ApiErrorCode, Project } from "../../shared/types";
 
 // validProjectPath 是 isExistingDirectory 在 routes 層的 alias,維持原本呼叫點不動。
 const validProjectPath = isExistingDirectory;

@@ -3,8 +3,8 @@ import * as pipelineDir from "../lib/pipelineDir";
 import * as draftStore from "../lib/qa/draftStore";
 import * as cli from "../lib/qa/claudeCli";
 import { splitTicketSpec, SplitError } from "../lib/qa/splitTicket";
-import { requireJsonUtf8 } from "./_http";
-import type { ApiResponse, ApiErrorCode, PartialSpec, TicketSpec } from "../../shared/types";
+import { requireJsonUtf8, ok, err, readJson } from "./_http";
+import type { PartialSpec, TicketSpec } from "../../shared/types";
 
 const REQUIRED_FIELDS: { key: keyof PartialSpec; label: string }[] = [
   { key: "title", label: "title(15 字內)" },
@@ -46,22 +46,6 @@ function buildProgressHint(spec: PartialSpec | null, turnNumber: number): string
 }
 
 
-
-function ok<T>(data: T): Response {
-  return Response.json({ ok: true, data } satisfies ApiResponse<T>);
-}
-function err(code: ApiErrorCode, message: string, status = 400): Response {
-  return Response.json({ ok: false, error: { code, message } } satisfies ApiResponse<never>, {
-    status,
-  });
-}
-async function readJson(req: Request): Promise<Record<string, unknown>> {
-  try {
-    return (await req.json()) as Record<string, unknown>;
-  } catch {
-    return {};
-  }
-}
 
 async function projectFor(hash: string) {
   const p = await projectStore.findByHash(hash);
