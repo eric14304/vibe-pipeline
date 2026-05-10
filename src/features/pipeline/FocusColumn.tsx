@@ -735,6 +735,8 @@ export function ReadyBanner({
 }) {
   const confirm = useConfirm();
   const [diffOpen, setDiffOpen] = useState(false);
+  // merge spawning:點按鈕後鎖住直到 polling 看到 state 變化(running/merged 或 merge ticket 真開跑)
+  const [mergeSpawning, setMergeSpawning] = useState(false);
   const commitCount = pipeline.tickets.reduce(
     (sum, t) => sum + (t.commits?.length ?? 0),
     0
@@ -749,6 +751,25 @@ export function ReadyBanner({
         t.status === "failed_transient" ||
         t.status === "paused")
   );
+  const runningMergeTicket = pipeline.tickets.some(
+    (t) => t.mode === "merge" && t.status === "running"
+  );
+  // pipeline state 變 running / merged 或 merge ticket 真開跑 → 清 spawning
+  useEffect(() => {
+    if (
+      pipeline.state === "running" ||
+      pipeline.state === "merged" ||
+      runningMergeTicket
+    ) {
+      setMergeSpawning(false);
+    }
+  }, [pipeline.state, runningMergeTicket]);
+  // 安全網 15s
+  useEffect(() => {
+    if (!mergeSpawning) return;
+    const id = setTimeout(() => setMergeSpawning(false), 15000);
+    return () => clearTimeout(id);
+  }, [mergeSpawning]);
 
   return (
     <div
@@ -799,7 +820,7 @@ export function ReadyBanner({
           onClose={() => setDiffOpen(false)}
         />
       )}
-      {onMerge && !isMerged && (
+      {onMerge && !isMerged && !mergeSpawning && (
         <button type="button"
           className="btn btn-primary"
           onClick={async () => {
@@ -822,7 +843,10 @@ export function ReadyBanner({
                   : `會 append 一張 merge ticket 進 pipeline 由 runner 派 sub-agent 處理(checkout / merge / 解衝突 / 跑驗證 / commit)。`),
               confirmLabel: isRetry ? "重試合併" : `AI 合併入 ${baseBranch}`,
             });
-            if (ok) onMerge(pipeline.id);
+            if (ok) {
+              setMergeSpawning(true);
+              onMerge(pipeline.id);
+            }
           }}
           title={
             failedMerge
@@ -831,6 +855,14 @@ export function ReadyBanner({
           }
         >
           <MergeIcon /> {failedMerge ? "重試 AI 合併" : `AI 合併入 ${baseBranch}`}
+        </button>
+      )}
+      {mergeSpawning && (
+        <button type="button" className="btn" disabled title="啟動 AI merge agent…">
+          <span className="qadr-thinking-dots" style={{ display: "inline-flex", verticalAlign: "middle" }}>
+            <span /><span /><span />
+          </span>{" "}
+          啟動中
         </button>
       )}
     </div>
