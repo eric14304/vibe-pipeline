@@ -118,34 +118,33 @@
   width: 18px; height: 1px; background: var(--line);
   margin: 2px 0;
 }
-.inbox-strip-item {
-  width: 32px; height: 32px;
-  border-radius: 7px;
-  display: inline-flex; align-items: center; justify-content: center;
-  font-size: 14px; line-height: 1;
-  background: color-mix(in srgb, var(--strip-color) 14%, transparent);
-  color: var(--strip-color);
-  border: 1px solid color-mix(in srgb, var(--strip-color) 35%, transparent);
-  position: relative;
-  transition: transform 100ms, background 120ms;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-.inbox-strip-item:hover { transform: scale(1.06); background: color-mix(in srgb, var(--strip-color) 22%, transparent); }
-.inbox-strip-item.has-pulse::after {
-  content: ""; position: absolute; top: -3px; right: -3px;
-  width: 9px; height: 9px; border-radius: 50%;
-  background: var(--failed);
-  border: 2px solid var(--bg-elevated);
-  animation: pulseDot 1.6s ease-in-out infinite;
-}
+/* .inbox-strip-item / .has-pulse / .inbox-strip-tooltip 已 dead — strip 改 flat pip 後不再用 */
 .inbox-strip-pips {
-  display: flex; flex-direction: column; gap: 5px;
-  align-items: center; padding: 4px 0;
+  display: flex; flex-direction: column; gap: 6px;
+  align-items: center; padding: 6px 0;
 }
-.inbox-strip-pips span {
-  width: 6px; height: 6px; border-radius: 50%;
-  background: var(--fg-faint); opacity: 0.55;
+.inbox-strip-pip {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  border: 0;
+  padding: 0;
+  background: var(--strip-color);
+  opacity: 0.4;
+  cursor: pointer;
+  transition: transform 100ms, opacity 100ms, box-shadow 100ms;
+}
+.inbox-strip-pip.is-unread {
+  opacity: 1;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--strip-color) 28%, transparent);
+}
+.inbox-strip-pip:hover {
+  opacity: 1;
+  transform: scale(1.4);
+}
+.inbox-strip-overflow {
+  font-size: 9px;
+  color: var(--fg-faint);
+  margin-top: 2px;
 }
 .inbox-strip-spacer { flex: 1; }
 .inbox-strip-label {
@@ -158,26 +157,6 @@
   padding: 6px 0 8px;
   opacity: 0.6;
 }
-.inbox-strip-tooltip {
-  position: absolute;
-  right: calc(100% + 8px);
-  top: 50%; transform: translateY(-50%);
-  background: #0a0c10;
-  color: #e8e3d6;
-  font-size: 11px;
-  padding: 5px 8px;
-  border-radius: 6px;
-  border: 1px solid var(--line-2);
-  white-space: nowrap;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 120ms;
-  box-shadow: var(--shadow-md);
-  z-index: 20;
-}
-.inbox-strip-item:hover .inbox-strip-tooltip { opacity: 1; }
-html.light .inbox-strip-tooltip { background: var(--fg); color: var(--bg-elevated); }
-
 /* ─── expanded panel ─── */
 .inbox-panel {
   display: flex; flex-direction: column;
@@ -239,22 +218,7 @@ html.light .inbox-strip-tooltip { background: var(--fg); color: var(--bg-elevate
   padding: 4px 8px 16px;
 }
 
-.inbox-section-label {
-  font-family: var(--font-mono);
-  font-size: 9.5px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.14em;
-  color: var(--fg-faint);
-  padding: 12px 6px 6px;
-  display: flex; align-items: center; gap: 6px;
-}
-.inbox-section-label .label-text { color: var(--fg-mute); }
-.inbox-section-label.sev-block .label-text { color: var(--paused); }
-.inbox-section-count { opacity: 0.65; }
-.inbox-section-bar {
-  flex: 1; height: 1px;
-  background: linear-gradient(90deg, var(--line), transparent);
-  margin-left: 4px;
-}
+/* .inbox-section-* 已 dead — panel 改 flat 後不再分組 */
 
 .inbox-item {
   position: relative;
@@ -268,7 +232,6 @@ html.light .inbox-strip-tooltip { background: var(--fg); color: var(--bg-elevate
   margin-bottom: 2px;
   cursor: pointer;
   transition: background 100ms, border-color 100ms;
-  position: relative;
 }
 .inbox-item:hover { background: var(--hover); }
 .inbox-item.is-block {

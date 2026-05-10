@@ -660,7 +660,6 @@ function TicketCard({
           <Verdicts list={ticket.iter.verdicts} blink={isPaused} />
           <span className="iter-meta mono">
             iter <strong>{iterCurrentLabel}</strong> · {fmtElapsed(elapsed)} elapsed
-            {isRunning && <span className="live-dot pulse" />}
           </span>
         </div>
       )}

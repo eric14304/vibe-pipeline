@@ -103,8 +103,5 @@ export const SEV_COLOR: Record<string, string> = {
   muted: "var(--fg-faint)",
 };
 
-export const SECTION_LABEL: Record<string, string> = {
-  block: "需要介入",
-  info: "進度",
-  muted: "更早",
-};
+// SECTION_LABEL 拿掉:flat list 後不分組,不再需要 section header
+// (NotificationsScreen prototype variant 也不引用)

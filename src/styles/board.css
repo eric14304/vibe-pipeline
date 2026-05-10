@@ -364,8 +364,10 @@
 .iter-stage.is-paused { color: var(--paused); border-color: var(--paused); background: var(--paused-soft); }
 .iter-stage-arrow { color: var(--fg-faint); font-size: 11px; }
 .iter-stage-pulse {
-  position: absolute; top: 50%; right: -3px; transform: translateY(-50%);
-  width: 5px; height: 5px; border-radius: 50%; background: var(--iter);
+  position: absolute; top: -2px; right: -2px;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--iter);
+  border: 1.5px solid var(--bg-elevated);
 }
 
 .verdicts { display: inline-flex; align-items: center; gap: 4px; }

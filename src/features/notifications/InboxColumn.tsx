@@ -1,6 +1,7 @@
 import { BannerIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon, InboxEmptyIcon } from "../../ui/icons";
-import { SECTION_LABEL, SEV_COLOR } from "../../data/notifications";
-import type { InboxFilter, InboxState, NotifItem, NotifSeverity } from "../../types/notif";
+// BannerIcon 仍用在 expanded panel 的 InboxItem;ChevronLeft 用在 strip。
+import { SEV_COLOR } from "../../data/notifications";
+import type { InboxFilter, InboxState, NotifItem } from "../../types/notif";
 
 type Common = {
   items: NotifItem[];
@@ -48,13 +49,11 @@ function InboxStrip({
   onExpand: () => void;
   onItemClick: (id: string, pipelineId?: string) => void;
 }) {
-  // 只把「未讀」的 block / info 升到大 icon;讀過的全部下沉到 muted pip
-  // (避免讀過的 block 還在 strip 上紅點脈衝,使用者不知為何)
-  const blocks = items.filter((i) => i.sev === "block" && i.unread);
-  const infos = items.filter((i) => i.sev === "info" && i.unread);
-  const muted = items.filter(
-    (i) => i.sev === "muted" || ((i.sev === "info" || i.sev === "block") && !i.unread)
-  );
+  // 一律 flat:items 已 newest-first,直接拿前 N 顯示;不再分 block/info/muted 三段層級
+  // sev 走 pip 顏色 + unread 走 ring(實心/外圈),不再「大 icon vs pip」雙視覺
+  const SHOW = 12;
+  const visible = items.slice(0, SHOW);
+  const overflow = Math.max(0, items.length - SHOW);
 
   return (
     <div className="inbox-strip">
@@ -64,41 +63,27 @@ function InboxStrip({
       <div className={"inbox-strip-count" + (unreadCount > 0 ? " has-unread" : "")}>{unreadCount}</div>
       <div className="inbox-strip-divider"></div>
 
-      {blocks.map((b, i) => (
-        <button
-          key={b.id}
-          className={"inbox-strip-item is-block" + (i === 0 ? " has-pulse" : "")}
-          style={{ ["--strip-color" as string]: SEV_COLOR.block } as React.CSSProperties}
-          onClick={() => onItemClick(b.id, b.pipelineId)}
-        >
-          <BannerIcon kind={b.iconKind} small />
-          <span className="inbox-strip-tooltip">
-            {b.title} · {b.ts}
+      <div className="inbox-strip-pips">
+        {visible.map((it) => (
+          <button
+            key={it.id}
+            className={
+              "inbox-strip-pip" +
+              (it.unread ? " is-unread" : "") +
+              " is-" + it.sev
+            }
+            style={{ ["--strip-color" as string]: SEV_COLOR[it.sev] } as React.CSSProperties}
+            onClick={() => onItemClick(it.id, it.pipelineId)}
+            title={it.title + " · " + it.ts}
+            aria-label={it.title}
+          />
+        ))}
+        {overflow > 0 && (
+          <span className="inbox-strip-overflow mono" title={`還有 ${overflow} 條`}>
+            +{overflow}
           </span>
-        </button>
-      ))}
-
-      {infos.map((b) => (
-        <button
-          key={b.id}
-          className="inbox-strip-item"
-          style={{ ["--strip-color" as string]: SEV_COLOR.info } as React.CSSProperties}
-          onClick={() => onItemClick(b.id, b.pipelineId)}
-        >
-          <BannerIcon kind={b.iconKind} small />
-          <span className="inbox-strip-tooltip">
-            {b.title} · {b.ts}
-          </span>
-        </button>
-      ))}
-
-      {muted.length > 0 && (
-        <div className="inbox-strip-pips">
-          {muted.slice(0, 6).map((m) => (
-            <span key={m.id} title={m.title} />
-          ))}
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="inbox-strip-spacer"></div>
       <div className="inbox-strip-label">INBOX</div>
@@ -123,9 +108,6 @@ function InboxPanel({
     if (filter === "blocking") return it.sev === "block";
     return true;
   });
-
-  const grouped: Record<NotifSeverity, NotifItem[]> = { block: [], info: [], muted: [] };
-  filtered.forEach((it) => grouped[it.sev].push(it));
 
   const blockCount = items.filter((i) => i.sev === "block").length;
 
@@ -169,28 +151,16 @@ function InboxPanel({
             <div>都看過了</div>
           </div>
         ) : (
-          (["block", "info", "muted"] as const).map((sev) => {
-            if (grouped[sev].length === 0) return null;
-            return (
-              <div key={sev} style={{ display: "contents" }}>
-                <div className={"inbox-section-label sev-" + sev}>
-                  <span className="label-text">{SECTION_LABEL[sev]}</span>
-                  <span className="inbox-section-count">· {grouped[sev].length}</span>
-                  <span className="inbox-section-bar"></span>
-                </div>
-                {grouped[sev].map((it) => (
-                  <InboxItem
-                    key={it.id}
-                    item={it}
-                    highlight={highlightId === it.id}
-                    onMarkRead={onMarkRead}
-                    onDismiss={onDismiss}
-                    onClick={() => onItemClick(it.id, it.pipelineId)}
-                  />
-                ))}
-              </div>
-            );
-          })
+          filtered.map((it) => (
+            <InboxItem
+              key={it.id}
+              item={it}
+              highlight={highlightId === it.id}
+              onMarkRead={onMarkRead}
+              onDismiss={onDismiss}
+              onClick={() => onItemClick(it.id, it.pipelineId)}
+            />
+          ))
         )}
       </div>
 
