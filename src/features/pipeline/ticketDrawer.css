@@ -20,19 +20,15 @@
   box-shadow: var(--shadow-lg);
 }
 
-/* 操作 toolbar — 放 drawer-head 內 status pill 下方,user 不用滾到底就能看到 reset/split/delete。
-   不用分隔線,用一個淡 panel 抬層級 — 看起來就是「操作區」。 */
+/* 操作 toolbar — 直接用跟 board 上 + ticket / RunButton 一樣的 .btn 視覺,不再額外 panel 包。
+   靠右對齊 + 跟 status pill 排同一個視覺重力。 */
 .tdrw-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 14px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: var(--panel);
-  border: 1px solid var(--line);
+  gap: 6px;
+  margin-top: 12px;
+  justify-content: flex-end;
 }
-/* 蓋 .btn-ghost 的 transparent 看起來不像按鈕 → 改有實邊框的 btn 樣 */
 .tdrw-action {
   display: inline-flex;
   align-items: center;
@@ -40,20 +36,21 @@
   font-size: 12.5px;
   font-weight: 500;
   padding: 6px 12px;
-  border-radius: 6px;
+  border-radius: 7px;
   border: 1px solid var(--line-2);
   background: var(--panel-2);
   color: var(--fg);
   cursor: pointer;
-  transition: background 120ms, border-color 120ms;
+  transition: background 120ms, border-color 120ms, transform 80ms;
 }
 .tdrw-action:hover {
   background: var(--hover);
   border-color: var(--accent);
 }
+.tdrw-action:active { transform: translateY(0.5px); }
 .tdrw-action-danger {
   color: var(--failed);
-  border-color: color-mix(in srgb, var(--failed) 40%, var(--line-2));
+  border-color: color-mix(in srgb, var(--failed) 30%, var(--line-2));
 }
 .tdrw-action-danger:hover {
   background: color-mix(in srgb, var(--failed) 12%, transparent);
