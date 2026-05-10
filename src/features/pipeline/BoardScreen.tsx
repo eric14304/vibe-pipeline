@@ -10,6 +10,7 @@ import { InitPopup } from "../init/InitPopup";
 import { InboxColumn } from "../notifications/InboxColumn";
 import { QADrawer } from "../qa/QADrawer";
 import { useQA } from "../qa/useQA";
+import { useTriConfirm } from "../../ui/ConfirmDialog";
 import type { NotifItem } from "../../types/notif";
 import { useActiveProjectHash } from "../../hooks/useActiveProject";
 import * as api from "../../api/projects";
@@ -39,6 +40,7 @@ export function BoardScreen({
   const [popupDismissed, setPopupDismissed] = useState(false);
 
   const qa = useQA(hash);
+  const triConfirm = useTriConfirm();
   const [openTicket, setOpenTicket] = useState<Ticket | null>(null);
   const [branches, setBranches] = useState<string[]>([]);
   const [maxParallel, setMaxParallel] = useState<number>(0);
@@ -624,11 +626,42 @@ export function BoardScreen({
             }}
             onMerge={async (pid) => {
               if (!project) return;
+              // 預先抓 sync-status,落後 > 0 → 跳三選一 confirm。建議 user 先 sync 再 merge,
+              // 把 base 衝突解在 pipeline 上下文(AI 看得到 ticket 歷史 + acceptance,判斷較準)
+              let behind = 0;
               try {
+                const s = await api.getSyncStatus(project.hash, pid);
+                behind = s.behind ?? 0;
+              } catch {
+                // sync-status 失敗(worktree 不存在等)— 不擋 merge 流程
+              }
+              let action: "confirm" | "tertiary" | "cancel" = "confirm";
+              if (behind > 0) {
+                action = await triConfirm({
+                  title: `base 落後 ${behind} 個 commit`,
+                  description:
+                    "建議先 sync 一次再 merge。sync 把 base 拉進 worktree,衝突在 pipeline 自己上下文(AI 看得到 ticket 歷史)解掉,merge ticket 後續就能 FF 不撞。",
+                  confirmLabel: "先 sync 再 merge",
+                  tertiaryLabel: "直接 merge",
+                  cancelLabel: "取消",
+                });
+                if (action === "cancel") return;
+              }
+              try {
+                if (action === "confirm" && behind > 0) {
+                  // 先 sync。runner 接手後 user 看 sync ticket 跑完(state 回 ready/merged),再自己點 merge
+                  const r = await api.syncPipeline(project.hash, pid);
+                  setReloadKey((k) => k + 1);
+                  setActionError(
+                    r.nothingToDo
+                      ? "✓ worktree 已是最新,直接點 merge 即可"
+                      : `✓ AI 同步已啟動(落後 ${r.behind} commit),sync 完成後再按 merge`
+                  );
+                  return;
+                }
+                // 直接 merge(behind=0 或 user 選 tertiary 跳過 sync)
                 await api.mergePipeline(project.hash, pid);
                 setReloadKey((k) => k + 1);
-                // 借用 actionError toast channel 顯示成功訊息(✓ 前綴);banner 會自然消,
-                // 用 toast 補「點到了」回饋,6s 自動消
                 setActionError("✓ AI 合併已啟動,runner 接手中…");
               } catch (e) {
                 setActionError(`觸發 AI 合併失敗: ${e instanceof Error ? e.message : String(e)}`);
