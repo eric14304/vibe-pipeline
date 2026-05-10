@@ -180,6 +180,8 @@ export function FocusColumn({
   // Worktree diff stat — fetch once on mount(讓 paused/ready 也看得到歷史 diff),
   // running/stopping 時 poll 每 3s 看即時進度。merged 後不打(已合進 base 沒意義)。
   const [diffStat, setDiffStat] = useState<api.DiffStat | null>(null);
+  // DiffModal 開關 — 由 head 上 chip 點擊觸發,任何 banner 不在的狀態都看得到
+  const [diffOpen, setDiffOpen] = useState(false);
   useEffect(() => {
     if (!projectHash || pipeline.state === "merged" || pipeline.state === "planning") {
       setDiffStat(null);
@@ -285,17 +287,28 @@ export function FocusColumn({
               {totalCost.toFixed(2)}
             </span>
           )}
-          {diffStat && (diffStat.files > 0 || diffStat.added > 0 || diffStat.deleted > 0) && (
-            <span
+          {diffStat && (diffStat.files > 0 || diffStat.added > 0 || diffStat.deleted > 0) && projectHash && (
+            <button
+              type="button"
               className="chip mono"
-              title={`worktree vs ${pipeline.baseBranch || "base"}:${diffStat.files} files,+${diffStat.added} -${diffStat.deleted}`}
-              style={{ fontSize: 11 }}
+              title={`點擊看完整 diff:${diffStat.files} files,+${diffStat.added} -${diffStat.deleted} vs ${pipeline.baseBranch || "base"}`}
+              style={{ fontSize: 11, cursor: "pointer", border: "1px solid var(--line)", background: "transparent" }}
+              onClick={() => setDiffOpen(true)}
             >
               <span style={{ color: "var(--done)" }}>+{diffStat.added}</span>
               <span style={{ color: "var(--fg-faint)", margin: "0 4px" }}>·</span>
               <span style={{ color: "var(--failed)" }}>-{diffStat.deleted}</span>
               <span style={{ color: "var(--fg-mute)", marginLeft: 6 }}>{diffStat.files}f</span>
-            </span>
+            </button>
+          )}
+          {diffOpen && projectHash && (
+            <DiffModal
+              projectHash={projectHash}
+              pipelineId={pipeline.id}
+              pipelineBranch={pipeline.branch}
+              baseBranch={pipeline.baseBranch || "main"}
+              onClose={() => setDiffOpen(false)}
+            />
           )}
 
           <button type="button" className="btn" onClick={() => onAddTicket?.(pipeline.id)}>
@@ -329,7 +342,6 @@ export function FocusColumn({
             pipeline={pipeline}
             onMerge={onMerge}
             mergeStrategy={mergeStrategy}
-            projectHash={projectHash}
           />
         )}
       </div>
@@ -726,17 +738,12 @@ export function ReadyBanner({
   pipeline,
   onMerge,
   mergeStrategy,
-  projectHash,
 }: {
   pipeline: Pipeline;
   onMerge?: (id: string) => void;
   mergeStrategy?: string;
-  projectHash?: string;
 }) {
   const confirm = useConfirm();
-  const [diffOpen, setDiffOpen] = useState(false);
-  // merge spawning:點按鈕後鎖住直到 polling 看到 state 變化(running/merged 或 merge ticket 真開跑)
-  const [mergeSpawning, setMergeSpawning] = useState(false);
   const commitCount = pipeline.tickets.reduce(
     (sum, t) => sum + (t.commits?.length ?? 0),
     0
@@ -751,25 +758,6 @@ export function ReadyBanner({
         t.status === "failed_transient" ||
         t.status === "paused")
   );
-  const runningMergeTicket = pipeline.tickets.some(
-    (t) => t.mode === "merge" && t.status === "running"
-  );
-  // pipeline state 變 running / merged 或 merge ticket 真開跑 → 清 spawning
-  useEffect(() => {
-    if (
-      pipeline.state === "running" ||
-      pipeline.state === "merged" ||
-      runningMergeTicket
-    ) {
-      setMergeSpawning(false);
-    }
-  }, [pipeline.state, runningMergeTicket]);
-  // 安全網 15s
-  useEffect(() => {
-    if (!mergeSpawning) return;
-    const id = setTimeout(() => setMergeSpawning(false), 15000);
-    return () => clearTimeout(id);
-  }, [mergeSpawning]);
 
   return (
     <div
@@ -802,25 +790,7 @@ export function ReadyBanner({
           {pipeline.branch} → {baseBranch} · {commitCount} commit{commitCount === 1 ? "" : "s"}
         </div>
       </div>
-      {projectHash && (
-        <button type="button"
-          className="btn"
-          onClick={() => setDiffOpen(true)}
-          title="看 worktree vs base 的完整 diff"
-        >
-          View Diff
-        </button>
-      )}
-      {diffOpen && projectHash && (
-        <DiffModal
-          projectHash={projectHash}
-          pipelineId={pipeline.id}
-          pipelineBranch={pipeline.branch}
-          baseBranch={pipeline.baseBranch || "main"}
-          onClose={() => setDiffOpen(false)}
-        />
-      )}
-      {onMerge && !isMerged && !mergeSpawning && (
+      {onMerge && !isMerged && (
         <button type="button"
           className="btn btn-primary"
           onClick={async () => {
@@ -843,10 +813,7 @@ export function ReadyBanner({
                   : `會 append 一張 merge ticket 進 pipeline 由 runner 派 sub-agent 處理(checkout / merge / 解衝突 / 跑驗證 / commit)。`),
               confirmLabel: isRetry ? "重試合併" : `AI 合併入 ${baseBranch}`,
             });
-            if (ok) {
-              setMergeSpawning(true);
-              onMerge(pipeline.id);
-            }
+            if (ok) onMerge(pipeline.id);
           }}
           title={
             failedMerge
@@ -855,14 +822,6 @@ export function ReadyBanner({
           }
         >
           <MergeIcon /> {failedMerge ? "重試 AI 合併" : `AI 合併入 ${baseBranch}`}
-        </button>
-      )}
-      {mergeSpawning && (
-        <button type="button" className="btn" disabled title="啟動 AI merge agent…">
-          <span className="qadr-thinking-dots" style={{ display: "inline-flex", verticalAlign: "middle" }}>
-            <span /><span /><span />
-          </span>{" "}
-          啟動中
         </button>
       )}
     </div>

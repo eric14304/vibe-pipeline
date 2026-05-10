@@ -589,7 +589,9 @@ export function BoardScreen({
               try {
                 await api.mergePipeline(project.hash, pid);
                 setReloadKey((k) => k + 1);
-                setActionError(null);
+                // 借用 actionError toast channel 顯示成功訊息(✓ 前綴);banner 會自然消,
+                // 用 toast 補「點到了」回饋,6s 自動消
+                setActionError("✓ AI 合併已啟動,runner 接手中…");
               } catch (e) {
                 setActionError(`觸發 AI 合併失敗: ${e instanceof Error ? e.message : String(e)}`);
               }
