@@ -228,6 +228,70 @@ export async function pausePipeline(hash: string, pipelineId: string): Promise<R
   return ok({ ok: true });
 }
 
+export async function mergePipeline(hash: string, pipelineId: string): Promise<Response> {
+  const project = await projectStore.findByHash(hash);
+  if (!project) return err("not_found", `Project not found: ${hash}`, 404);
+  if (!project.hasGit) return err("invalid_path", "Project 沒 .git/", 400);
+  if (orchestrator.isRunning(hash, pipelineId)) {
+    return err("invalid_path", "Pipeline 在跑,先 pause 才能 merge", 409);
+  }
+
+  const pipeline = (await pipelineDir.readPipeline(project.path, pipelineId)) as {
+    name?: string;
+    branch?: string;
+    baseBranch?: string;
+    state?: string;
+    tickets?: Array<{ status?: string }>;
+    [k: string]: unknown;
+  } | null;
+  if (!pipeline) return err("not_found", `Pipeline not found: ${pipelineId}`, 404);
+
+  const allDone = (pipeline.tickets ?? []).every((t) => t.status === "done");
+  if (!allDone) {
+    return err("invalid_path", "還有 ticket 未 done,先跑完再 merge", 409);
+  }
+  if (pipeline.state === "merged") {
+    return err("invalid_path", "Pipeline 已 merge 過", 409);
+  }
+
+  const branch = pipeline.branch || `pipeline/${pipeline.name || pipelineId}`;
+  const baseBranch = pipeline.baseBranch || "main";
+
+  // strategy 從 project config 拿
+  const cfg = await pipelineDir.readConfig(project.path);
+  const strategyRaw = cfg.defaults?.merge_strategy ?? "squash";
+  const strategy: git.MergeStrategy =
+    strategyRaw === "merge" || strategyRaw === "ff-only" ? strategyRaw : "squash";
+
+  const r = await git.merge(project.path, branch, baseBranch, strategy);
+  if (!r.ok) {
+    const msg =
+      r.reason === "conflict"
+        ? `Merge 衝突 — 手動 resolve 後 commit:\n${r.stderr}`
+        : r.reason === "not_fast_forward"
+        ? `不能 fast-forward(strategy=${strategy}),改用 merge / squash:\n${r.stderr}`
+        : r.stderr;
+    return err("invalid_path", msg, 409);
+  }
+
+  // 標 merged + 寫 mergedAt + 記錄 merge commit
+  await pipelineDir.writePipeline(project.path, pipelineId, {
+    ...pipeline,
+    state: "merged",
+    mergedAt: Date.now(),
+    mergeCommit: { hash: r.commitHash, subject: r.commitSubject, ts: Date.now() },
+  });
+
+  notifs.emit(project.path, {
+    type: "pipeline_merged",
+    title: `${pipeline.name || pipelineId} merged → ${baseBranch}`,
+    sub: r.commitHash.slice(0, 7),
+    pipelineId,
+  });
+
+  return ok({ ok: true, commitHash: r.commitHash, commitSubject: r.commitSubject });
+}
+
 export async function listNotifs(hash: string): Promise<Response> {
   const project = await projectStore.findByHash(hash);
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);

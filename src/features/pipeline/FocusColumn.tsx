@@ -85,6 +85,7 @@ export function FocusColumn({
   onRename,
   onResetAll,
   onRevealWorktree,
+  onMerge,
   existingNames = [],
   onTicketClick,
   projectHash,
@@ -99,6 +100,7 @@ export function FocusColumn({
   onRename?: (pipelineId: string, newName: string) => void;
   onResetAll?: (pipelineId: string) => void;
   onRevealWorktree?: (pipelineId: string) => void;
+  onMerge?: (pipelineId: string) => void;
   existingNames?: string[];
   onTicketClick?: (ticket: Ticket) => void;
   projectHash?: string;
@@ -188,7 +190,13 @@ export function FocusColumn({
           />
         </div>
 
-        {allDone && <ReadyBanner pipeline={pipeline} />}
+        {allDone && (
+          <ReadyBanner
+            pipeline={pipeline}
+            onMerge={onMerge}
+            onRevealWorktree={onRevealWorktree}
+          />
+        )}
       </div>
 
       <div className="focus-list">
@@ -567,7 +575,15 @@ function FocusTitle({
   );
 }
 
-export function ReadyBanner({ pipeline }: { pipeline: Pipeline }) {
+export function ReadyBanner({
+  pipeline,
+  onMerge,
+  onRevealWorktree,
+}: {
+  pipeline: Pipeline;
+  onMerge?: (id: string) => void;
+  onRevealWorktree?: (id: string) => void;
+}) {
   const commitCount = pipeline.tickets.reduce(
     (sum, t) => sum + (t.commits?.length ?? 0),
     0
@@ -584,10 +600,30 @@ export function ReadyBanner({ pipeline }: { pipeline: Pipeline }) {
           {pipeline.branch} → {baseBranch} · {commitCount} commit{commitCount === 1 ? "" : "s"}
         </div>
       </div>
-      <button className="btn" disabled title="尚未實作">View diff</button>
-      <button className="btn btn-primary" disabled title="merge endpoint 尚未實作 (Phase 3+)">
-        <MergeIcon /> Merge to {baseBranch}
-      </button>
+      {onRevealWorktree && (
+        <button
+          className="btn"
+          onClick={() => onRevealWorktree(pipeline.id)}
+          title="開啟 worktree(在裡面 git diff main..HEAD 看完整 diff)"
+        >
+          View diff
+        </button>
+      )}
+      {onMerge && (
+        <button
+          className="btn btn-primary"
+          onClick={() => {
+            const msg =
+              `Merge ${pipeline.branch} → ${baseBranch}?\n\n` +
+              `策略走 project config(預設 squash)。\n` +
+              `衝突會 abort 不留痕,需要你手動 resolve。`;
+            if (window.confirm(msg)) onMerge(pipeline.id);
+          }}
+          title={`Merge ${pipeline.branch} into ${baseBranch}`}
+        >
+          <MergeIcon /> Merge to {baseBranch}
+        </button>
+      )}
     </div>
   );
 }

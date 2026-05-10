@@ -61,6 +61,9 @@ export async function start(opts: {
       return { ok: false, error: "Pipeline 已完成,沒待跑的 ticket(reset ticket.status 才能重跑)" };
     }
   }
+  if (pipeline.state === "merged") {
+    return { ok: false, error: "Pipeline 已 merge 進 base branch,不能再跑(刪掉重新建一條)" };
+  }
 
   const branch = pipeline.branch || `pipeline/${pipeline.name || pipelineId}`;
   const baseBranch = pipeline.baseBranch || "main";

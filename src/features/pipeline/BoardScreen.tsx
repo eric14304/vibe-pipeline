@@ -577,6 +577,19 @@ export function BoardScreen({
                 setActionError(`開啟 worktree 失敗: ${e instanceof Error ? e.message : String(e)}`);
               }
             }}
+            onMerge={async (pid) => {
+              if (!project) return;
+              try {
+                const r = await api.mergePipeline(project.hash, pid);
+                setReloadKey((k) => k + 1);
+                setActionError(null);
+                // 用 actionError pattern 顯示成功訊息(臨時 toast,6s 自動消)
+                // 沒專門 success toast,借 actionError channel 但訊息用「✓」前綴
+                setActionError(`✓ Merged → ${r.commitHash.slice(0, 7)} ${r.commitSubject}`);
+              } catch (e) {
+                setActionError(`Merge 失敗: ${e instanceof Error ? e.message : String(e)}`);
+              }
+            }}
           />
         )
       }

@@ -51,12 +51,13 @@ async function handle(req: Request): Promise<Response> {
       if (method === "DELETE") return projects.deletePipeline(hash, id);
     }
 
-    const pipelineRunMatch = rest.match(/^\/pipelines\/([a-z0-9_-]+)\/(run|pause)$/);
+    const pipelineRunMatch = rest.match(/^\/pipelines\/([a-z0-9_-]+)\/(run|pause|merge)$/);
     if (pipelineRunMatch && method === "POST") {
       const id = pipelineRunMatch[1];
       const action = pipelineRunMatch[2];
       if (action === "run") return projects.runPipeline(hash, id);
       if (action === "pause") return projects.pausePipeline(hash, id);
+      if (action === "merge") return projects.mergePipeline(hash, id);
     }
 
     const worktreeRevealMatch = rest.match(

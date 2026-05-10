@@ -87,6 +87,13 @@ export function pausePipeline(hash: string, id: string): Promise<{ ok: true }> {
   return call<{ ok: true }>(`/api/projects/${hash}/pipelines/${id}/pause`, { method: "POST" });
 }
 
+export function mergePipeline(hash: string, id: string): Promise<{ ok: true; commitHash: string; commitSubject: string }> {
+  return call<{ ok: true; commitHash: string; commitSubject: string }>(
+    `/api/projects/${hash}/pipelines/${id}/merge`,
+    { method: "POST" }
+  );
+}
+
 export type NotifRecord = {
   id: string;
   type: string;
