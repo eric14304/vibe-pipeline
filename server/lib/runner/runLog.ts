@@ -12,28 +12,8 @@ import { readdirSync, existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import * as pipelineDir from "../pipelineDir";
 
-export type RunSummary = {
-  filename: string;       // <pipelineId>-<ts>.log
-  startedAt: number;      // 從 filename 拆 ts
-  exitCode: number | null;
-  durationMs: number | null;
-  costUsd: number | null;
-  numTurns: number | null;
-  result: string | null;  // claude CLI "result" 欄位 (主 agent 最終訊息)
-  tokens: {
-    input: number;
-    output: number;
-    cacheRead: number;
-    cacheCreate: number;
-  } | null;
-  sessionId: string | null;
-  hasStderr: boolean;
-};
-
-export type RunDetail = RunSummary & {
-  stdout: string;
-  stderr: string;
-};
+import type { RunSummary, RunDetail } from "../../../shared/types";
+export type { RunSummary, RunDetail };
 
 const FILENAME_RE = /^(.+)-(\d+)\.log$/;
 

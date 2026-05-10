@@ -2,12 +2,9 @@
 
 const API = "http://127.0.0.1:3001/api/__test";
 
-// QA reply 結構跟 server/lib/qa/schema.ts 對齊。spec 寫劇本時用這型別。
-export type QAReply = {
-  message: string;
-  options: string[];
-  optionsMode?: "single" | "multi";
-  complete: boolean;
+// QA reply 結構跟 shared/types.ts 一致;mock 腳本 spec 欄位放寬到 Record(允許 partial spec test)。
+import type { QAReply as SharedQAReply } from "../../../shared/types";
+export type QAReply = Omit<SharedQAReply, "spec"> & {
   spec: Record<string, unknown> | null;
 };
 

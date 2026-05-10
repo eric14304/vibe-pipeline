@@ -2,6 +2,8 @@ import { join } from "node:path";
 import { existsSync, mkdirSync } from "node:fs";
 import { projectHash } from "../hash";
 import { vibeHome } from "../paths";
+import type { DiffStat, DiffFile, FullDiff } from "../../../shared/types";
+export type { DiffStat, DiffFile, FullDiff };
 
 function worktreeRoot(): string {
   return join(vibeHome(), ".vibe-pipeline", "worktrees");
@@ -78,8 +80,6 @@ export async function prune(projectPath: string): Promise<void> {
 // 看當下 worktree 跟 base 的 diff stat(已 commit + working tree 都算)。
 // 給 UI polling 顯示「+N -M / K files」用,讓 user 知道 runner 正在改東西。
 // 沒 worktree / git 異常 → 回 null,UI 隱藏即可。
-export type DiffStat = { files: number; added: number; deleted: number };
-
 export async function diffStat(
   projectPath: string,
   pipelineId: string,
@@ -143,9 +143,6 @@ export async function behindBaseCount(
 
 // 完整 unified diff:跟 base 比對 worktree 全部改動。
 // 回 { files: [{path, added, deleted}], raw } — raw 是 git diff 全文,前端自己 render。
-export type DiffFile = { path: string; added: number; deleted: number };
-export type FullDiff = { files: DiffFile[]; raw: string };
-
 export async function fullDiff(
   projectPath: string,
   pipelineId: string,

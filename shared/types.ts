@@ -89,6 +89,126 @@ export function isCompleteSpec(s: unknown): s is TicketSpec {
   );
 }
 
+// ─── Pipeline / Ticket(持久化於 .vibe-pipeline/pipelines/<id>.json) ───
+// "merge" / "sync" 是 synthetic ticket(/merge / /sync endpoint append),不在 QA / TicketSpec 列表
+export type TicketMode = "step" | "iter" | "merge" | "sync";
+
+export type TicketStatus =
+  | "draft"
+  | "ready"
+  | "running"
+  | "paused"
+  | "done"
+  | "failed"
+  | "failed_iter_limit"
+  | "failed_transient";
+
+// 1/0/-1 是舊 prototype mock 格式;runner 寫回是字串 "PASS"/"FAIL"/"PARTIAL"
+export type Verdict = 1 | 0 | -1 | "PASS" | "FAIL" | "PARTIAL";
+
+// 一輪 iter 的紀錄。runner 主 agent 在每輪審核完寫進 ticket.iter.rounds[]。
+export type IterRound = {
+  n: number;                  // 第幾輪 (1-based)
+  startedAt: number;          // 執行AI 派出當下,unix ms
+  endedAt?: number;           // 審核完當下
+  executorSummary?: string;   // 主 agent 拿到 sub-agent 結果後的簡述(<=300 字)
+  criticVerdict: "PASS" | "FAIL" | "PARTIAL";
+  criticFeedback?: string;    // 審核AI 給的 feedback(下一輪 prompt 用)
+};
+
+// iter 階段(UI 用;persistent JSON 寫 "doer"/"critic"/"done" 等)
+export type IterStage = "doer" | "critic" | "✓" | "done";
+
+// 持久化的 iter 狀態(寫進 ticket.iter)。
+// totalElapsed 不在實際 JSON,前端 FocusColumn 依 rounds[] 推算後可選擇掛上來;
+// 保留 optional 欄位讓 UI 與型別都不用走 cast。
+export type IterState = {
+  current: number;
+  stage: IterStage;
+  verdicts: Verdict[];
+  rounds?: IterRound[];
+  totalElapsed?: number;
+};
+
+// ticket 完成後 runner commit 的紀錄
+export type CommitRef = {
+  hash: string;       // git rev-parse HEAD 抓的完整 hash
+  subject: string;    // commit message 第一行
+  ts: number;         // commit 時間 unix ms
+};
+
+export type Ticket = {
+  id: string;
+  n: number;
+  title: string;
+  goal?: string;
+  acceptance?: string[];
+  prompt?: string;
+  mode: TicketMode;
+  status: TicketStatus;
+  iterLimit?: number;
+  iterStopAtLimit?: boolean;
+  // step / iter 共用:runner 寫 unix ms,給 UI 算 elapsed 用
+  startedAt?: number;
+  endedAt?: number;
+  meta?: string;
+  iter?: IterState;
+  liveLog?: string;
+  reason?: string;
+  commits?: CommitRef[];
+};
+
+export type PipelineState =
+  | "planning"
+  | "running"
+  | "stopping"
+  | "queued"
+  | "paused"
+  | "ready"
+  | "failed"
+  | "merged";
+
+export type Pipeline = {
+  id: string;
+  name: string;
+  branch: string;
+  state: PipelineState;
+  tickets: Ticket[];
+  baseBranch?: string;
+  mergedAt?: number;
+  mergeCommit?: { hash: string; subject: string; ts: number };
+};
+
+// ─── Run log(.runtime/logs/<pipelineId>-<ts>.log 解析結果) ───
+export type RunSummary = {
+  filename: string;       // <pipelineId>-<ts>.log
+  startedAt: number;      // 從 filename 拆 ts
+  exitCode: number | null;
+  durationMs: number | null;
+  costUsd: number | null;
+  numTurns: number | null;
+  result: string | null;  // claude CLI "result" 欄位 (主 agent 最終訊息)
+  tokens: {
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheCreate: number;
+  } | null;
+  sessionId: string | null;
+  hasStderr: boolean;
+};
+
+export type RunDetail = RunSummary & {
+  stdout: string;
+  stderr: string;
+};
+
+// ─── Worktree diff(server/lib/git/worktree.ts 算 / frontend 顯示) ───
+export type DiffStat = { files: number; added: number; deleted: number };
+export type DiffFile = { path: string; added: number; deleted: number };
+export type FullDiff = { files: DiffFile[]; raw: string };
+
+// ─── API envelope ─────────────────────────────────────────────────
 export type ApiOk<T> = { ok: true; data: T };
 export type ApiErr = { ok: false; error: { code: ApiErrorCode; message: string } };
 export type ApiResponse<T> = ApiOk<T> | ApiErr;
@@ -148,6 +268,17 @@ export type NotifEventMeta = {
   sev: NotifSeverity;
   phase: NotifPhase;
   label: string;
+};
+
+// 持久化的 notif 紀錄(append-only 寫進 .runtime/notifs.jsonl)
+export type NotifRecord = {
+  id: string;
+  type: NotifEventType;
+  title: string;
+  sub?: string;
+  ts: number;
+  unread: boolean;
+  pipelineId?: string;
 };
 
 export const NOTIF_EVENTS: Record<NotifEventType, NotifEventMeta> = {
