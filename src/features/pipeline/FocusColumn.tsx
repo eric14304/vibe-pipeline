@@ -833,8 +833,9 @@ function FocusTitle({
             setEditing(false);
             setDraft(pipeline.name);
           }}
+          title="取消 (Esc)"
         >
-          Esc
+          ✕
         </button>
       </span>
     );
