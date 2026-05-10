@@ -85,9 +85,9 @@ export async function splitTicketSpec(opts: {
     "--output-format",
     "json",
     "--model",
-    "claude-haiku-4-5-20251001",
+    "claude-sonnet-4-6",
     "--effort",
-    "low", // 結構化輸出,不需深度推理;low 最快
+    "medium",
     "--system-prompt",
     SPLIT_BEHAVIOR_PROMPT,
     "--disallowedTools",
