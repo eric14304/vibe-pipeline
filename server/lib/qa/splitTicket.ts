@@ -75,6 +75,8 @@ export async function splitTicketSpec(opts: {
     JSON.stringify(spec, null, 2),
   ].join("\n");
 
+  // userMessage 走 stdin,別當 positional arg(Windows 下 --system-prompt 後接 long positional 會被
+  // claude CLI 當成 input 缺失,踩過)
   const args = [
     "claude",
     "-p",
@@ -82,18 +84,19 @@ export async function splitTicketSpec(opts: {
     "json",
     "--system-prompt",
     SPLIT_BEHAVIOR_PROMPT,
-    // 鎖死寫檔工具(這個流程不該動 disk)
     "--disallowedTools",
     "Edit Write Task",
-    userMessage,
   ];
 
   let proc: ReturnType<typeof Bun.spawn>;
   try {
-    proc = Bun.spawn(args, { cwd, stdout: "pipe", stderr: "pipe" });
+    proc = Bun.spawn(args, { cwd, stdout: "pipe", stderr: "pipe", stdin: "pipe" });
   } catch (e) {
     throw new SplitError("not_available", `claude CLI not found: ${e}`);
   }
+  // 寫 userMessage 進 stdin 後關閉,讓 claude CLI 讀取
+  proc.stdin.write(userMessage);
+  proc.stdin.end();
   const [stdoutText, stderrText] = await Promise.all([
     new Response(proc.stdout).text(),
     new Response(proc.stderr).text(),
