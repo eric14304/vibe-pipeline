@@ -434,57 +434,46 @@ export function BoardScreen({
       onCancel={qa.cancel}
       onClose={qa.close}
       onFinalize={async (edits) => {
-        // drawer 立刻關(useQA finalize setState(INITIAL) 已先做);split-check 跑在 background。
-        // 給個 toast 讓 user 知道在跑(避免「我點完什麼都沒發生」感)
-        setActionError("ticket 送出中,AI 評估範圍…");
-        type FinalizeResult = {
-          pipeline: Pipeline;
-          ticket: { id: string; title: string };
-          splitSuggestion?: { count: number; ticketId: string };
-        };
-        let result: FinalizeResult | null;
+        // 三步:1) preview-split(drawer 內 busy spinner,~5-15s) → 2) 結果 = 1 → 直接 finalize 1 張;
+        // 結果 >= 2 → 跳 confirm 三選一;3) finalize(splitInto?) 寫入 + 關 drawer
+        type Preview = { count: number; specs: qaApi.TicketSpec[] };
+        let preview: Preview | null;
         try {
-          result = (await qa.finalize(edits)) as FinalizeResult | null;
+          preview = (await qa.previewSplit(edits)) as Preview | null;
         } catch (e) {
-          setActionError(`送出 ticket 失敗: ${e instanceof Error ? e.message : String(e)}`);
+          setActionError(`分析範圍失敗: ${e instanceof Error ? e.message : String(e)}`);
           return;
         }
-        if (result) {
-          const r = result;
-          setPipelines((arr) =>
-            arr.map((p) => (p.id === r.pipeline.id ? r.pipeline : p))
-          );
-          if (r.splitSuggestion) {
-            // AI 評估覺得這 spec 含多件事,跳 confirm 讓 user 選拆 / 不拆
-            const ok = await triConfirm({
-              title: `AI 認為這張 ticket 含 ${r.splitSuggestion.count} 件事`,
-              description: `已先存成 1 張(原樣)。要立刻 AI 拆成 ${r.splitSuggestion.count} 張獨立 ticket 嗎?(預估再多花 ~$0.05-0.20)`,
-              confirmLabel: "立刻拆分",
-              tertiaryLabel: "保留 1 張",
-              cancelLabel: "稍後決定",
-            });
-            if (ok === "confirm") {
-              try {
-                const splitR = await qaApi.splitTicket(
-                  project.hash,
-                  r.pipeline.id,
-                  r.splitSuggestion.ticketId
-                );
-                setReloadKey((k) => k + 1);
-                if ("nothingToSplit" in splitR) {
-                  setActionError("✓ AI 重新評估後認為不需拆");
-                } else {
-                  setActionError(`✓ 已拆成 ${splitR.count} 張 ticket`);
-                }
-              } catch (e) {
-                setActionError(`AI 拆分失敗: ${e instanceof Error ? e.message : String(e)}`);
-              }
-            } else {
-              setActionError(`✓ ticket 已建立(可隨時點 ticket → 操作 → AI 拆分)`);
-            }
-          } else {
-            setActionError("✓ ticket 已建立");
+        let splitInto: qaApi.TicketSpec[] | undefined;
+        if (preview && preview.count >= 2) {
+          const pv = preview;
+          const ok = await triConfirm({
+            title: `AI 認為這張 ticket 含 ${pv.count} 件事`,
+            description: `要拆成 ${pv.count} 張獨立 ticket 還是保留 1 張原樣?`,
+            confirmLabel: `拆成 ${pv.count} 張`,
+            tertiaryLabel: "保留 1 張",
+            cancelLabel: "取消(回 QA)",
+          });
+          if (ok === "cancel") return; // drawer 留著
+          if (ok === "confirm") splitInto = pv.specs;
+          // tertiary → 保留 1 張,splitInto 維持 undefined
+        }
+        try {
+          const result = (await qa.finalize(edits, splitInto)) as
+            | { pipeline: Pipeline; tickets: Array<{ id: string }>; splitCount: number }
+            | null;
+          if (result) {
+            setPipelines((arr) =>
+              arr.map((p) => (p.id === result.pipeline.id ? result.pipeline : p))
+            );
+            setActionError(
+              result.splitCount > 1
+                ? `✓ 已拆成 ${result.splitCount} 張 ticket 建立`
+                : "✓ ticket 已建立"
+            );
           }
+        } catch (e) {
+          setActionError(`送出 ticket 失敗: ${e instanceof Error ? e.message : String(e)}`);
         }
       }}
     />

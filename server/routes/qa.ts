@@ -182,6 +182,33 @@ export async function turn(hash: string, draftId: string, req: Request): Promise
   return ok({ draft: updated, reply });
 }
 
+// 跑 splitTicketSpec 評估 draft 的 spec 是否該拆;不寫 pipeline.json。
+// 給前端「卡 drawer 等分析」流程用 — preview → user 決定 → 再 finalize。
+export async function previewSplit(hash: string, draftId: string, req: Request): Promise<Response> {
+  const guardErr = requireJsonUtf8(req);
+  if (guardErr) return guardErr;
+  const r = await projectFor(hash);
+  if ("error" in r) return r.error;
+  const { project } = r;
+
+  const draft = await draftStore.readDraft(project.path, draftId);
+  if (!draft) return err("not_found", `Draft not found: ${draftId}`, 404);
+  if (!draft.spec) return err("invalid_path", "Draft spec not ready");
+
+  const body = await readJson(req);
+  const edits = (body.edits as Partial<typeof draft.spec>) ?? {};
+  const finalSpec = { ...draft.spec, ...edits } as TicketSpec;
+
+  try {
+    const specs = await splitTicketSpec({ cwd: project.path, spec: finalSpec });
+    return ok({ count: specs.length, specs });
+  } catch (e) {
+    // 失敗 → 回 count=1,讓前端走預設「直接 finalize 1 張」path,不擋 user
+    console.warn(`[previewSplit] 失敗,假裝 count=1: ${e instanceof Error ? e.message : String(e)}`);
+    return ok({ count: 1, specs: [finalSpec] });
+  }
+}
+
 export async function finalize(hash: string, draftId: string, req: Request): Promise<Response> {
   const guardErr = requireJsonUtf8(req);
   if (guardErr) return guardErr;
@@ -196,12 +223,16 @@ export async function finalize(hash: string, draftId: string, req: Request): Pro
   const body = await readJson(req);
   const edits = (body.edits as Partial<typeof draft.spec>) ?? {};
   const finalSpec = { ...draft.spec, ...edits };
+  // 若前端帶 splitInto: TicketSpec[],這次 finalize 寫 N 張 ticket(取代原 finalSpec 寫 1 張)。
+  // 用於「preview 後 user 選拆」flow;單張 fallback 走 finalSpec
+  const splitInto = Array.isArray(body.splitInto) ? (body.splitInto as TicketSpec[]) : null;
+
   const required: (keyof typeof finalSpec)[] = ["title", "goal", "acceptance", "prompt", "mode"];
   const missing = required.filter((k) => {
     const v = finalSpec[k];
     return v == null || v === "" || (Array.isArray(v) && v.length === 0);
   });
-  if (missing.length > 0)
+  if (!splitInto && missing.length > 0)
     return err("invalid_path", `Spec incomplete, missing: ${missing.join(", ")}`);
 
   const pipeline = (await pipelineDir.readPipeline(project.path, draft.pipelineId)) as {
@@ -211,30 +242,34 @@ export async function finalize(hash: string, draftId: string, req: Request): Pro
   if (!pipeline) return err("not_found", `Pipeline not found: ${draft.pipelineId}`, 404);
 
   const existingTickets = Array.isArray(pipeline.tickets) ? pipeline.tickets : [];
-  const ticket = {
-    id: `t${existingTickets.length + 1}-${Date.now().toString(16)}`,
-    n: existingTickets.length + 1,
-    status: "draft",
-    ...finalSpec,
-  };
-  const updatedPipeline = { ...pipeline, tickets: [...existingTickets, ticket] };
+  let newTickets: Array<Record<string, unknown>>;
+  if (splitInto && splitInto.length > 0) {
+    const ts = Date.now().toString(16);
+    newTickets = splitInto.map((s, i) => ({
+      id: `t${existingTickets.length + i + 1}-${i}-${ts}`,
+      n: existingTickets.length + i + 1,
+      status: "draft",
+      ...s,
+    }));
+  } else {
+    newTickets = [
+      {
+        id: `t${existingTickets.length + 1}-${Date.now().toString(16)}`,
+        n: existingTickets.length + 1,
+        status: "draft",
+        ...finalSpec,
+      },
+    ];
+  }
+  const updatedPipeline = { ...pipeline, tickets: [...existingTickets, ...newTickets] };
   await pipelineDir.writePipeline(project.path, draft.pipelineId, updatedPipeline);
   await draftStore.deleteDraft(project.path, draftId);
 
-  // 自動 split-check:跑一次 splitTicketSpec 評估這 spec 是否該拆。
-  // 同步等結果(finalize 多 5-15s,可接受);失敗(claude 缺 / parse 異常)安靜跳過,不擋 ticket 落地。
-  // N >= 2 → 回 splitSuggestion 給前端,讓 user 看 toast 決定要不要走拆分流程。
-  let splitSuggestion: { count: number; ticketId: string } | undefined;
-  try {
-    const splits = await splitTicketSpec({ cwd: project.path, spec: finalSpec as TicketSpec });
-    if (splits.length >= 2) {
-      splitSuggestion = { count: splits.length, ticketId: ticket.id };
-    }
-  } catch (e) {
-    console.warn(`[finalize] split-check 失敗,跳過: ${e instanceof Error ? e.message : String(e)}`);
-  }
-
-  return ok({ ticket, pipeline: updatedPipeline, splitSuggestion });
+  return ok({
+    tickets: newTickets,
+    pipeline: updatedPipeline,
+    splitCount: newTickets.length,
+  });
 }
 
 export async function cancel(hash: string, draftId: string): Promise<Response> {

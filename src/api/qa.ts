@@ -34,10 +34,14 @@ async function call<T>(path: string, init?: CallInit): Promise<T> {
 type StartResp = { draft: Draft; reply: QAReply };
 type TurnResp = { draft: Draft; reply: QAReply };
 type FinalizeResp = {
-  ticket: unknown;
+  tickets: Array<{ id: string; n: number; title: string }>;
   pipeline: unknown;
-  // backend 在 finalize 時自動跑 split-check;若 spec 太大可拆,這欄位帶建議
-  splitSuggestion?: { count: number; ticketId: string };
+  splitCount: number;
+};
+
+type PreviewSplitResp = {
+  count: number;
+  specs: TicketSpec[];
 };
 
 export function startQA(hash: string, pipelineId: string): Promise<StartResp> {
@@ -57,9 +61,23 @@ export function turnQA(hash: string, draftId: string, userMessage: string): Prom
 export function finalizeQA(
   hash: string,
   draftId: string,
-  edits?: Partial<TicketSpec>
+  edits?: Partial<TicketSpec>,
+  splitInto?: TicketSpec[]
 ): Promise<FinalizeResp> {
   return call<FinalizeResp>(`/api/projects/${hash}/qa/${draftId}/finalize`, {
+    method: "POST",
+    body: { edits: edits ?? {}, ...(splitInto ? { splitInto } : {}) },
+  });
+}
+
+// 跑 split-check,不寫 pipeline.json。前端按「送出 ticket」後先打這個,
+// 拿到 count + specs,再決定 finalize(splitInto=specs) 寫 N 張或預設寫 1 張
+export function previewSplitQA(
+  hash: string,
+  draftId: string,
+  edits?: Partial<TicketSpec>
+): Promise<PreviewSplitResp> {
+  return call<PreviewSplitResp>(`/api/projects/${hash}/qa/${draftId}/preview-split`, {
     method: "POST",
     body: { edits: edits ?? {} },
   });

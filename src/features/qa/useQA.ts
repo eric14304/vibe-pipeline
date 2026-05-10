@@ -137,19 +137,38 @@ export function useQA(projectHash: string | null) {
     await refreshDrafts();
   }, [projectHash, state.draft, refreshDrafts]);
 
+  // 跑 split-check 預覽(不寫)。回 { count, specs }。
+  const previewSplit = useCallback(
+    async (edits?: Partial<TicketSpec>) => {
+      if (!projectHash || !state.draft) return null;
+      setState((s) => ({ ...s, busy: true, error: null }));
+      try {
+        return await qaApi.previewSplitQA(projectHash, state.draft.draftId, edits);
+      } finally {
+        setState((s) => ({ ...s, busy: false }));
+      }
+    },
+    [projectHash, state.draft]
+  );
+
+  // finalize: splitInto 帶就寫 N 張,沒帶就寫 1 張(原本 spec)。
+  // 寫成功後關 drawer
   const finalize = useCallback(
-    async (edits?: Partial<TicketSpec>): Promise<unknown | null> => {
+    async (edits?: Partial<TicketSpec>, splitInto?: TicketSpec[]): Promise<unknown | null> => {
       if (!projectHash || !state.draft) return null;
       const draftId = state.draft.draftId;
-      // 立刻關 drawer(finalize 含 split-check ~5-15s,讓 user 不卡視覺)
-      // backend 失敗的話 BoardScreen 會用 toast 顯錯
-      setState(INITIAL);
+      setState((s) => ({ ...s, busy: true, error: null }));
       try {
-        const result = await qaApi.finalizeQA(projectHash, draftId, edits);
+        const result = await qaApi.finalizeQA(projectHash, draftId, edits, splitInto);
+        setState(INITIAL);
         await refreshDrafts();
         return result;
       } catch (e) {
-        // 失敗 → throw 給呼叫端處理(BoardScreen onFinalize 走 toast channel)
+        setState((s) => ({
+          ...s,
+          busy: false,
+          error: e instanceof Error ? e.message : String(e),
+        }));
         throw e instanceof Error ? e : new Error(String(e));
       }
     },
@@ -165,6 +184,7 @@ export function useQA(projectHash: string | null) {
     sendTurn,
     cancel,
     finalize,
+    previewSplit,
     refreshDrafts,
   };
 }

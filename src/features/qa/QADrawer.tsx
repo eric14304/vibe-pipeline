@@ -519,7 +519,16 @@ function SpecReview({
         </button>
         <span style={{ flex: 1 }} />
         <button type="button" className="btn btn-primary" onClick={() => onFinalize(edited)} disabled={busy}>
-          送出建立 ticket
+          {busy ? (
+            <>
+              <span className="qadr-thinking-dots" style={{ display: "inline-flex", verticalAlign: "middle" }}>
+                <span /><span /><span />
+              </span>{" "}
+              AI 分析範圍中…
+            </>
+          ) : (
+            "送出建立 ticket"
+          )}
         </button>
       </div>
     </div>

@@ -151,6 +151,7 @@ async function handle(req: Request): Promise<Response> {
       if (sub === "" && method === "GET") return qa.getDraft(hash, draftId);
       if (sub === "/turn" && method === "POST") return qa.turn(hash, draftId, req);
       if (sub === "/finalize" && method === "POST") return qa.finalize(hash, draftId, req);
+      if (sub === "/preview-split" && method === "POST") return qa.previewSplit(hash, draftId, req);
       if (sub === "/cancel" && method === "POST") return qa.cancel(hash, draftId);
     }
   }
