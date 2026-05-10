@@ -25,6 +25,8 @@ export default defineConfig({
   testDir: "./mock",
   fullyParallel: false,
   workers: 1,
+  // 個別 test 偶爾 flake(temp dir 清理時 fs.watch / mock runner 殘餘 timeline);retry 1 次擋掉。
+  retries: process.env.CI ? 2 : 1,
   reporter: process.env.CI
     ? [["github"], ["html", { outputFolder: "../../playwright-report", open: "never" }]]
     : [["list"], ["html", { outputFolder: "../../playwright-report", open: "never" }]],
