@@ -1,12 +1,18 @@
-import { homedir } from "node:os";
 import { join, basename, resolve } from "node:path";
 import { existsSync, mkdirSync, statSync } from "node:fs";
 import { projectHash } from "./hash";
 import { currentBranch } from "./git";
+import { vibeHome } from "./paths";
 import type { Project } from "../../shared/types";
 
-const STATE_DIR = join(homedir(), ".vibe-pipeline");
-const STATE_FILE = join(STATE_DIR, "state.json");
+// 注意:不要 cache 這條 path。e2e 一次 process 內 VP_HOME_OVERRIDE 不變但抽 function 比較乾淨,
+// 也讓未來 multi-tenant / per-request 切 home 不用大改。
+function stateDir(): string {
+  return join(vibeHome(), ".vibe-pipeline");
+}
+function stateFile(): string {
+  return join(stateDir(), "state.json");
+}
 
 type State = {
   lastProject: string | null;
@@ -16,9 +22,9 @@ type State = {
 const EMPTY_STATE: State = { lastProject: null, recentProjects: [] };
 
 async function readState(): Promise<State> {
-  if (!existsSync(STATE_FILE)) return EMPTY_STATE;
+  if (!existsSync(stateFile())) return EMPTY_STATE;
   try {
-    const text = await Bun.file(STATE_FILE).text();
+    const text = await Bun.file(stateFile()).text();
     const parsed = JSON.parse(text);
     return {
       lastProject: typeof parsed.lastProject === "string" ? parsed.lastProject : null,
@@ -30,10 +36,10 @@ async function readState(): Promise<State> {
 }
 
 async function writeState(state: State): Promise<void> {
-  if (!existsSync(STATE_DIR)) mkdirSync(STATE_DIR, { recursive: true });
-  const tmp = STATE_FILE + ".tmp";
+  if (!existsSync(stateDir())) mkdirSync(stateDir(), { recursive: true });
+  const tmp = stateFile() + ".tmp";
   await Bun.write(tmp, JSON.stringify(state, null, 2));
-  await Bun.$`mv ${tmp} ${STATE_FILE}`.quiet();
+  await Bun.$`mv ${tmp} ${stateFile()}`.quiet();
 }
 
 async function toProject(path: string, lastOpenedAt: number): Promise<Project> {

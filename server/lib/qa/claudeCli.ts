@@ -1,5 +1,7 @@
 import { QA_BEHAVIOR_PROMPT } from "./systemPrompt";
 import type { QAReply } from "./schema";
+import { isTestMode, nextQAReply } from "../testMode";
+import { projectHash } from "../hash";
 
 export class ClaudeCliError extends Error {
   constructor(public code: "not_available" | "exec_failed" | "parse_failed", message: string) {
@@ -35,6 +37,17 @@ export async function runTurn({
   isFirstTurn,
   progressHint,
 }: RunOpts): Promise<QAReply> {
+  // E2E mock:從 testMode store 拿下一筆 scripted reply。不 spawn 真 claude。
+  // 走 enforceContract 通過保留跟 real 模式同樣的 spec coercion / completeness check。
+  if (isTestMode()) {
+    void sessionId;
+    void userMessage;
+    void isFirstTurn;
+    void progressHint;
+    const reply = nextQAReply(projectHash(cwd));
+    return enforceContract(reply);
+  }
+
   const args = ["claude", "-p", "--output-format", "json"];
   // QA 階段:鎖會改檔 / 跑 sub-agent / 上網的工具,其他(Bash / Read / Grep / Glob / MCP)放行讓 AI 收斂時可查專案。
   args.push("--disallowedTools", "Edit Write Task");

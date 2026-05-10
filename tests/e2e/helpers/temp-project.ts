@@ -1,0 +1,73 @@
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { spawnSync } from "node:child_process";
+
+export type TempProject = {
+  path: string;
+  hash: string;
+};
+
+const API = "http://127.0.0.1:3001/api";
+
+// Run git deterministically:設 user.name/email + -b baseBranch,避免吃 user 全域 git config 出 surprise。
+function git(cwd: string, args: string[]): { ok: boolean; out: string; err: string } {
+  const res = spawnSync("git", args, {
+    cwd,
+    encoding: "utf-8",
+    env: {
+      ...process.env,
+      GIT_AUTHOR_NAME: "vp-e2e",
+      GIT_AUTHOR_EMAIL: "vp-e2e@local",
+      GIT_COMMITTER_NAME: "vp-e2e",
+      GIT_COMMITTER_EMAIL: "vp-e2e@local",
+    },
+  });
+  return {
+    ok: res.status === 0,
+    out: res.stdout ?? "",
+    err: res.stderr ?? "",
+  };
+}
+
+// 建一個 temp git repo + .vibe-pipeline/(可選 seed pipelines),註冊進 backend recents。
+// 回 path + hash,後續 spec 用 ?project=<hash> 進 board。
+export async function createTempProject(opts?: {
+  baseBranch?: string;
+  pipelines?: Array<Record<string, unknown>>;
+}): Promise<TempProject> {
+  const baseBranch = opts?.baseBranch ?? "main";
+  const dir = mkdtempSync(join(tmpdir(), "vp-e2e-proj-"));
+
+  const init = git(dir, ["init", "-b", baseBranch]);
+  if (!init.ok) throw new Error(`git init failed: ${init.err}`);
+  writeFileSync(join(dir, "README.md"), "# vp-e2e fixture\n");
+  const add = git(dir, ["add", "."]);
+  if (!add.ok) throw new Error(`git add failed: ${add.err}`);
+  const commit = git(dir, ["commit", "-m", "init"]);
+  if (!commit.ok) throw new Error(`git commit failed: ${commit.err}`);
+
+  const res = await fetch(`${API}/__test/register-project`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      path: dir,
+      ensureInit: true,
+      seedPipelines: opts?.pipelines ?? [],
+    }),
+  });
+  const body = (await res.json()) as { ok: boolean; data?: { hash: string }; error?: { message: string } };
+  if (!body.ok || !body.data) {
+    throw new Error(`register-project failed: ${body.error?.message ?? "unknown"}`);
+  }
+  return { path: dir, hash: body.data.hash };
+}
+
+// 砍 fixture dir。worktrees 在 VP_HOME_OVERRIDE,留給 OS tmp 自然回收。
+export function cleanupTempProject(p: TempProject): void {
+  try {
+    rmSync(p.path, { recursive: true, force: true });
+  } catch {
+    // ignore — OS 會清 tmp
+  }
+}

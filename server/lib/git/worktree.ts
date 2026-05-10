@@ -1,12 +1,14 @@
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { existsSync, mkdirSync } from "node:fs";
 import { projectHash } from "../hash";
+import { vibeHome } from "../paths";
 
-const WORKTREE_ROOT = join(homedir(), ".vibe-pipeline", "worktrees");
+function worktreeRoot(): string {
+  return join(vibeHome(), ".vibe-pipeline", "worktrees");
+}
 
 export function worktreePath(projectPath: string, pipelineId: string): string {
-  return join(WORKTREE_ROOT, projectHash(projectPath), pipelineId);
+  return join(worktreeRoot(), projectHash(projectPath), pipelineId);
 }
 
 export function exists(projectPath: string, pipelineId: string): boolean {
@@ -38,7 +40,7 @@ export async function ensure(
   const wt = worktreePath(projectPath, pipelineId);
   if (existsSync(wt)) return wt;
 
-  mkdirSync(join(WORKTREE_ROOT, projectHash(projectPath)), { recursive: true });
+  mkdirSync(join(worktreeRoot(), projectHash(projectPath)), { recursive: true });
 
   // Check if branch already exists
   const branchCheck = await spawnGit(

@@ -1,7 +1,9 @@
 import * as projects from "./routes/projects";
 import * as qa from "./routes/qa";
+import * as test from "./routes/test";
 import * as projectStore from "./lib/projectStore";
 import * as orchestrator from "./lib/runner/orchestrator";
+import * as testMode from "./lib/testMode";
 
 const PORT = Number(process.env.PORT ?? 3001);
 
@@ -18,7 +20,19 @@ async function handle(req: Request): Promise<Response> {
   const method = req.method;
 
   if (pathname === "/api/health" && method === "GET") {
-    return Response.json({ ok: true, data: { status: "up" } });
+    return Response.json({ ok: true, data: { status: "up", testMode: testMode.isTestMode() } });
+  }
+
+  // E2E 控制端點 — 只 mock 模式 mount,real 模式 404
+  if (testMode.isTestMode() && pathname.startsWith("/api/__test/")) {
+    if (pathname === "/api/__test/register-project" && method === "POST")
+      return test.registerProject(req);
+    if (pathname === "/api/__test/script/qa" && method === "POST")
+      return test.setQAScript(req);
+    if (pathname === "/api/__test/script/runner" && method === "POST")
+      return test.setRunnerScript(req);
+    if (pathname === "/api/__test/reset" && method === "POST") return test.reset();
+    return notFound();
   }
 
   if (pathname === "/api/projects" && method === "GET") {
