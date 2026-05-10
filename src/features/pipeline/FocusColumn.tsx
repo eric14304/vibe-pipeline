@@ -54,7 +54,7 @@ function RunButton({
   if (noTickets) {
     return (
       <button className="btn" disabled title="按上方「+ ticket」開 QA 建第一張">
-        先建 ticket
+        無ticket可執行
       </button>
     );
   }
