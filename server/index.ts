@@ -161,6 +161,9 @@ async function handle(req: Request): Promise<Response> {
 const server = Bun.serve({
   port: PORT,
   hostname: "127.0.0.1",
+  // 預設 10s 太短 — QA / split / merge 都會 spawn claude CLI,單次跑 10-60s 常見;
+  // 拉到 5min cover 大部分 case,真超過代表 claude 卡死,讓 bun 砍掉合理
+  idleTimeout: 255, // bun 上限 255s (≈4.25min)
   async fetch(req) {
     try {
       return await handle(req);
