@@ -222,10 +222,17 @@ bunx playwright show-report    # 看上次 HTML report
 - 加新 mock 注入點 → 一律走 `/api/__test/*`,不要直接改業務 lib
 - 任何讓「real 模式炸但 mock 過」的 PR 都不該 merge — 兩套要互補不互蓋
 
-## 還沒做(隨進度補)
+## 進度
 
-- [ ] Phase 1:架構 scaffolding(playwright.config + helpers + 一個 smoke spec)
-- [ ] Phase 2:Mock 注入點 + control endpoints + fixture lifecycle
-- [ ] Phase 3:照覆蓋矩陣寫滿 mock 套
-- [ ] Phase 4:Real 套 + 跑一輪驗證 prompt 沒退化
-- [ ] Phase 5:CI 整合(GitHub Actions / 本地 pre-push hook)
+- [x] Phase 1:架構 scaffolding(playwright.config + smoke 3 個 test)— commit `be5f541`
+- [x] Phase 2:Mock 注入點 + `/api/__test/*` + fixture lifecycle — commit `8f4a895`
+- [x] Phase 3:Mock 套覆蓋全部主要 flow(12 個 spec / 55 個 test)— commits `178e881` `cf07a88` `dac2cd2` `28b1996`
+  - smoke / fixture / pipeline-crud / qa-flow / runner-flow / runner-edge / ticket-drawer / merge / notif / topbar / guards / empty / project-lifecycle / dev-states
+- [ ] Phase 4:Real 套 — 等用戶手動觸發,real claude CLI 燒 token
+- [ ] Phase 5:CI 整合(GitHub Actions / 本地 pre-push hook)— 等用戶決定 CI provider
+
+## 已知 flake / 限制
+
+- 個別 test 在 full suite 跑時偶爾 race,playwright `retries: 1` 擋掉。常見肇因:temp dir cleanup 時 fs.watch noise / mock runner async timeline 殘餘 / vite first-paint。穩定性夠 production 用,但不適合 zero-flake 嚴格要求。
+- Mock runner 不做真 git commit(用假 hash 寫 `ticket.commits[]`),所以 merge 的 spec 自己 preBuildBranch 預先寫真 commit。要測「runner 跑完 → merge」端到端,等 phase 4 real 套。
+- `/api/__test/*` 控制端點 in-memory 存劇本,server 重啟即清。Test 之間用 `resetMocks()` 顯式清。
