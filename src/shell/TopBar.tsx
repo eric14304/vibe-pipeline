@@ -5,15 +5,22 @@ import { BellIcon, CheckIconSm, ChevronIcon, FolderIcon, GearIcon, MoonIcon, Plu
 import * as api from "../api/projects";
 import { useActiveProjectHash } from "../hooks/useActiveProject";
 import type { Project } from "../../shared/types";
+import { SettingsPopover } from "../features/settings/SettingsPopover";
 
 export function TopBar({
   onBellClick,
   notifActive = false,
   unreadCount = 0,
+  runningCount = 0,
+  maxParallel = 0,
+  onConfigSaved,
 }: {
   onBellClick?: () => void;
   notifActive?: boolean;
   unreadCount?: number;
+  runningCount?: number;
+  maxParallel?: number;
+  onConfigSaved?: (cfg: api.ProjectConfig) => void;
 } = {}) {
   const { hash, setHash } = useActiveProjectHash();
   const [recents, setRecents] = useState<Project[]>([]);
@@ -218,6 +225,9 @@ export function TopBar({
       <span style={{ flex: 1 }} />
 
       <div className="topbar-right">
+        {hash && maxParallel > 0 && (
+          <ParallelChip running={runningCount} max={maxParallel} />
+        )}
         <button type="button"
           className="icon-btn topbar-theme-toggle"
           onClick={toggleTheme}
@@ -239,11 +249,77 @@ export function TopBar({
             </span>
           )}
         </button>
-        <button type="button" className="icon-btn" title="設定 (尚未實作)" disabled>
-          <GearIcon />
-        </button>
+        <SettingsButton
+          hash={hash}
+          onConfigSaved={onConfigSaved}
+        />
       </div>
     </div>
+  );
+}
+
+// N/M chip:過載(N>M,max_parallel 改小但已起的不 kill)時加括號標記
+function ParallelChip({ running, max }: { running: number; max: number }) {
+  const overload = running > max;
+  const color = overload
+    ? "var(--failed)"
+    : running >= max && running > 0
+    ? "var(--queued)"
+    : running > 0
+    ? "var(--running)"
+    : "var(--fg-mute)";
+  return (
+    <span
+      className="chip mono"
+      title={
+        overload
+          ? `running ${running} 條已超過 max_parallel ${max}(改小不會 kill 既有的)`
+          : `同時跑 ${running} / ${max} 條`
+      }
+      style={{ color, borderColor: "var(--line)" }}
+    >
+      <span style={{ color: "var(--fg-mute)" }}>▶</span>
+      {running}/{max}
+      {overload && <span style={{ color: "var(--failed)" }}>!</span>}
+    </span>
+  );
+}
+
+function SettingsButton({
+  hash,
+  onConfigSaved,
+}: {
+  hash: string | null;
+  onConfigSaved?: (cfg: api.ProjectConfig) => void;
+}) {
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  return (
+    <span style={{ position: "relative", display: "inline-block" }}>
+      <button
+        ref={btnRef}
+        type="button"
+        className={"icon-btn" + (open ? " is-active" : "")}
+        title={hash ? "設定" : "選擇 project 後可開設定"}
+        onClick={() => hash && setOpen((o) => !o)}
+        disabled={!hash}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+      >
+        <GearIcon />
+      </button>
+      {hash && (
+        <SettingsPopover
+          hash={hash}
+          open={open}
+          onClose={() => setOpen(false)}
+          onSaved={(cfg) => {
+            onConfigSaved?.(cfg);
+          }}
+          anchorRef={btnRef}
+        />
+      )}
+    </span>
   );
 }
 

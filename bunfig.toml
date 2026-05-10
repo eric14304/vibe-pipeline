@@ -1,0 +1,5 @@
+[test]
+# bun test 預設掃所有 *.test.ts / *.spec.ts。把 root 縮在 server/,
+# 讓 `bun test` 不會誤吃 tests/e2e 的 Playwright spec(那些走 playwright test runner)。
+# E2E 走 `bun run test:e2e` / `bun run test:e2e:real`。
+root = "server"

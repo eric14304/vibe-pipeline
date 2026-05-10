@@ -16,6 +16,7 @@ export function RunButton({
   onPause,
   lastRun,
   spawning = false,
+  queuePosition,
 }: {
   pipeline: Pipeline;
   onRun?: (id: string) => void;
@@ -24,6 +25,7 @@ export function RunButton({
   // user 點 開始/繼續/重試 後 → 等 polling 看到 state 跳出 planning/paused/failed 為止
   // 避開「點下去看似沒反應」的視覺空窗(POST 回來到第一個 ticket 真跑可能 0-7s)
   spawning?: boolean;
+  queuePosition?: number;
 }) {
   const s = pipeline.state;
   const noTickets = pipeline.tickets.length === 0;
@@ -57,6 +59,20 @@ export function RunButton({
           停止中
         </button>
       );
+    case "queued": {
+      const posLabel = queuePosition && queuePosition > 0 ? `順位 ${queuePosition}` : "排隊中";
+      return (
+        <button
+          type="button"
+          className="btn"
+          onClick={() => onPause?.(pipeline.id)}
+          title="取消排隊(改回 paused)"
+          style={{ color: "var(--queued)", borderColor: "var(--queued)" }}
+        >
+          ⏳ {posLabel}
+        </button>
+      );
+    }
     case "ready":
       return (
         <button type="button" className="btn" disabled title="所有 ticket 已完成">
@@ -142,6 +158,7 @@ export function FocusColumn({
   onTicketClick,
   projectHash,
   mergeStrategy,
+  queuePosition,
 }: {
   pipeline: Pipeline;
   tick: number;
@@ -158,6 +175,7 @@ export function FocusColumn({
   onTicketClick?: (ticket: Ticket) => void;
   projectHash?: string;
   mergeStrategy?: string;
+  queuePosition?: number;
 }) {
   // Runs summary 給 head chip + RunButton 預估用。pipeline.id / state 變動就 refetch
   // (state 變表示可能新跑完一次)。失敗安靜忽略 — 純資訊性。
@@ -230,7 +248,9 @@ export function FocusColumn({
     t.status === "failed_transient"
   );
   const lockedByState =
-    pipeline.state === "running" || pipeline.state === "stopping";
+    pipeline.state === "running" ||
+    pipeline.state === "stopping" ||
+    pipeline.state === "queued";
 
   // Spawning state:點 開始/繼續/重試 後到 polling 看到 state 跳出 [planning/paused/failed]。
   // 解掉「點下去看似沒反應」的視覺空窗(POST 回 → state.json 寫入 → polling 抓到 ≤ 1.5s + claude 啟動 0~5s)。
@@ -332,6 +352,7 @@ export function FocusColumn({
             onPause={onPause}
             lastRun={lastRun}
             spawning={spawning}
+            queuePosition={queuePosition}
           />
           <OverflowMenu
             pipeline={pipeline}
@@ -652,7 +673,9 @@ function FocusTitle({
     trimmed !== pipeline.name && existingNames.includes(trimmed);
   const valid = trimmed.length > 0 && formatOk && !taken;
   const lockedByState =
-    pipeline.state === "running" || pipeline.state === "stopping";
+    pipeline.state === "running" ||
+    pipeline.state === "stopping" ||
+    pipeline.state === "queued";
 
   function commit() {
     if (!valid || trimmed === pipeline.name) {

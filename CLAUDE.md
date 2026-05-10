@@ -4,7 +4,7 @@
 
 ## 當前 phase(2026-05-11)
 
-**Phase 4 進行中**:e2e 套(mock + real)+ AI merge 改成 ticket-based 架構 + UI polish 一輪。pipeline/phase3 branch 上有「multi-pipeline 平行 + PUT charset guard」兩張 ticket 還沒 merge 進 main(self-dogfood 撞 vite/bun watch 雷,要手動 merge 收掉)。
+**Phase 4 進行中**:e2e 套(mock + real)+ AI merge 改成 ticket-based 架構 + UI polish 一輪。pipeline/phase3 branch 的「multi-pipeline 平行 + PUT charset guard」兩張 ticket 已手動 merge 進 main。
 
 **Phase 3 第四刀(舊)→ 第五刀(本 phase)**:Phase 3 第四刀的機械 merge 已被 Phase 4 ticket-based AI merge 取代;`/merge` 端點現在 append synthetic merge ticket 走 runner 主流程。
 
@@ -16,6 +16,7 @@
 - Phase 3 第三刀 — Pipeline 操作補齊(delete pipeline、rename inline ✎、reset ticket、reset all done/failed、reveal worktree)、TopBar(真實 currentBranch、⌘O / Ctrl+O 鍵盤捷徑、theme toggle 走 localStorage 持久化、Settings disabled stub)、UX 系列(bell unread 數字、actionError 右下 toast、collapsed inbox 讀過 block 沉降 muted、ts 絕對定位右下、commit hash click-to-copy、empty pipeline 空狀態 CTA、EmptyProject 箭頭指向 TopBar、browser tab title 動態、FocusColumn 累計成本 chip + RunButton 上次 duration 預估、overflow menu 收 worktree/重跑全部/刪除、QADrawer tech leak 清除)、Backend 安全網(orchestrator state guard 擋 ready/running/stopping 的 /run、savePipeline shape 驗證 + race guard + PUT-as-upsert 擋、auto-cancel 空 QA draft)、Backend 新 endpoint(GET /branches、POST /pipelines/:id/worktree/reveal、DELETE /pipelines/:id、GET /pipelines/:id/runs[/:filename])、Project type 加 currentBranch、Rail 漏狀態色補齊(stopping / failed_iter_limit / failed_transient)+ 移除假 Archive chip
 - Phase 3 第二.五刀 — iter FAIL → PASS round chain 驗證(test pipeline,$1.51,verdicts ["FAIL","PASS"] + criticFeedback 全寫入 + executor 第二輪確實 incorporate feedback + 真實 ms 時間戳)、multi-ticket 順序 + pause/resume 驗證(3-step pipeline,$1.47 split 兩段,pause 後 runner 跑完 t1 才收 paused、resume 從 t2 接,3 commit 各自獨立)、atomic write(.tmp + JSON.parse round-trip + renameSync,防 partial write / serialize 炸)、inbox panel + strip 改 flat 列表(不分 sev 群組,strip 改全 8px pip)、iter-stage-pulse 改 box 內右上角 notification badge 樣式
 - Phase 3 第四刀 — Pipeline merge:`POST /pipelines/:id/merge` 用 project config `defaults.merge_strategy`(預設 squash;支援 merge/squash/ff-only),checkout base → merge → squash 模式追加 commit,衝突 / not-fast-forward / 其他 abort + 訊息;成功標 `state="merged"` + `mergedAt` + `mergeCommit{hash,subject,ts}` + emit `pipeline_merged` notif。ReadyBanner 的 View diff(改開 worktree)/ Merge 按鈕從 disabled 接通。orchestrator state guard 補擋 merged 狀態的 /run。E2E 驗過 squash → main
+- Phase 3 第五刀 — Multi-pipeline 平行執行:config `defaults.max_parallel`(預設 2,clamp 1-8)+ orchestrator in-memory slot tracker + FIFO queue per project + 滿 slot 自動 'queued' state(新增到 PipelineState union + STATE_COLOR/STATE_LABEL + tokens.css teal `--queued`)+ emit `pipeline_queued` notif + process exit 觸發 dispatcher 接棒 FIFO + recovery 把 queued 視同 stale → paused。Backend 新 endpoint:GET /api/projects/:hash/config / PUT /api/projects/:hash/config(只白名單 max_parallel)/ GET /api/projects/:hash/runtime(回 N/M)。Pause endpoint 對 queued 狀態走 `cancelQueued`(從 queue 拔 + 標 paused)。前端 TopBar N/M chip(running >= max 變 queued 色,過載紅 `!`)、RunButton 'queued' 狀態(順位顯示 + 按鈕當「取消排隊」)、Settings popover(SettingsPopover.tsx)露 max_parallel 數字欄位 1-8 + 即時 triggerDispatch 補位、FocusColumn / Title rename 把 'queued' 加進 lockedByState。savePipeline race guard 加 'queued',deletePipeline 在 queued 時走 cancelQueued 拔出再刪。**PUT body charset guard**:沒帶 charset=utf-8 / 非 application/json → 400 拒絕,防 shell caller cp950 mojibake 寫進 pipeline.json
 - Phase 4 第一/二刀 e2e — Playwright 雙模式(mock CI / real 手動)、12 mock spec / 55 test 全綠、real 套 vp-autotest scaffold + iter ticket 真跑驗過。詳見 `vibe-pipeline-e2e` SKILL
 - Phase 4 第三刀 AI merge ticket-based — `/merge` 改 append 一張 `mode="merge"` synthetic ticket 走 runner 主流程,`mergeTicketPrompt()` sub-agent 用 `git -C "<projectPath>"` 操作 main repo,主 agent 解析 PASS / FAIL / FAIL_NORETRY 三種 sub-agent 回應(致命條件不再浪費 iter);merge ticket 帶上完整 ticket 歷史(title/goal/acceptance/commits)讓 AI 解衝突 + 寫精煉 commit message。preflight working tree 髒直接 409 不 spawn agent;失敗 merge ticket 重試走「reset → re-run」不重複 append。default merge_strategy 改 `merge`(--no-ff,保留 ticket commit chain)
 - Phase 4 第四刀 UI polish — ConfirmDialog 取代 native window.confirm(Promise hook + danger 變體 + Esc/Enter 鍵);TicketCard 顯 goal sub-line + iter rounds 多 row 垂直排列 + 「執行→審核→結果」三段 stage(結果顯 PASS/FAIL/PARTIAL);RunButton spawning「啟動中…」過場;Rail item state-aware 第二行(▶ #N title / 可合併入 main / 已併入 main / 上次活動 N 分鐘前);InboxItem read/unread 改單 dot 兩種樣式(實心/空心);prompt 用 react-markdown 渲染;mode label / STATE_LABEL 全中文;DiffModal(point worktree vs base 完整 diff,React Portal 跳出 fade-up transform 牢籠)。focus-head 加可點 +N -M 統計 chip(任何狀態都看得到 worktree diff);recoverStale 補 orphan ticket 修復(running ticket pipeline 已 paused 的錯位);QA pipelineContext snapshot(QA AI 看 pipeline 內既有 ticket 避免重複)
@@ -24,13 +25,12 @@
 **架構決策**:Bun local server + browser(前端 Vite 5173 / 後端 Bun 3001 / `/api/*` 透過 Vite proxy)。Runner 主 agent 工具白名單只准 Edit/Write 改 pipeline.json + Bash 跑 read-only 指令 + git add/commit;source code 改動 100% 透過 Task 派 sub-agent。Theme 偏好走 localStorage(URL `?theme=` 仍 override 給分享連結用),非 backend config — 簡單 + 無 round-trip + first-paint 不閃。
 
 **還沒做(下個 iteration)**
-- pipeline/phase3 branch 上的兩張 ticket(multi-pipeline 平行 + PUT charset guard)沒 merge 進 main — 因 self-dogfood 撞 AI merge 雷,需手動 git merge 收
-- Multi-pipeline 平行執行(實作躺 pipeline/phase3 branch 等手動合)
-- PUT body charset guard(同上)
 - Transient retry 真正觸發測試(沒自然 fixture,需 fault injection;低優先,留 production 真踩到再補)
 - Budget tracker(P2+;不需 SQLite,直接 sum log JSON)
-- Settings 畫面實際內容(default base branch / merge_strategy / cost 上限等;multi-parallel 那張 ticket 已寫 SettingsPopover 雛形,等 merge)
+- Settings 畫面其餘欄位(default base branch / merge_strategy / cost 上限等;phase 3-5 已露 max_parallel,SettingsPopover 雛形已落地,其他保留)
 - AI 跑 merge / runner 時的 model / effort 控制(目前都用 user 預設;QA 適合 sonnet 省、merge sub-agent 適合 opus,可加 ticket spec 欄位 + 全域 default config)
+- log/notif GC 已落地(per-pipeline 留 10 / 全 project 留 500)
+- Phase 3-5 e2e 留給 user 手動(orchestrator 不會 spawn 巢狀 claude session 跑覆蓋)
 - self-dogfood 不靠手動 merge 的方案 → merge worktree isolation,規模 ~150 行,看 [refs/merge-isolation-2026-05-11.md](.claude/skills/vibe-pipeline/refs/merge-isolation-2026-05-11.md);99% user 不踩,當前不投入
 
 **已 final 決定**(不再討論)

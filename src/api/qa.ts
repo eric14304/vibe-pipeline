@@ -23,7 +23,7 @@ async function call<T>(path: string, init?: CallInit): Promise<T> {
   const opts: RequestInit = { method: init?.method };
   if (init?.body !== undefined) {
     opts.body = typeof init.body === "string" ? init.body : JSON.stringify(init.body);
-    opts.headers = { "Content-Type": "application/json" };
+    opts.headers = { "Content-Type": "application/json; charset=utf-8" };
   }
   const res = await fetch(path, opts);
   const json = (await res.json()) as ApiResponse<T> & { data?: T };

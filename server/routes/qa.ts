@@ -2,6 +2,7 @@ import * as projectStore from "../lib/projectStore";
 import * as pipelineDir from "../lib/pipelineDir";
 import * as draftStore from "../lib/qa/draftStore";
 import * as cli from "../lib/qa/claudeCli";
+import { requireJsonUtf8 } from "../lib/http";
 import type { ApiResponse, ApiErrorCode, PartialSpec } from "../../shared/types";
 
 const REQUIRED_FIELDS: { key: keyof PartialSpec; label: string }[] = [
@@ -139,6 +140,8 @@ function truncate(s: string, max: number): string {
 }
 
 export async function turn(hash: string, draftId: string, req: Request): Promise<Response> {
+  const guardErr = requireJsonUtf8(req);
+  if (guardErr) return guardErr;
   const r = await projectFor(hash);
   if ("error" in r) return r.error;
   const { project } = r;
@@ -179,6 +182,8 @@ export async function turn(hash: string, draftId: string, req: Request): Promise
 }
 
 export async function finalize(hash: string, draftId: string, req: Request): Promise<Response> {
+  const guardErr = requireJsonUtf8(req);
+  if (guardErr) return guardErr;
   const r = await projectFor(hash);
   if ("error" in r) return r.error;
   const { project } = r;

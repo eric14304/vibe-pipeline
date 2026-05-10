@@ -61,7 +61,7 @@ test("iter ticket FAIL → PASS chain on vp-autotest($1.5 估)", async () => {
     `/projects/${VP_AUTOTEST_HASH}/pipelines`,
     {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json; charset=utf-8" },
       body: JSON.stringify({
         name: pipelineName,
         branch: `pipeline/${pipelineName}`,
@@ -76,7 +76,7 @@ test("iter ticket FAIL → PASS chain on vp-autotest($1.5 估)", async () => {
   // 2. 開 QA session
   const startResp = await api<{ draft: { draftId: string; sessionId: string } }>(
     `/projects/${VP_AUTOTEST_HASH}/pipelines/${pipeline.id}/qa/start`,
-    { method: "POST", body: JSON.stringify({}), headers: { "content-type": "application/json" } }
+    { method: "POST", body: JSON.stringify({}), headers: { "content-type": "application/json; charset=utf-8" } }
   );
   const draftId = startResp.draft.draftId;
   console.log(`[real] QA draft: ${draftId}`);
@@ -98,7 +98,7 @@ test("iter ticket FAIL → PASS chain on vp-autotest($1.5 估)", async () => {
     `/projects/${VP_AUTOTEST_HASH}/qa/${draftId}/turn`,
     {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json; charset=utf-8" },
       body: JSON.stringify({ userMessage: opener }),
     }
   );
@@ -110,7 +110,7 @@ test("iter ticket FAIL → PASS chain on vp-autotest($1.5 估)", async () => {
       `/projects/${VP_AUTOTEST_HASH}/qa/${draftId}/turn`,
       {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json; charset=utf-8" },
         body: JSON.stringify({ userMessage: userMsg }),
       }
     );
@@ -122,7 +122,7 @@ test("iter ticket FAIL → PASS chain on vp-autotest($1.5 估)", async () => {
   // 4. Finalize
   await api(
     `/projects/${VP_AUTOTEST_HASH}/qa/${draftId}/finalize`,
-    { method: "POST", body: JSON.stringify({}), headers: { "content-type": "application/json" } }
+    { method: "POST", body: JSON.stringify({}), headers: { "content-type": "application/json; charset=utf-8" } }
   );
 
   // 5. 確認 ticket 是 iter mode

@@ -30,12 +30,17 @@ export function hasInit(projectPath: string): boolean {
   return existsSync(p) && statSync(p).isDirectory();
 }
 
+export const DEFAULT_MAX_PARALLEL = 2;
+export const MAX_PARALLEL_MIN = 1;
+export const MAX_PARALLEL_MAX = 8;
+
 const DEFAULT_CONFIG = {
   defaults: {
     base_branch: "main",
     // merge --no-ff 保留 ticket commit 鏈,bisect / git log 看得出 pipeline 邊界
     // (squash 適合「main 極乾淨」的個人專案,要的話改本檔)
     merge_strategy: "merge",
+    max_parallel: DEFAULT_MAX_PARALLEL,
   },
   scripts: {
     setup: "",
@@ -48,7 +53,7 @@ const DEFAULT_CONFIG = {
 };
 
 export type ProjectConfig = {
-  defaults?: { base_branch?: string; merge_strategy?: string };
+  defaults?: { base_branch?: string; merge_strategy?: string; max_parallel?: number };
   scripts?: { setup?: string; dev?: string; cleanup?: string };
   qa?: { openingMessage?: string };
 };
@@ -61,6 +66,26 @@ export async function readConfig(projectPath: string): Promise<ProjectConfig> {
   } catch {
     return {};
   }
+}
+
+export async function writeConfig(projectPath: string, cfg: ProjectConfig): Promise<void> {
+  const root = rootPath(projectPath);
+  if (!existsSync(root)) mkdirSync(root, { recursive: true });
+  await writeJson(join(root, "config.json"), cfg);
+}
+
+// max_parallel:讀 config + clamp [1,8],壞值 / 缺值 → DEFAULT_MAX_PARALLEL
+export function clampMaxParallel(raw: unknown): number {
+  const n = typeof raw === "number" && Number.isFinite(raw) ? Math.floor(raw) : NaN;
+  if (!Number.isFinite(n)) return DEFAULT_MAX_PARALLEL;
+  if (n < MAX_PARALLEL_MIN) return MAX_PARALLEL_MIN;
+  if (n > MAX_PARALLEL_MAX) return MAX_PARALLEL_MAX;
+  return n;
+}
+
+export async function getMaxParallel(projectPath: string): Promise<number> {
+  const cfg = await readConfig(projectPath);
+  return clampMaxParallel(cfg.defaults?.max_parallel);
 }
 
 // Atomic write:先寫 .tmp,parse 驗一次,再 rename 蓋過原檔。

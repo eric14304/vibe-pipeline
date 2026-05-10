@@ -12,7 +12,7 @@ async function call<T>(path: string, init?: CallInit): Promise<T> {
   const opts: RequestInit = { method: init?.method, headers: init?.headers };
   if (init?.body !== undefined) {
     opts.body = typeof init.body === "string" ? init.body : JSON.stringify(init.body);
-    opts.headers = { "Content-Type": "application/json", ...(init.headers || {}) };
+    opts.headers = { "Content-Type": "application/json; charset=utf-8", ...(init.headers || {}) };
   }
   const res = await fetch(path, opts);
   const json = (await res.json()) as ApiResponse<T>;
@@ -50,6 +50,34 @@ export function reveal(hash: string): Promise<{ ok: true }> {
 
 export function listBranches(hash: string): Promise<string[]> {
   return call<string[]>(`/api/projects/${hash}/branches`);
+}
+
+export type ProjectConfig = {
+  defaults: {
+    base_branch: string;
+    merge_strategy: string;
+    max_parallel: number;
+  };
+};
+
+export function getConfig(hash: string): Promise<ProjectConfig> {
+  return call<ProjectConfig>(`/api/projects/${hash}/config`);
+}
+
+export function updateConfig(
+  hash: string,
+  patch: { defaults?: Partial<ProjectConfig["defaults"]> }
+): Promise<ProjectConfig> {
+  return call<ProjectConfig>(`/api/projects/${hash}/config`, {
+    method: "PUT",
+    body: patch,
+  });
+}
+
+export type RuntimeStats = { runningCount: number; maxParallel: number };
+
+export function getRuntime(hash: string): Promise<RuntimeStats> {
+  return call<RuntimeStats>(`/api/projects/${hash}/runtime`);
 }
 
 export function listPipelines(hash: string): Promise<unknown[]> {
