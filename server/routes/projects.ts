@@ -471,7 +471,6 @@ export async function syncPipeline(hash: string, pipelineId: string): Promise<Re
     [k: string]: unknown;
   } | null;
   if (!pipeline) return err("not_found", `Pipeline not found: ${pipelineId}`, 404);
-  if (pipeline.state === "merged") return err("invalid_path", "Pipeline 已 merged,不需 sync", 409);
   if (pipeline.state === "queued") return err("invalid_path", "Pipeline 在排隊,等開跑後 pause 才能 sync", 409);
 
   const baseBranch = pipeline.baseBranch || "main";

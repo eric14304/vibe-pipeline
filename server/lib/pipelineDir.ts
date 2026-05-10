@@ -251,7 +251,6 @@ export async function appendSyncTicket(opts: {
     [k: string]: unknown;
   } | null;
   if (!p) return { ok: false, error: "Pipeline not found" };
-  if (p.state === "merged") return { ok: false, error: "Pipeline 已 merged,不需 sync" };
   const tickets = p.tickets ?? [];
   const anyRunning = tickets.some((t) => t.status === "running");
   if (anyRunning) return { ok: false, error: "有 ticket 正在跑,先 pause 才能 sync" };

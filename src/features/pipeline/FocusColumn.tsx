@@ -226,12 +226,13 @@ export function FocusColumn({
     };
   }, [projectHash, pipeline.id, pipeline.state]);
 
-  // Sync status — worktree 落後 base 幾個 commit。merged 不需顯,planning 沒 worktree 不抓。
+  // Sync status — worktree 落後 base 幾個 commit。planning 沒 worktree 不抓;merged 仍然抓
+  // (merged 不是終態,branch/worktree 還在,可以繼續加 ticket / sync / 再 merge)。
   // 跟 diffStat 同節奏:running/stopping 才 poll(base 那時可能被別條 pipeline 推進);
   // 其他 state 一次抓完,不同 pipeline.state 自動 refetch。
   const [behind, setBehind] = useState<number | null>(null);
   useEffect(() => {
-    if (!projectHash || pipeline.state === "merged" || pipeline.state === "planning") {
+    if (!projectHash || pipeline.state === "planning") {
       setBehind(null);
       return;
     }

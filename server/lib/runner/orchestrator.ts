@@ -135,17 +135,15 @@ export async function start(opts: {
   if (pipeline.state === "queued") {
     return { ok: false, error: "Pipeline 已在 queued" };
   }
-  if (pipeline.state === "ready") {
-    // 全部 ticket 都 done,沒事可跑。要重跑的話 user 要先 reset ticket 狀態。
+  if (pipeline.state === "ready" || pipeline.state === "merged") {
+    // 沒事可跑 — ready / merged 都需要 user 先 append 新 ticket(或 sync ticket)才有東西跑。
+    // merged 不是終態:branch / worktree 都還在,可以繼續加 ticket、sync、再 merge。
     const hasRunnable = (pipeline.tickets ?? []).some(
       (t) => t.status === "draft" || t.status === "ready"
     );
     if (!hasRunnable) {
-      return { ok: false, error: "Pipeline 已完成,沒待跑的 ticket(reset ticket.status 才能重跑)" };
+      return { ok: false, error: "Pipeline 沒待跑的 ticket(append 新 ticket 或 reset 既有的)" };
     }
-  }
-  if (pipeline.state === "merged") {
-    return { ok: false, error: "Pipeline 已 merge 進 base branch,不能再跑(刪掉重新建一條)" };
   }
 
   // Slot 檢查:滿了改進 queue
