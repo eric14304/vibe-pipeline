@@ -505,6 +505,21 @@ export function BoardScreen({
           setActionError(`刪除 ticket 失敗: ${e instanceof Error ? e.message : String(e)}`);
         }
       }}
+      onToggleMode={async (ticketId, nextMode) => {
+        if (!project || !active) return;
+        const next: Pipeline = {
+          ...active,
+          tickets: active.tickets.map((t) =>
+            t.id === ticketId ? { ...t, mode: nextMode } : t
+          ),
+        };
+        try {
+          await api.savePipeline(project.hash, active.id, next);
+          setReloadKey((k) => k + 1);
+        } catch (e) {
+          setActionError(`切換 mode 失敗: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }}
     />
   ) : null;
 

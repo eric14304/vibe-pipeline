@@ -29,6 +29,7 @@ export function TicketDrawer({
   onResetTicket,
   onSplitTicket,
   onDeleteTicket,
+  onToggleMode,
 }: {
   ticket: Ticket;
   pipelineName: string;
@@ -39,6 +40,7 @@ export function TicketDrawer({
   onResetTicket?: (ticketId: string) => Promise<void> | void;
   onSplitTicket?: (ticketId: string) => Promise<void> | void;
   onDeleteTicket?: (ticketId: string) => Promise<void> | void;
+  onToggleMode?: (ticketId: string, nextMode: "step" | "iter") => Promise<void> | void;
 }) {
   const confirm = useConfirm();
   useEffect(() => {
@@ -104,9 +106,39 @@ export function TicketDrawer({
               <span className="dot" style={{ background: accent }} />
               {statusLabel}
             </span>
-            <span className={"chip ticket-mode" + (ticket.mode === "iter" ? " is-iter" : "")}>
-              {modeLabel}
-            </span>
+            {(() => {
+              const canToggle =
+                onToggleMode && (ticket.mode === "step" || ticket.mode === "iter") && isModeToggleable(ticket);
+              const next: "step" | "iter" = ticket.mode === "iter" ? "step" : "iter";
+              const className =
+                "chip ticket-mode" +
+                (ticket.mode === "iter" ? " is-iter" : "") +
+                (canToggle ? " is-toggle" : "");
+              const label = canToggle ? `${modeLabel} ⇄` : modeLabel;
+              const title = canToggle
+                ? `點擊切換為 ${next === "iter" ? "迭代任務" : "單次任務"}`
+                : ticket.mode === "merge" || ticket.mode === "sync"
+                ? "synthetic ticket 不可切 mode"
+                : "ticket 已跑過 / 在跑,不可切 mode";
+              if (canToggle) {
+                return (
+                  <button
+                    type="button"
+                    className={className}
+                    onClick={() => onToggleMode?.(ticket.id, next)}
+                    title={title}
+                    style={{ cursor: "pointer" }}
+                  >
+                    {label}
+                  </button>
+                );
+              }
+              return (
+                <span className={className} title={title}>
+                  {modeLabel}
+                </span>
+              );
+            })()}
             {ticket.mode === "iter" && spec.iterLimit != null && (
               <span>上限 {spec.iterLimit} 輪</span>
             )}
@@ -234,6 +266,12 @@ export function TicketDrawer({
 
 function isTerminalStatus(s: string): boolean {
   return s === "done" || s === "failed" || s === "failed_iter_limit" || s === "failed_transient";
+}
+
+// 只 draft / ready 可切 mode(step ↔ iter);跑過後切 mode 影響已產生的 iter rounds 顯示語意
+function isModeToggleable(t: Ticket): boolean {
+  if (t.mode !== "step" && t.mode !== "iter") return false; // synthetic 不切
+  return t.status === "draft" || t.status === "ready";
 }
 
 // 只 draft / ready 可拆;running 中拆會撞 runner;done / failed 拆完也派不出去(已跑過)
