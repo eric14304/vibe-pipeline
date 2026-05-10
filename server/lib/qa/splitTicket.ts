@@ -87,7 +87,7 @@ export async function splitTicketSpec(opts: {
     "--model",
     "claude-sonnet-4-6",
     "--effort",
-    "medium",
+    "low",
     "--system-prompt",
     SPLIT_BEHAVIOR_PROMPT,
     "--disallowedTools",
