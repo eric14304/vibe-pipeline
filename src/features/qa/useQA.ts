@@ -140,19 +140,17 @@ export function useQA(projectHash: string | null) {
   const finalize = useCallback(
     async (edits?: Partial<TicketSpec>): Promise<unknown | null> => {
       if (!projectHash || !state.draft) return null;
-      setState((s) => ({ ...s, busy: true, error: null }));
+      const draftId = state.draft.draftId;
+      // 立刻關 drawer(finalize 含 split-check ~5-15s,讓 user 不卡視覺)
+      // backend 失敗的話 BoardScreen 會用 toast 顯錯
+      setState(INITIAL);
       try {
-        const result = await qaApi.finalizeQA(projectHash, state.draft.draftId, edits);
-        setState(INITIAL);
+        const result = await qaApi.finalizeQA(projectHash, draftId, edits);
         await refreshDrafts();
         return result;
       } catch (e) {
-        setState((s) => ({
-          ...s,
-          busy: false,
-          error: e instanceof Error ? e.message : String(e),
-        }));
-        return null;
+        // 失敗 → throw 給呼叫端處理(BoardScreen onFinalize 走 toast channel)
+        throw e instanceof Error ? e : new Error(String(e));
       }
     },
     [projectHash, state.draft, refreshDrafts]
