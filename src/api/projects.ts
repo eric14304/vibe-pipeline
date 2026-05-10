@@ -1,24 +1,16 @@
-import type { ApiResponse, Project, ApiErrorCode } from "../../shared/types";
+import type {
+  Project,
+  NotifRecord,
+  RunSummary,
+  RunDetail,
+  DiffStat,
+  DiffFile,
+  FullDiff,
+} from "../../shared/types";
+import { call, ApiError } from "./_client";
 
-export class ApiError extends Error {
-  constructor(public code: ApiErrorCode, message: string) {
-    super(message);
-  }
-}
-
-type CallInit = { method?: string; body?: unknown; headers?: Record<string, string> };
-
-async function call<T>(path: string, init?: CallInit): Promise<T> {
-  const opts: RequestInit = { method: init?.method, headers: init?.headers };
-  if (init?.body !== undefined) {
-    opts.body = typeof init.body === "string" ? init.body : JSON.stringify(init.body);
-    opts.headers = { "Content-Type": "application/json; charset=utf-8", ...(init.headers || {}) };
-  }
-  const res = await fetch(path, opts);
-  const json = (await res.json()) as ApiResponse<T>;
-  if (!json.ok) throw new ApiError(json.error.code, json.error.message);
-  return json.data;
-}
+export type { NotifRecord, RunSummary, RunDetail, DiffStat, DiffFile, FullDiff };
+export { ApiError };
 
 export function listRecent(): Promise<Project[]> {
   return call<Project[]>("/api/projects");
@@ -57,6 +49,7 @@ export type ProjectConfig = {
     base_branch: string;
     max_parallel: number;
     cost_limit_usd: number;
+    auto_merge: boolean;
   };
 };
 
@@ -65,6 +58,7 @@ export type ProjectConfigPatch = {
     max_parallel?: number;
     default_base_branch?: string;
     cost_limit_usd?: number;
+    auto_merge?: boolean;
   };
 };
 
@@ -148,28 +142,13 @@ export function syncPipeline(
   );
 }
 
-export type DiffStat = { files: number; added: number; deleted: number };
-
 export function getDiffStat(hash: string, id: string): Promise<DiffStat | null> {
   return call<DiffStat | null>(`/api/projects/${hash}/pipelines/${id}/diff-stat`);
 }
 
-export type DiffFile = { path: string; added: number; deleted: number };
-export type FullDiff = { files: DiffFile[]; raw: string };
-
 export function getFullDiff(hash: string, id: string): Promise<FullDiff | null> {
   return call<FullDiff | null>(`/api/projects/${hash}/pipelines/${id}/diff`);
 }
-
-export type NotifRecord = {
-  id: string;
-  type: string;
-  title: string;
-  sub?: string;
-  ts: number;
-  unread: boolean;
-  pipelineId?: string;
-};
 
 export function listNotifs(hash: string): Promise<NotifRecord[]> {
   return call<NotifRecord[]>(`/api/projects/${hash}/notifs`);
@@ -186,21 +165,6 @@ export function dismissNotif(hash: string, id: string): Promise<{ ok: true }> {
 export function markAllNotifsRead(hash: string): Promise<{ ok: true }> {
   return call<{ ok: true }>(`/api/projects/${hash}/notifs/mark-all-read`, { method: "POST" });
 }
-
-export type RunSummary = {
-  filename: string;
-  startedAt: number;
-  exitCode: number | null;
-  durationMs: number | null;
-  costUsd: number | null;
-  numTurns: number | null;
-  result: string | null;
-  tokens: { input: number; output: number; cacheRead: number; cacheCreate: number } | null;
-  sessionId: string | null;
-  hasStderr: boolean;
-};
-
-export type RunDetail = RunSummary & { stdout: string; stderr: string };
 
 export function listPipelineRuns(hash: string, pipelineId: string): Promise<RunSummary[]> {
   return call<RunSummary[]>(`/api/projects/${hash}/pipelines/${pipelineId}/runs`);

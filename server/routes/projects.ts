@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { existsSync, statSync } from "node:fs";
+import { existsSync } from "node:fs";
 import * as projectStore from "../lib/projectStore";
 import * as pipelineDir from "../lib/pipelineDir";
 import * as git from "../lib/git";
@@ -7,41 +7,16 @@ import * as orchestrator from "../lib/runner/orchestrator";
 import * as worktree from "../lib/git/worktree";
 import * as runLog from "../lib/runner/runLog";
 import * as notifs from "../lib/notifs/store";
-import { mergeTicketPrompt } from "../lib/runner/mergeTicketPrompt";
+import { triggerMerge } from "../lib/pipelineMerge";
 import { syncTicketPrompt } from "../lib/runner/syncTicketPrompt";
 import { pickFolder, revealFolder } from "../lib/dialog";
 import { projectHash } from "../lib/hash";
-import { requireJsonUtf8 } from "../lib/http";
-import type { ApiResponse, ApiErrorCode, Project } from "../../shared/types";
+import { isExistingDirectory } from "../lib/fs";
+import { requireJsonUtf8, ok, err, readJson } from "./_http";
+import type { ApiErrorCode, Project } from "../../shared/types";
 
-function ok<T>(data: T): Response {
-  return Response.json({ ok: true, data } satisfies ApiResponse<T>);
-}
-
-function err(code: ApiErrorCode, message: string, status = 400): Response {
-  return Response.json({ ok: false, error: { code, message } } satisfies ApiResponse<never>, {
-    status,
-  });
-}
-
-async function readJson(req: Request): Promise<Record<string, unknown>> {
-  try {
-    return (await req.json()) as Record<string, unknown>;
-  } catch {
-    return {};
-  }
-}
-
-function validProjectPath(p: string): boolean {
-  if (!p || typeof p !== "string") return false;
-  const abs = resolve(p);
-  if (!existsSync(abs)) return false;
-  try {
-    return statSync(abs).isDirectory();
-  } catch {
-    return false;
-  }
-}
+// validProjectPath 是 isExistingDirectory 在 routes 層的 alias,維持原本呼叫點不動。
+const validProjectPath = isExistingDirectory;
 
 export async function listRecent(): Promise<Response> {
   const items = await projectStore.listRecent();
@@ -129,7 +104,20 @@ export async function createPipeline(hash: string, req: Request): Promise<Respon
   const body = await readJson(req);
   const name = (body.name as string) || "pipeline";
   const id = (body.id as string) || pipelineDir.generatePipelineId(name);
-  const data = { ...body, id, tickets: Array.isArray(body.tickets) ? body.tickets : [] };
+  // autoMerge:body 沒帶就讀 project config defaults.auto_merge,有帶就用 body 值(必須是 boolean)
+  let autoMerge: boolean;
+  if (typeof body.autoMerge === "boolean") {
+    autoMerge = body.autoMerge;
+  } else {
+    const resolved = await pipelineDir.getResolvedDefaults(project.path);
+    autoMerge = resolved.auto_merge;
+  }
+  const data = {
+    ...body,
+    id,
+    autoMerge,
+    tickets: Array.isArray(body.tickets) ? body.tickets : [],
+  };
   await pipelineDir.writePipeline(project.path, id, data);
   return ok(data);
 }
@@ -158,7 +146,17 @@ export async function deletePipeline(hash: string, id: string): Promise<Response
       pipelineId: id,
     });
   }
-  // 刪 pipeline.json + qa drafts(若有)。worktree 留著,user 自己 git worktree remove 清。
+  // 順手 prune worktree(不論 state — merged / failed / draft / queued 都該清);
+  // 失敗只 warn,不擋 pipeline.json 刪除
+  try {
+    const r = await worktree.removeQuiet(project.path, id);
+    if (!r.ok) {
+      console.warn(`[delete ${id}] worktree prune failed: ${r.error}`);
+    }
+  } catch (e) {
+    console.warn(`[delete ${id}] worktree prune threw:`, e);
+  }
+  // 刪 pipeline.json + qa drafts(若有)
   const removed = pipelineDir.deletePipeline(project.path, id);
   if (!removed) return err("not_found", `Pipeline not found: ${id}`, 404);
   return ok({ ok: true });
@@ -206,6 +204,11 @@ export async function savePipeline(hash: string, id: string, req: Request): Prom
       "Body 缺必要欄位:name(string)/ branch(string)/ tickets(array)",
       400
     );
+  }
+  // autoMerge:若 body 有帶必須是 boolean(不接受 undefined → 維持既有值)
+  const bodyAutoMerge = (body as Record<string, unknown>).autoMerge;
+  if (bodyAutoMerge !== undefined && typeof bodyAutoMerge !== "boolean") {
+    return err("invalid_path", "autoMerge 必須為 boolean", 400);
   }
   const data = { ...body, id };
   await pipelineDir.writePipeline(project.path, id, data);
@@ -325,139 +328,44 @@ export async function pausePipeline(hash: string, pipelineId: string): Promise<R
   return ok({ ok: true });
 }
 
-// 跑 git -C <path> status --porcelain 判 working tree 乾淨。
-// 回 { ok: true } 表示乾淨可動;{ ok: false, modified, untracked, files } 表示髒,給 UI 顯示。
-async function checkWorkingTreeDirty(projectPath: string): Promise<
-  | { ok: true }
-  | { ok: false; modified: number; untracked: number; files: string[] }
-> {
-  const proc = Bun.spawn(["git", "-C", projectPath, "status", "--porcelain"], {
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  const out = (await new Response(proc.stdout).text()).trim();
-  await proc.exited;
-  if (out.length === 0) return { ok: true };
-  const lines = out.split(/\r?\n/);
-  let modified = 0;
-  let untracked = 0;
-  const files: string[] = [];
-  for (const line of lines) {
-    // porcelain format: "XY filename" 兩個 status code
-    const code = line.slice(0, 2);
-    const file = line.slice(3);
-    if (code.startsWith("??")) untracked++;
-    else modified++;
-    if (files.length < 12) files.push(file); // 前 12 個給 UI 顯示
-  }
-  return { ok: false, modified, untracked, files };
-}
-
 // AI merge(ticket-based):append 一張 mode=merge synthetic ticket 進 pipeline,
 // 然後觸發 runner 接管。merge ticket 由 sub-agent 在 main repo 跑(不在 worktree)。
 // 完成後 runner 主 agent 看到 mode=merge done,把 pipeline.state 設 merged + mergeCommit。
+// 真實邏輯抽到 lib/pipelineMerge.triggerMerge,handler 跟 auto-trigger 共用。
 export async function mergePipeline(hash: string, pipelineId: string): Promise<Response> {
   const project = await projectStore.findByHash(hash);
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);
-  if (!project.hasGit) return err("invalid_path", "Project 沒 .git/", 400);
-  if (orchestrator.isRunning(hash, pipelineId)) {
-    return err("invalid_path", "Pipeline 在跑,先 pause 才能 merge", 409);
-  }
-
-  // Preflight:main repo working tree 必須乾淨。
-  // AI merge agent 在 main repo 動 git checkout,如果有未 commit 的東西會撞;
-  // 直接擋下,要 user 先 commit 比 AI 試錯燒 token 後失敗划算。
-  const dirty = await checkWorkingTreeDirty(project.path);
-  if (!dirty.ok) {
-    return Response.json(
-      {
-        ok: false,
-        error: {
-          code: "invalid_path",
-          message:
-            `main repo 有 ${dirty.modified} 個 modified + ${dirty.untracked} 個 untracked,` +
-            `先 commit 或 stash 再 AI 合併(避免 merge 動到 user 沒存的工作)。`,
-          details: { modified: dirty.modified, untracked: dirty.untracked, files: dirty.files },
-        },
-      },
-      { status: 409 }
-    );
-  }
-
-  const pipeline = (await pipelineDir.readPipeline(project.path, pipelineId)) as {
-    name?: string;
-    branch?: string;
-    baseBranch?: string;
-    state?: string;
-    tickets?: Array<{
-      n?: number;
-      title?: string;
-      mode?: string;
-      goal?: string;
-      acceptance?: string[];
-      commits?: Array<{ hash?: string; subject?: string }>;
-    }>;
-    [k: string]: unknown;
-  } | null;
-  if (!pipeline) return err("not_found", `Pipeline not found: ${pipelineId}`, 404);
-
-  const branch = pipeline.branch || `pipeline/${pipeline.name || pipelineId}`;
-  const baseBranch = pipeline.baseBranch || "main";
-
-  // strategy 鎖死 merge --no-ff:squash / ff-only 跟新版 auto-rebase + sync chip 不相容
-  const strategy = pipelineDir.FIXED_MERGE_STRATEGY;
-
-  // 把 real ticket(非 merge mode)的歷史塞進 prompt,給 sub-agent 解衝突 / 寫 commit message 上下文
-  const history = (pipeline.tickets ?? [])
-    .filter((t) => t.mode !== "merge")
-    .map((t) => ({
-      n: typeof t.n === "number" ? t.n : 0,
-      title: t.title ?? "(no title)",
-      mode: t.mode,
-      goal: t.goal,
-      acceptance: t.acceptance,
-      commits: (t.commits ?? [])
-        .map((c) => ({ hash: c.hash ?? "", subject: c.subject ?? "" }))
-        .filter((c) => c.hash || c.subject),
-    }));
-
-  const prompt = mergeTicketPrompt({
-    projectPath: project.path,
-    branch,
-    baseBranch,
-    strategy,
-    history,
-  });
-
-  const appendRes = await pipelineDir.appendMergeTicket({
-    projectPath: project.path,
-    pipelineId,
-    prompt,
-  });
-  if (!appendRes.ok) return err("invalid_path", appendRes.error, 409);
-
-  // 觸發 runner;runner 主迴圈會挑到剛 append 的 merge ticket。
-  // pipeline.state 此刻可能是 "ready"(全 done 後 runner 標的);orchestrator.start state guard
-  // 會把 state 改回 running 並 spawn。
-  // 注意:state guard 內 ready 會檢查 hasRunnable(draft/ready);merge ticket status=ready 會被認列。
-  const startRes = await orchestrator.start({
+  const r = await triggerMerge({
     projectPath: project.path,
     projectHash: hash,
     pipelineId,
+    hasGit: project.hasGit,
   });
-  if (!startRes.ok) {
-    // 補救:append 了但 spawn 失敗,把 merge ticket 拔掉避免之後干擾
-    const cur = (await pipelineDir.readPipeline(project.path, pipelineId)) as {
-      tickets?: Array<{ id?: string; mode?: string }>;
-      [k: string]: unknown;
-    } | null;
-    if (cur?.tickets) {
-      const filtered = cur.tickets.filter((t) => t.mode !== "merge" || t.id !== appendRes.ticket.id);
-      await pipelineDir.writePipeline(project.path, pipelineId, { ...cur, tickets: filtered });
-    }
-    return err("invalid_path", `append OK but spawn failed: ${startRes.error}`, 500);
+  if (r.ok) return ok({ ok: true, ticketId: r.ticketId });
+  switch (r.reason) {
+    case "not_found":
+      return err("not_found", r.error, 404);
+    case "no_git":
+      return err("invalid_path", r.error, 400);
+    case "running":
+      return err("invalid_path", r.error, 409);
+    case "working_tree_dirty":
+      return Response.json(
+        {
+          ok: false,
+          error: {
+            code: "invalid_path",
+            message: r.error,
+            details: r.details,
+          },
+        },
+        { status: 409 }
+      );
+    case "append_failed":
+      return err("invalid_path", r.error, 409);
+    case "spawn_failed":
+      return err("invalid_path", r.error, 500);
   }
-  return ok({ ok: true, ticketId: appendRes.ticket.id });
 }
 
 // GET sync 狀態:回 worktree 落後 base 幾個 commit
@@ -669,6 +577,15 @@ export async function updateConfig(hash: string, req: Request): Promise<Response
       return fieldErr("cost_limit_usd", "cost_limit_usd 必須 >= 0(0 = 無限)");
     }
     nextDefaults.cost_limit_usd = v;
+  }
+
+  // auto_merge:boolean(pipeline ready 後是否自動觸發 AI 合併)
+  if ("auto_merge" in incomingDefaults) {
+    const v = incomingDefaults.auto_merge;
+    if (typeof v !== "boolean") {
+      return fieldErr("auto_merge", "auto_merge 必須為 boolean");
+    }
+    nextDefaults.auto_merge = v;
   }
 
   const next: pipelineDir.ProjectConfig = {

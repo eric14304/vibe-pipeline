@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "../../shell/AppShell";
 import { Rail } from "../../shell/Rail";
 import { TopBar } from "../../shell/TopBar";
@@ -10,6 +10,8 @@ import { InitPopup } from "../init/InitPopup";
 import { InboxColumn } from "../notifications/InboxColumn";
 import { QADrawer } from "../qa/QADrawer";
 import { useQA } from "../qa/useQA";
+import { SettingsPopover } from "../settings/SettingsPopover";
+import { GearIcon } from "../../ui/icons";
 import type { NotifItem } from "../../types/notif";
 import { useActiveProjectHash } from "../../hooks/useActiveProject";
 import * as api from "../../api/projects";
@@ -43,6 +45,7 @@ export function BoardScreen({
   const [openTicket, setOpenTicket] = useState<Ticket | null>(null);
   const [branches, setBranches] = useState<string[]>([]);
   const [maxParallel, setMaxParallel] = useState<number>(0);
+  const [defaultAutoMerge, setDefaultAutoMerge] = useState<boolean>(false);
 
   const [inboxState, setInboxState] = useState<InboxState>("collapsed");
   const [filter, setFilter] = useState<InboxFilter>("all");
@@ -217,6 +220,7 @@ export function BoardScreen({
       .then((c) => {
         if (cancelled) return;
         setMaxParallel(c.defaults.max_parallel);
+        setDefaultAutoMerge(!!c.defaults.auto_merge);
       })
       .catch(() => {});
     return () => {
@@ -265,7 +269,15 @@ export function BoardScreen({
     [activeId, pipelines]
   );
 
-  async function handleCreate({ name, baseBranch }: { name: string; baseBranch: string }) {
+  async function handleCreate({
+    name,
+    baseBranch,
+    autoMerge,
+  }: {
+    name: string;
+    baseBranch: string;
+    autoMerge: boolean;
+  }) {
     if (!project) return;
     const body = {
       name,
@@ -273,6 +285,7 @@ export function BoardScreen({
       baseBranch,
       state: "planning" as const,
       tickets: [],
+      autoMerge,
     };
     try {
       const created = (await api.createPipeline(project.hash, body)) as Pipeline;
@@ -306,7 +319,15 @@ export function BoardScreen({
     <TopBar
       runningCount={runningCount}
       maxParallel={maxParallel}
-      onConfigSaved={(cfg) => setMaxParallel(cfg.defaults.max_parallel)}
+      settingsSlot={
+        <SettingsButton
+          hash={hash}
+          onConfigSaved={(cfg) => {
+            setMaxParallel(cfg.defaults.max_parallel);
+            setDefaultAutoMerge(!!cfg.defaults.auto_merge);
+          }}
+        />
+      }
     />
   );
   // actionError 用右下角小 toast 浮現,別用 NotifBanner(那是 prototype 用,真 notif 走 inbox)
@@ -582,6 +603,7 @@ export function BoardScreen({
               onSubmit={handleCreate}
               existingNames={pipelines.map((p) => p.name)}
               branches={branches}
+              defaultAutoMerge={defaultAutoMerge}
             />
           }
         />
@@ -724,6 +746,26 @@ export function BoardScreen({
                 setActionError(`觸發 AI 同步失敗: ${e instanceof Error ? e.message : String(e)}`);
               }
             }}
+            onToggleAutoMerge={async (pid, nextValue) => {
+              if (!project) return;
+              const target = pipelines.find((p) => p.id === pid);
+              if (!target) return;
+              const next: Pipeline = { ...target, autoMerge: nextValue };
+              // optimistic 先更
+              setPipelines((arr) => arr.map((p) => (p.id === pid ? next : p)));
+              try {
+                await api.savePipeline(project.hash, pid, next);
+                setActionError(
+                  nextValue
+                    ? "✓ 已啟用 auto-merge(ready 後自動合併)"
+                    : "✓ 已關閉 auto-merge"
+                );
+              } catch (e) {
+                // rollback
+                setPipelines((arr) => arr.map((p) => (p.id === pid ? target : p)));
+                setActionError(`切換 auto-merge 失敗: ${e instanceof Error ? e.message : String(e)}`);
+              }
+            }}
           />
         )
       }
@@ -740,6 +782,10 @@ const SEV_BY_EVENT: Record<string, "block" | "info" | "muted"> = {
   pipeline_ready_to_merge: "info",
   pipeline_failed: "block",
   pipeline_merged: "info",
+  pipeline_merge_cleanup_failed: "info",
+  pipeline_auto_merge_started: "info",
+  merge_started: "muted",
+  merge_blocked: "block",
   ticket_started: "muted",
   ticket_done: "info",
   ticket_failed: "block",
@@ -763,6 +809,46 @@ function fmtTs(ms: number): { ts: string; since: number } {
   if (since < 3600) return { ts: `${Math.floor(since / 60)} min`, since };
   if (since < 86400) return { ts: `${Math.floor(since / 3600)} h`, since };
   return { ts: `${Math.floor(since / 86400)} d`, since };
+}
+
+// Gear button + Settings popover。原本在 shell/TopBar 內,因為 SettingsPopover 屬 features/
+// 不該被 shell 認識,改由 BoardScreen 注入 TopBar 的 settingsSlot。
+function SettingsButton({
+  hash,
+  onConfigSaved,
+}: {
+  hash: string | null;
+  onConfigSaved?: (cfg: api.ProjectConfig) => void;
+}) {
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  return (
+    <span style={{ position: "relative", display: "inline-block" }}>
+      <button
+        ref={btnRef}
+        type="button"
+        className={"icon-btn" + (open ? " is-active" : "")}
+        title={hash ? "設定" : "選擇 project 後可開設定"}
+        onClick={() => hash && setOpen((o) => !o)}
+        disabled={!hash}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+      >
+        <GearIcon />
+      </button>
+      {hash && (
+        <SettingsPopover
+          hash={hash}
+          open={open}
+          onClose={() => setOpen(false)}
+          onSaved={(cfg) => {
+            onConfigSaved?.(cfg);
+          }}
+          anchorRef={btnRef}
+        />
+      )}
+    </span>
+  );
 }
 
 function toNotifItem(r: api.NotifRecord): NotifItem {

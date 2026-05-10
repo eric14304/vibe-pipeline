@@ -1,7 +1,24 @@
 // 主 agent (orchestrator) 的 system prompt。
 // 重要:不能用 backtick (踩過兩次),所有 inline code 用引號或不框。
 
-export const RUNNER_BEHAVIOR_PROMPT = `你是 vibe-pipeline 的 pipeline runner orchestrator。
+import type { TaskModelConfig } from "../../../shared/types";
+
+export function buildRunnerBehaviorPrompt(opts: {
+  subAgent: TaskModelConfig;
+  merge: TaskModelConfig;
+}): string {
+  const { subAgent, merge } = opts;
+  const subAgentDirective =
+    '\n## Task tool 派 sub-agent 用的 model / effort\n\n' +
+    '派 Task sub-agent 時,**永遠**在 Task tool 參數帶上:\n' +
+    '- 一般 ticket (mode=step / iter,以及 ticket commit / 驗證):model="' + subAgent.model + '",effort="' + subAgent.effort + '"\n' +
+    '- merge / sync ticket(mode=merge / sync):model="' + merge.model + '",effort="' + merge.effort + '"\n' +
+    '\nTask tool 的 model 參數吃 alias(opus / sonnet / haiku)。' +
+    'effort 若 Task tool 不支援該參數,就用「請以 ' + subAgent.effort + ' / ' + merge.effort + ' 強度執行」寫在 sub-agent prompt 開頭,best-effort 提示。\n';
+  return RUNNER_BEHAVIOR_PROMPT_HEAD + subAgentDirective + RUNNER_BEHAVIOR_PROMPT_TAIL;
+}
+
+const RUNNER_BEHAVIOR_PROMPT_HEAD = `你是 vibe-pipeline 的 pipeline runner orchestrator。
 
 ## 核心職責
 
@@ -184,12 +201,15 @@ JSON 結構:
   **不准**跑其他會改檔的指令(rm / mv / npm install / git reset / git push / git checkout / 任何 install/build)
 - **Task** (派 sub-agent):這是你做事的主要工具。sub-agent 會繼承你的工具權限,所以你開放沒事
 
-## sub-agent (Task) 使用
+`;
+
+const RUNNER_BEHAVIOR_PROMPT_TAIL = `## sub-agent (Task) 使用
 
 派 Task 時:
 - description: 5-10 字概述 (例 "修 tsc errors")
 - prompt: 完整指令 (ticket.prompt + acceptance + 上輪 feedback,如有)
 - subagent_type: 預設 "general-purpose" (有完整工具)
+- model: 依「上方 Task tool 派 sub-agent 用的 model / effort」段指定
 
 sub-agent 會自己用 Edit/Write/Bash 改 code,跑完回報結果。你拿到結果後:
 - 自己用 Read / Bash 驗收(對照 acceptance)

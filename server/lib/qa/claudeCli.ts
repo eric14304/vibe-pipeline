@@ -3,6 +3,7 @@ import type { QAReply } from "./schema";
 import type { TicketSpec } from "../../../shared/types";
 import { isTestMode, nextQAReply } from "../testMode";
 import { projectHash } from "../hash";
+import { getTaskConfig } from "../userConfig";
 
 export class ClaudeCliError extends Error {
   constructor(public code: "not_available" | "exec_failed" | "parse_failed", message: string) {
@@ -55,7 +56,17 @@ export async function runTurn({
     return enforceContract(reply);
   }
 
-  const args = ["claude", "-p", "--output-format", "json"];
+  const qaCfg = await getTaskConfig("qa");
+  const args = [
+    "claude",
+    "-p",
+    "--output-format",
+    "json",
+    "--model",
+    qaCfg.model,
+    "--effort",
+    qaCfg.effort,
+  ];
   // QA 階段:鎖會改檔 / 跑 sub-agent / 上網的工具,其他(Bash / Read / Grep / Glob / MCP)放行讓 AI 收斂時可查專案。
   args.push("--disallowedTools", "Edit Write Task");
   if (isFirstTurn) {

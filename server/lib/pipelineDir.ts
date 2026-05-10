@@ -39,12 +39,14 @@ export const MAX_PARALLEL_MAX = 8;
 // 留 const 供 mergeTicketPrompt / 任何呼叫端參照,不再走 config。
 export const FIXED_MERGE_STRATEGY = "merge" as const;
 export const DEFAULT_COST_LIMIT_USD = 0;
+export const DEFAULT_AUTO_MERGE = false;
 
 const DEFAULT_CONFIG = {
   defaults: {
     base_branch: "main",
     max_parallel: DEFAULT_MAX_PARALLEL,
     cost_limit_usd: DEFAULT_COST_LIMIT_USD,
+    auto_merge: DEFAULT_AUTO_MERGE,
   },
   scripts: {
     setup: "",
@@ -61,6 +63,7 @@ export type ProjectConfig = {
     base_branch?: string;
     max_parallel?: number;
     cost_limit_usd?: number;
+    auto_merge?: boolean;
   };
   scripts?: { setup?: string; dev?: string; cleanup?: string };
   qa?: { openingMessage?: string };
@@ -71,6 +74,7 @@ export type ResolvedDefaults = {
   base_branch: string;
   max_parallel: number;
   cost_limit_usd: number;
+  auto_merge: boolean;
 };
 
 export async function readConfig(projectPath: string): Promise<ProjectConfig> {
@@ -126,6 +130,7 @@ export async function getResolvedDefaults(projectPath: string): Promise<Resolved
     base_branch,
     max_parallel: clampMaxParallel(d.max_parallel),
     cost_limit_usd: normalizeCostLimitUsd(d.cost_limit_usd),
+    auto_merge: typeof d.auto_merge === "boolean" ? d.auto_merge : DEFAULT_AUTO_MERGE,
   };
 }
 

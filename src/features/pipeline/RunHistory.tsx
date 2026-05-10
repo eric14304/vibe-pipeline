@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import * as api from "../../api/projects";
 import type { RunSummary, RunDetail } from "../../api/projects";
+import { fmtDuration } from "../../data/pipelines";
 
 export function RunHistory({
   projectHash,
@@ -176,16 +177,6 @@ function RunCard({
       )}
     </div>
   );
-}
-
-function fmtDuration(ms: number): string {
-  const s = Math.round(ms / 1000);
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  const sec = s % 60;
-  if (m < 60) return `${m}m ${sec}s`;
-  const h = Math.floor(m / 60);
-  return `${h}h ${m % 60}m`;
 }
 
 function fmtNum(n: number): string {

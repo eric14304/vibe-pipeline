@@ -1,17 +1,8 @@
 import { join } from "node:path";
 import { existsSync, appendFileSync, readFileSync, writeFileSync } from "node:fs";
 import { ensureRuntime } from "../pipelineDir";
-import type { NotifEventType } from "../../../shared/types";
-
-export type NotifRecord = {
-  id: string;
-  type: NotifEventType;
-  title: string;
-  sub?: string;
-  ts: number;
-  unread: boolean;
-  pipelineId?: string;
-};
+import type { NotifEventType, NotifRecord } from "../../../shared/types";
+export type { NotifRecord };
 
 function file(projectPath: string): string {
   return join(ensureRuntime(projectPath), "notifs.jsonl");

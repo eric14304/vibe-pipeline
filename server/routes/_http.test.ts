@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { isJsonUtf8, requireJsonUtf8 } from "./http";
+import { isJsonUtf8, requireJsonUtf8 } from "./_http";
 
 describe("isJsonUtf8", () => {
   test("standard application/json; charset=utf-8 → true", () => {

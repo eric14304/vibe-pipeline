@@ -1,35 +1,15 @@
 import type {
-  ApiResponse,
-  ApiErrorCode,
   TicketSpec,
   PartialSpec,
   QAReply,
   Turn,
   Draft,
 } from "../../shared/types";
+import { call, ApiError } from "./_client";
 
 export type { TicketSpec, PartialSpec, QAReply, Turn, Draft };
 export { MODE_LABELS, DEFAULT_ITER_LIMIT, DEFAULT_ITER_STOP_AT_LIMIT } from "../../shared/types";
-
-export class ApiError extends Error {
-  constructor(public code: ApiErrorCode | string, message: string) {
-    super(message);
-  }
-}
-
-type CallInit = { method?: string; body?: unknown };
-
-async function call<T>(path: string, init?: CallInit): Promise<T> {
-  const opts: RequestInit = { method: init?.method };
-  if (init?.body !== undefined) {
-    opts.body = typeof init.body === "string" ? init.body : JSON.stringify(init.body);
-    opts.headers = { "Content-Type": "application/json; charset=utf-8" };
-  }
-  const res = await fetch(path, opts);
-  const json = (await res.json()) as ApiResponse<T> & { data?: T };
-  if (!json.ok) throw new ApiError(json.error.code, json.error.message);
-  return json.data!;
-}
+export { ApiError };
 
 type StartResp = { draft: Draft; reply: QAReply };
 type TurnResp = { draft: Draft; reply: QAReply };

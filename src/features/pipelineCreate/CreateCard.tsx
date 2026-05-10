@@ -8,11 +8,13 @@ export function CreateCard({
   onSubmit,
   existingNames = [],
   branches,
+  defaultAutoMerge = false,
 }: {
   onCancel: () => void;
-  onSubmit: (data: { name: string; baseBranch: string }) => void;
+  onSubmit: (data: { name: string; baseBranch: string; autoMerge: boolean }) => void;
   existingNames?: string[];
   branches?: string[];
+  defaultAutoMerge?: boolean;
 }) {
   const baseList = useMemo(
     () => (branches && branches.length > 0 ? branches : FALLBACK_BRANCHES),
@@ -26,6 +28,7 @@ export function CreateCard({
   const [name, setName] = useState("");
   const [baseBranch, setBaseBranch] = useState(defaultBase);
   const [baseOpen, setBaseOpen] = useState(false);
+  const [autoMerge, setAutoMerge] = useState(defaultAutoMerge);
   const inputRef = useRef<HTMLInputElement>(null);
   const cardRef = useRef<HTMLFormElement>(null);
 
@@ -43,7 +46,7 @@ export function CreateCard({
   function submit(e?: React.FormEvent) {
     e?.preventDefault();
     if (!valid) return;
-    onSubmit({ name: trimmed, baseBranch });
+    onSubmit({ name: trimmed, baseBranch, autoMerge });
   }
 
   return (
@@ -88,6 +91,25 @@ export function CreateCard({
           options={baseList.map((b) => ({ id: b, label: b, mono: true }))}
         />
       </div>
+
+      <label
+        className="create-field"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          cursor: "pointer",
+          fontSize: 12,
+        }}
+        title="全 ticket done → backend 自動 append merge ticket 走 runner 流程,不用人按"
+      >
+        <input
+          type="checkbox"
+          checked={autoMerge}
+          onChange={(e) => setAutoMerge(e.target.checked)}
+        />
+        <span>ready 後自動 merge</span>
+      </label>
 
       <div className="create-actions">
         <button type="button" className="btn create-cancel" onClick={onCancel}>

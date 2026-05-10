@@ -7,7 +7,8 @@ import * as notifs from "../notifs/store";
 import * as ticketWatcher from "./ticketWatcher";
 import * as runLog from "./runLog";
 import * as testMode from "../testMode";
-import { RUNNER_BEHAVIOR_PROMPT } from "./runnerPrompt";
+import { buildRunnerBehaviorPrompt } from "./runnerPrompt";
+import { loadUserConfig } from "../userConfig";
 
 type RunningProcess = {
   pipelineId: string;
@@ -305,6 +306,10 @@ async function spawnDirect(opts: {
   // 主 agent 拿全工具 — 因為 sub-agent (Task) 會繼承限制,
   // 擋 Edit/Write 就等於 sub-agent 也不能改 code,ticket 跑不了。
   // 改用 system prompt 約束主 agent 自己不直接改 source(只用 Edit/Write 更新 pipeline.json)
+  const userCfg = await loadUserConfig();
+  const runnerCfg = userCfg.defaults.runner;
+  const subAgentCfg = userCfg.defaults.subAgent;
+  const mergeCfg = userCfg.defaults.merge;
   const args = [
     "claude",
     "-p",
@@ -312,8 +317,12 @@ async function spawnDirect(opts: {
     "json",
     "--session-id",
     sessionId,
+    "--model",
+    runnerCfg.model,
+    "--effort",
+    runnerCfg.effort,
     "--system-prompt",
-    RUNNER_BEHAVIOR_PROMPT,
+    buildRunnerBehaviorPrompt({ subAgent: subAgentCfg, merge: mergeCfg }),
     initialMessage,
   ];
 
@@ -375,21 +384,23 @@ async function spawnDirect(opts: {
         } | null;
         const name = final?.name || pipelineId;
 
-        // Auto-rebase worktree onto base after AI merge done。merge 完 worktree 仍在舊 branch tip,
-        // base 已吸收 ticket commits → rebase 是 FF,hash 不變。把 worktree 拉到新 base 後
-        // sync chip 自然 = 0(base 沒往前),banner 也不會重觸發 re-merge。
-        // strategy 鎖 merge,一律跑 auto-rebase。
+        // Merge 完 worktree 已沒用 — 直接 prune,讓 `git worktree list` / VSCode Source Control
+        // 不再堆積已合併的分支。pipeline.json 保留作紀錄,只清磁碟與 git 註冊表。
+        // 失敗時 emit warning notif 但不阻斷 merge 成功狀態。
         if (final?.state === "merged") {
           try {
-            const base = final?.baseBranch || "main";
-            const rebaseRes = await worktree.rebaseOntoBase(projectPath, pipelineId, base);
-            if (rebaseRes.ok) {
-              console.log(`[runner ${pipelineId}] auto-rebase post-merge ok`);
-            } else {
-              console.warn(`[runner ${pipelineId}] auto-rebase skipped: ${rebaseRes.err}`);
+            const r = await worktree.removeQuiet(projectPath, pipelineId);
+            if (!r.ok) {
+              console.warn(`[runner ${pipelineId}] worktree prune failed: ${r.error}`);
+              notifs.emit(projectPath, {
+                type: "pipeline_merge_cleanup_failed",
+                title: `${name} merge 後 worktree 清理失敗`,
+                sub: r.error,
+                pipelineId,
+              });
             }
           } catch (e) {
-            console.warn(`[runner ${pipelineId}] auto-rebase failed:`, e);
+            console.warn(`[runner ${pipelineId}] worktree prune threw:`, e);
           }
         }
 
@@ -431,6 +442,14 @@ async function spawnDirect(opts: {
     } finally {
       running.delete(k);
       ticketWatcher.stop({ projectHash, pipelineId });
+      // Auto-merge:pipeline 收尾後若 state=ready && autoMerge → 直接觸發 AI merge。
+      // 必須在 running.delete 之後,讓 triggerMerge 內的 orchestrator.start 看得到空 slot。
+      // 不擋 dispatch — 即使 auto-merge spawn 自己也走 start(若 slot 滿會自己進 queue)。
+      try {
+        await maybeAutoMerge({ projectPath, projectHash, pipelineId });
+      } catch (e) {
+        console.error(`[runner ${pipelineId}] maybeAutoMerge failed:`, e);
+      }
       // slot 釋出,看看 queue 有沒有 pending 接棒
       dispatch(projectPath, projectHash).catch((e) =>
         console.error(`[runner ${pipelineId}] dispatch after exit failed:`, e)
@@ -439,6 +458,76 @@ async function spawnDirect(opts: {
   })();
 
   return { ok: true };
+}
+
+// Pipeline 進入 ready 後,若 autoMerge=true 且當前 state=ready → 自動觸發 AI 合併。
+// 走跟手動 /merge 同一條 triggerMerge,因此 slot 滿會自然進 queue。
+// 失敗(working tree 髒 / spawn 失敗等)→ 寫 lastAutoMergeError + emit notif,不重試。
+// 用 dynamic import 避免 orchestrator <-> pipelineMerge 循環(pipelineMerge 也 import 本檔)。
+async function maybeAutoMerge(opts: {
+  projectPath: string;
+  projectHash: string;
+  pipelineId: string;
+}): Promise<void> {
+  const { projectPath, projectHash, pipelineId } = opts;
+  const pipeline = (await pipelineDir.readPipeline(projectPath, pipelineId)) as {
+    state?: string;
+    name?: string;
+    autoMerge?: boolean;
+    [k: string]: unknown;
+  } | null;
+  if (!pipeline) return;
+  // 自動 merge 觸發條件:autoMerge=true && state===ready && 不在 merged/merging/failed
+  // (merged 已合過、merging 沒這個 state、failed 不重試)
+  if (!pipeline.autoMerge) return;
+  if (pipeline.state !== "ready") return;
+
+  const name = pipeline.name || pipelineId;
+  notifs.emit(projectPath, {
+    type: "pipeline_auto_merge_started",
+    title: `${name} 自動合併已觸發`,
+    sub: "全 ticket done → autoMerge=true",
+    pipelineId,
+  });
+
+  // 清掉之前的 lastAutoMergeError(重新嘗試)
+  if (pipeline.lastAutoMergeError !== undefined) {
+    await pipelineDir.writePipeline(projectPath, pipelineId, {
+      ...pipeline,
+      lastAutoMergeError: undefined,
+    });
+  }
+
+  try {
+    // dynamic import 拆循環依賴
+    const { triggerMerge } = await import("../pipelineMerge");
+    const r = await triggerMerge({
+      projectPath,
+      projectHash,
+      pipelineId,
+      hasGit: true, // ready 時必然有 git(否則跑不到這一刻)
+    });
+    if (!r.ok) {
+      // 把錯誤回寫進 pipeline,前端可顯示 + emit merge_blocked
+      const cur = (await pipelineDir.readPipeline(projectPath, pipelineId)) as {
+        [k: string]: unknown;
+      } | null;
+      if (cur) {
+        await pipelineDir.writePipeline(projectPath, pipelineId, {
+          ...cur,
+          lastAutoMergeError: r.error,
+        });
+      }
+      notifs.emit(projectPath, {
+        type: "merge_blocked",
+        title: `${name} 自動合併失敗`,
+        sub: r.error,
+        pipelineId,
+      });
+    }
+  } catch (e) {
+    console.error(`[autoMerge ${pipelineId}] failed:`, e);
+  }
 }
 
 // Pause: 標 pipeline.state = "stopping",主 agent 跑完當前 ticket 看到後自己標 paused 退出
@@ -600,6 +689,23 @@ async function startMockRunner(opts: {
       }
 
       const name = pipeline.name || pipelineId;
+      // Mock merge 後也要 prune worktree(mock 不一定有真 worktree dir,但 git 註冊表可能有)
+      if (finalState === "merged") {
+        try {
+          const r = await worktree.removeQuiet(projectPath, pipelineId);
+          if (!r.ok) {
+            console.warn(`[mock runner ${pipelineId}] worktree prune failed: ${r.error}`);
+            notifs.emit(projectPath, {
+              type: "pipeline_merge_cleanup_failed",
+              title: `${name} merge 後 worktree 清理失敗`,
+              sub: r.error,
+              pipelineId,
+            });
+          }
+        } catch (e) {
+          console.warn(`[mock runner ${pipelineId}] worktree prune threw:`, e);
+        }
+      }
       if (finalState === "ready") {
         notifs.emit(projectPath, {
           type: "pipeline_ready_to_merge",
@@ -624,6 +730,11 @@ async function startMockRunner(opts: {
     } finally {
       running.delete(k);
       ticketWatcher.stop({ projectHash, pipelineId });
+      try {
+        await maybeAutoMerge({ projectPath, projectHash, pipelineId });
+      } catch (e) {
+        console.error(`[mock runner ${pipelineId}] maybeAutoMerge failed:`, e);
+      }
       dispatch(projectPath, projectHash).catch((e) =>
         console.error(`[mock runner ${pipelineId}] dispatch after exit failed:`, e)
       );
