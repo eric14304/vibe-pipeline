@@ -409,10 +409,15 @@ export async function mergePipeline(hash: string, pipelineId: string): Promise<R
   const branch = pipeline.branch || `pipeline/${pipeline.name || pipelineId}`;
   const baseBranch = pipeline.baseBranch || "main";
 
-  // strategy 從 project config 拿
+  // strategy 從 project config 拿(沒設 / 髒值 → fallback DEFAULT_MERGE_STRATEGY,Phase 4 第三刀的 'merge')
   const cfg = await pipelineDir.readConfig(project.path);
-  const strategyRaw = (cfg.defaults?.merge_strategy as string | undefined) ?? "merge";
-  const strategy = (["merge", "squash", "ff-only"] as const).find((s) => s === strategyRaw) ?? "merge";
+  const rawStrategy = cfg.defaults?.merge_strategy;
+  const strategy = pipelineDir.normalizeMergeStrategy(rawStrategy);
+  if (rawStrategy !== undefined && !pipelineDir.isMergeStrategy(rawStrategy)) {
+    console.warn(
+      `[merge ${pipelineId}] config.defaults.merge_strategy 髒值 ${JSON.stringify(rawStrategy)},fallback ${strategy}`
+    );
+  }
 
   // 把 real ticket(非 merge mode)的歷史塞進 prompt,給 sub-agent 解衝突 / 寫 commit message 上下文
   const history = (pipeline.tickets ?? [])

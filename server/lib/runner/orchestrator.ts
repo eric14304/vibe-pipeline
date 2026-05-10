@@ -382,7 +382,7 @@ async function spawnDirect(opts: {
         if (final?.state === "merged") {
           try {
             const cfg = await pipelineDir.readConfig(projectPath);
-            const strategy = cfg.defaults?.merge_strategy as string | undefined;
+            const strategy = pipelineDir.normalizeMergeStrategy(cfg.defaults?.merge_strategy);
             if (strategy !== "squash") {
               const base = final?.baseBranch || "main";
               const rebaseRes = await worktree.rebaseOntoBase(projectPath, pipelineId, base);
