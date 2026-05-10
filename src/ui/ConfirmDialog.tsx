@@ -38,8 +38,9 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
       if (e.key === "Escape") {
         state.resolve("cancel");
         setState(null);
-      } else if (e.key === "Enter") {
-        // 避免在 form input focus 時誤觸 — 但這個 modal 沒 input,Enter = confirm(primary)
+      } else if (e.key === "Enter" && !state.danger) {
+        // 非 danger:Enter = confirm(primary) 加速操作
+        // danger 不接受 Enter 觸發,避免 user 亂打 Enter 觸發資料遺失動作
         state.resolve("confirm");
         setState(null);
       }
@@ -77,7 +78,14 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
               <div className="confirm-desc">{state.description}</div>
             )}
             <div className="confirm-actions">
-              <button type="button" className="btn confirm-cancel" onClick={() => close("cancel")}>
+              <button
+                type="button"
+                className="btn confirm-cancel"
+                onClick={() => close("cancel")}
+                // danger 時把 autoFocus 給取消,user 亂按 Enter / Space 是取消而非執行
+                // biome-ignore lint/a11y/noAutofocus: 為了在 danger confirm 上預設 focus 取消按鈕,降低誤觸風險
+                autoFocus={state.danger}
+              >
                 {state.cancelLabel ?? "取消"}
                 <span className="kbd-inline mono">Esc</span>
               </button>
@@ -94,11 +102,12 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                 type="button"
                 className={"btn " + (state.danger ? "btn-danger" : "btn-primary")}
                 onClick={() => close("confirm")}
-                // biome-ignore lint/a11y/noAutofocus: modal confirm 預期立刻可以 Enter 確認,符合 UX 慣例
-                autoFocus
+                // 非 danger 才 autoFocus confirm + 顯 ↵ 提示。danger 上不接受 Enter,提示移除
+                // biome-ignore lint/a11y/noAutofocus: 非 danger 預期立刻可以 Enter 確認,符合 UX 慣例
+                autoFocus={!state.danger}
               >
                 {state.confirmLabel ?? "確認"}
-                <span className="kbd-inline mono">↵</span>
+                {!state.danger && <span className="kbd-inline mono">↵</span>}
               </button>
             </div>
           </div>
