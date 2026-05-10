@@ -2,7 +2,47 @@ import * as projectStore from "../lib/projectStore";
 import * as pipelineDir from "../lib/pipelineDir";
 import * as draftStore from "../lib/qa/draftStore";
 import * as cli from "../lib/qa/claudeCli";
-import type { ApiResponse, ApiErrorCode } from "../../shared/types";
+import type { ApiResponse, ApiErrorCode, PartialSpec } from "../../shared/types";
+
+const REQUIRED_FIELDS: { key: keyof PartialSpec; label: string }[] = [
+  { key: "title", label: "title(15 字內)" },
+  { key: "goal", label: "goal(一句 why)" },
+  { key: "acceptance", label: "acceptance(陣列,1-3 條可驗收)" },
+  { key: "prompt", label: "prompt(給執行AI 的完整指令)" },
+  { key: "mode", label: 'mode("step" 或 "iter")' },
+];
+
+function fieldFilled(spec: PartialSpec | null, key: keyof PartialSpec): boolean {
+  if (!spec) return false;
+  const v = spec[key];
+  if (v == null || v === "") return false;
+  if (Array.isArray(v) && v.length === 0) return false;
+  if (key === "mode") return v === "step" || v === "iter";
+  return true;
+}
+
+function buildProgressHint(spec: PartialSpec | null, turnNumber: number): string {
+  const filled = REQUIRED_FIELDS.filter((f) => fieldFilled(spec, f.key));
+  const missing = REQUIRED_FIELDS.filter((f) => !fieldFilled(spec, f.key));
+  if (missing.length === 0) {
+    return `當前進度:5/5 齊。這輪 spec 必須包含全部 5 欄位內容(不可塌陷),complete 設 true,結束對話。`;
+  }
+  const filledStr = filled.length > 0 ? filled.map((f) => f.key).join(" / ") : "(無)";
+  const missingStr = missing.map((f) => f.label).join(" / ");
+  let urgency = "";
+  if (turnNumber >= 4) {
+    urgency =
+      "\n**已第 " +
+      turnNumber +
+      " 輪,你必須這輪自行填好所有缺的欄位**(用合理預設,不要再問問題)。" +
+      "spec 必須含 5 個欄位完整內容,complete 設 true。" +
+      "user 答得抽象就你判斷,不要無限拖。";
+  } else if (turnNumber >= 3) {
+    urgency = "\n第 " + turnNumber + " 輪了,加快推進,1-2 輪內收齊。";
+  }
+  return `當前進度:${filled.length}/5 齊(已收:${filledStr})。還缺:${missingStr}。${urgency}`;
+}
+
 
 
 function ok<T>(data: T): Response {
@@ -76,6 +116,14 @@ export async function turn(hash: string, draftId: string, req: Request): Promise
   if (!draft) return err("not_found", `Draft not found: ${draftId}`, 404);
 
   const isFirstTurn = !draft.sessionStarted;
+
+  // 算 progress hint 讓 AI 知道目前進度 + 還缺什麼。
+  // 規則:
+  // - 累計 user 輪數 >= 3 且 spec < 5/5 → 強催 AI 自填預設一次到位
+  // - spec partial → 列缺欄位
+  const userTurns = draft.turns.filter((t) => t.role === "user").length;
+  const progressHint = !isFirstTurn ? buildProgressHint(draft.spec, userTurns + 1) : undefined;
+
   let reply;
   try {
     reply = await cli.runTurn({
@@ -83,6 +131,7 @@ export async function turn(hash: string, draftId: string, req: Request): Promise
       sessionId: draft.sessionId,
       userMessage,
       isFirstTurn,
+      progressHint,
     });
   } catch (e) {
     return err("internal_error", String(e), 500);

@@ -22,6 +22,8 @@ type RunOpts = {
   sessionId: string;
   userMessage: string;
   isFirstTurn: boolean;
+  // 收斂進度提示:caller (qa.ts route) 計算後傳進來,讓 AI 知道目前狀態
+  progressHint?: string;
 };
 
 // Run one turn through claude CLI. First turn supplies session-id + system prompt,
@@ -31,6 +33,7 @@ export async function runTurn({
   sessionId,
   userMessage,
   isFirstTurn,
+  progressHint,
 }: RunOpts): Promise<QAReply> {
   const args = ["claude", "-p", "--output-format", "json"];
   // QA 階段:鎖會改檔 / 跑 sub-agent / 上網的工具,其他(Bash / Read / Grep / Glob / MCP)放行讓 AI 收斂時可查專案。
@@ -40,10 +43,10 @@ export async function runTurn({
     args.push("--system-prompt", QA_BEHAVIOR_PROMPT);
   } else {
     args.push("--resume", sessionId);
-    args.push(
-      "--append-system-prompt",
-      "提醒:你只負責對話收斂 ticket 需求,不要實際執行任何工具(Bash/Read/Edit/Grep/...)。回覆永遠用單一 JSON 物件 {message, options, complete, spec},不要解釋、不要 markdown 包裝。"
-    );
+    const hint =
+      "提醒:你只負責對話收斂 ticket 需求,不要實際執行任何工具(Bash/Read/Edit/Grep/...)。回覆永遠用單一 JSON 物件 {message, options, complete, spec},不要解釋、不要 markdown 包裝。" +
+      (progressHint ? "\n\n" + progressHint : "");
+    args.push("--append-system-prompt", hint);
   }
   args.push(userMessage);
 
