@@ -4,25 +4,60 @@
 //
 // 重要:不能用 inline backtick(踩過兩次),所有 inline code 用單引號或不框。
 
+export type MergeHistoryTicket = {
+  n: number;
+  title: string;
+  mode?: string;
+  goal?: string;
+  acceptance?: string[];
+  commits?: Array<{ hash: string; subject: string }>;
+};
+
 export function mergeTicketPrompt(opts: {
   projectPath: string;
   branch: string;
   baseBranch: string;
   strategy: "merge" | "squash" | "ff-only";
+  // pipeline 內已完成的 real ticket 歷史(merge ticket 自己不放),
+  // 給 sub-agent 解衝突時判斷 branch side 改動意圖、寫 commit message 用
+  history?: MergeHistoryTicket[];
 }): string {
-  const { projectPath, branch, baseBranch, strategy } = opts;
+  const { projectPath, branch, baseBranch, strategy, history } = opts;
   const strategyDesc =
     strategy === "squash"
-      ? "git -C \"" + projectPath + "\" merge --squash " + branch + ",之後 git -C \"" + projectPath + "\" commit -m 'Squash merge " + branch + " into " + baseBranch + "'"
+      ? "git -C \"" + projectPath + "\" merge --squash " + branch + " (沒 commit;見「## merge commit message」自己 compose 後 commit)"
       : strategy === "ff-only"
-      ? "git -C \"" + projectPath + "\" merge --ff-only " + branch
-      : "git -C \"" + projectPath + "\" merge --no-ff " + branch + " -m 'Merge " + branch + " into " + baseBranch + "'";
+      ? "git -C \"" + projectPath + "\" merge --ff-only " + branch + " (線性,沒 merge commit;ticket commits 直接接到 base)"
+      : "git -C \"" + projectPath + "\" merge --no-ff " + branch + " --no-commit (先 merge 不 commit;見「## merge commit message」compose 後再 commit)";
+
+  const historyLines: string[] = [];
+  if (history && history.length > 0) {
+    historyLines.push("## 此 pipeline 已完成的 ticket 歷史");
+    historyLines.push("");
+    historyLines.push("(branch side 的改動由這些 ticket 累積而成,解衝突時 branch side 應視為這些任務的成果;commit message 也可參考這些寫得更精準)");
+    historyLines.push("");
+    for (const t of history) {
+      historyLines.push("**#" + t.n + " " + t.title + "**" + (t.mode ? " (" + t.mode + ")" : ""));
+      if (t.goal) historyLines.push("- goal: " + truncate(t.goal, 200));
+      if (Array.isArray(t.acceptance) && t.acceptance.length > 0) {
+        historyLines.push("- acceptance:");
+        for (const a of t.acceptance) historyLines.push("  - " + truncate(a, 150));
+      }
+      if (Array.isArray(t.commits) && t.commits.length > 0) {
+        historyLines.push("- commits:");
+        for (const c of t.commits) historyLines.push("  - " + (c.hash ? c.hash.slice(0, 7) + " " : "") + (c.subject ?? ""));
+      }
+      historyLines.push("");
+    }
+  }
+
   return [
     "AI merge 任務。把 pipeline branch '" + branch + "' 合併到 base '" + baseBranch + "'。",
     "",
     "**所有 git 操作都用 git -C \"" + projectPath + "\" 顯式指定 main repo,不切 cwd**。",
     "(你的 cwd 是 worktree,不能在這做 merge — 必須在 main repo 操作。)",
     "",
+    ...historyLines,
     "## 流程",
     "",
     "1. 預檢:",
@@ -39,10 +74,35 @@ export function mergeTicketPrompt(opts: {
     "   - Bash: git -C \"" + projectPath + "\" diff --name-only --diff-filter=U → 列出衝突檔(都是相對 main repo 路徑)",
     "   - 對每個衝突檔(用絕對路徑 \"" + projectPath + "/<相對路徑>\"):",
     "     a. Read 看內容(<<<<<<< / ======= / >>>>>>> markers)",
-    "     b. Edit 解衝突,markers 全清掉",
-    "     c. Bash: git -C \"" + projectPath + "\" add <相對路徑>",
-    "   - 全解完 → Bash: git -C \"" + projectPath + "\" commit -m 'Merge " + branch + " into " + baseBranch + " (AI resolved)'",
+    "     b. **看上方 ticket 歷史**判斷 branch side 的改動意圖(branch side <<< 是 pipeline tickets 累積的成果),保留 branch side 邏輯但融合 base side 的平行修改。",
+    "     c. Edit 解衝突,markers 全清掉",
+    "     d. Bash: git -C \"" + projectPath + "\" add <相對路徑>",
+    "   - 全解完 → 進「## merge commit message」compose 後 commit",
     "   - 解不出來 → Bash: git -C \"" + projectPath + "\" merge --abort,回報失敗 + 衝突檔列表",
+    "",
+    "## merge commit message(strategy=" + strategy + ")",
+    "",
+    (strategy === "ff-only"
+      ? "ff-only 模式不產 merge commit(直接 fast-forward),這段跳過。"
+      : strategy === "squash"
+      ? [
+          "squash 是這條 pipeline 在 base 上的**唯一 commit**,訊息要能完整代表這條 pipeline 做了什麼。",
+          "看上方 ticket 歷史 compose 訊息:",
+          "  - 第一行 (subject):≤72 字,概括這條 pipeline 在做什麼(用 imperative,例:'Add multi-pipeline parallel execution and config guards')",
+          "  - 空行",
+          "  - body:每張 ticket 一條 bullet,寫該 ticket 的成果(動詞開頭,簡潔,≤80 字 / 行);用 ticket title + acceptance 重點精煉",
+          "Bash 用多個 -m 串多段(每個 -m 自動加空行):",
+          "  git -C \"" + projectPath + "\" commit -m \"<subject>\" -m \"- <ticket1 精煉>\" -m \"- <ticket2 精煉>\" ..."
+        ].join("\n")
+      : [
+          "merge --no-ff 模式 base 上多一個 merge commit + ticket commits 也保留。merge commit 訊息簡短即可(細節在 ticket commits 看):",
+          "  - 第一行 (subject):'Merge " + branch + " into " + baseBranch + "' 或更精準的概括(看 ticket 歷史)",
+          "  - body(可選):一句話總結這條 pipeline 做了什麼",
+          "Bash:",
+          "  git -C \"" + projectPath + "\" commit -m \"<subject>\" [-m \"<body>\"]"
+        ].join("\n")
+    ),
+    "",
     "",
     "5. 驗證:",
     "   - Bash: cat \"" + projectPath + "/package.json\" 看有哪些 script",
@@ -72,5 +132,11 @@ export function mergeTicketPrompt(opts: {
     "- main repo 的 " + baseBranch + " 上有新 commit 包含 " + branch + " 的內容",
     "- working tree 乾淨(沒未 commit 的 conflict markers)",
     "- 驗證(tsc / build / test)PASS",
+    "- 若有 ticket 歷史,各 ticket 的 acceptance 經 merge 後仍成立",
   ].join("\n");
+}
+
+function truncate(s: string, max: number): string {
+  if (s.length <= max) return s;
+  return s.slice(0, max - 1) + "…";
 }

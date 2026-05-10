@@ -151,7 +151,7 @@ vibe-pipeline/
 
 <target-repo>/.vibe-pipeline/  每個 user target repo 內,由 init 建
 ├── config.json                (git tracked) project-level 設定
-├── pipelines/*.json           (git tracked) 一檔一條,內含 tickets 陣列 (id 格式: <12-hex-ms-ts>-<slug>)
+├── pipelines/*.json           (gitignored) 一檔一條,內含 tickets 陣列;runtime 紀錄 merge 後 redundant 於 git commit chain
 └── .runtime/                  (gitignored) 執行期暫存
     ├── qa-drafts/<id>.json    QA 對話 draft (含 session_id,可 resume / 之後可當 memory)
     ├── notifs.jsonl           backend emit 的事件流 (append-only,Phase 3)

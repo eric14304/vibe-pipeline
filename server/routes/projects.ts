@@ -333,6 +333,14 @@ export async function mergePipeline(hash: string, pipelineId: string): Promise<R
     branch?: string;
     baseBranch?: string;
     state?: string;
+    tickets?: Array<{
+      n?: number;
+      title?: string;
+      mode?: string;
+      goal?: string;
+      acceptance?: string[];
+      commits?: Array<{ hash?: string; subject?: string }>;
+    }>;
     [k: string]: unknown;
   } | null;
   if (!pipeline) return err("not_found", `Pipeline not found: ${pipelineId}`, 404);
@@ -345,11 +353,26 @@ export async function mergePipeline(hash: string, pipelineId: string): Promise<R
   const strategyRaw = (cfg.defaults?.merge_strategy as string | undefined) ?? "merge";
   const strategy = (["merge", "squash", "ff-only"] as const).find((s) => s === strategyRaw) ?? "merge";
 
+  // 把 real ticket(非 merge mode)的歷史塞進 prompt,給 sub-agent 解衝突 / 寫 commit message 上下文
+  const history = (pipeline.tickets ?? [])
+    .filter((t) => t.mode !== "merge")
+    .map((t) => ({
+      n: typeof t.n === "number" ? t.n : 0,
+      title: t.title ?? "(no title)",
+      mode: t.mode,
+      goal: t.goal,
+      acceptance: t.acceptance,
+      commits: (t.commits ?? [])
+        .map((c) => ({ hash: c.hash ?? "", subject: c.subject ?? "" }))
+        .filter((c) => c.hash || c.subject),
+    }));
+
   const prompt = mergeTicketPrompt({
     projectPath: project.path,
     branch,
     baseBranch,
     strategy,
+    history,
   });
 
   const appendRes = await pipelineDir.appendMergeTicket({

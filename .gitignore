@@ -11,6 +11,9 @@ playwright/.cache/
 
 # vibe-pipeline runtime (session drafts etc, regenerated)
 .vibe-pipeline/.runtime/
+# pipeline 執行紀錄 — merge 後 redundant 於 git commit chain(每張 ticket 的 ticket(<n>): <title> commit + merge commit
+# 已記錄結果),pipeline.json 留的 iter rounds / status 是過程,solo 用沒共享需求
+.vibe-pipeline/pipelines/
 
 # tsc emit (build via Vite, no separate emit needed)
 *.tsbuildinfo
