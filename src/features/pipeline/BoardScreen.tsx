@@ -767,7 +767,7 @@ export function BoardScreen({
                 await api.savePipeline(project.hash, pid, next);
                 setActionError(
                   nextValue
-                    ? "✓ 已啟用自動合併(ready 後自動合併)"
+                    ? "✓ 已啟用自動合併"
                     : "✓ 已關閉自動合併"
                 );
               } catch (e) {

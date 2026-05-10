@@ -390,11 +390,7 @@ export function FocusColumn({
           {onToggleAutoMerge && (
             <label
               className={"toggle-pill mono" + (pipeline.autoMerge ? " is-on" : "")}
-              title={
-                pipeline.autoMerge
-                  ? "ready 後自動合併(關掉)"
-                  : "ready 後自動合併(打開)"
-              }
+              title="全 ticket done → backend 自動 append merge ticket 走 runner 流程"
             >
               <input
                 type="checkbox"

@@ -94,7 +94,7 @@ export function CreateCard({
 
       <label
         className={"toggle-pill mono" + (autoMerge ? " is-on" : "")}
-        title="全 ticket done → backend 自動 append merge ticket 走 runner 流程,不用人按"
+        title="全 ticket done → backend 自動 append merge ticket 走 runner 流程"
       >
         <input
           type="checkbox"
@@ -104,7 +104,7 @@ export function CreateCard({
         <span className="toggle-pill-track" aria-hidden>
           <span className="toggle-pill-thumb" />
         </span>
-        ready 後自動合併
+        自動合併
       </label>
 
       <div className="create-actions">

@@ -353,6 +353,7 @@ export function SettingsPopover({
       <div style={hintStyle}>0 = 無限。超過上限會擋下新的 /run 並發 notif。</div>
 
       <label
+        title="全 ticket done → backend 自動 append merge ticket 走 runner 流程"
         style={{
           display: "flex",
           alignItems: "center",
