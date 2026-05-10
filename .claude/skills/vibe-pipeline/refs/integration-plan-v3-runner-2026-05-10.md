@@ -338,3 +338,66 @@ reset test pipeline → 跑 → 結果:
 - Pixel-diff 既存 broken(real backend vs static prototype mock)— 單獨 sprint
 - atomic write(.tmp + mv)安全網
 - Worktree 位置 final(目前 global)
+
+## 13. 第二.五刀 + 第四刀(已落地 2026-05-10)
+
+第三刀後 phase 3 收尾還剩三件:**iter FAIL 第二輪實證 / multi-ticket pause/resume 實證 / pipeline merge to base branch**。前兩件做完合稱「二.五刀」,merge 是「第四刀」。
+
+### 第二.五刀
+
+**iter FAIL 驗證**($1.51 / 2m54s / 22 turns):
+- 在 user 主 project 建 `iter-fail-test` pipeline,prompt 故意只說寫 `hello`,acceptance 要 `hello world`
+- 實跑出兩輪:round 1 FAIL(criticFeedback 寫「缺 world,改成 hello world」) → round 2 executor 收 feedback 改成 `hello world` → PASS
+- ticket commit `5f39250` 進 worktree git
+- timestamps 為真實 unix ms(`date +%s%3N`)不再是估的整千 — 第三刀 prompt 收緊有效
+
+**Multi-ticket pause/resume 驗證**($0.69 + $0.78 = $1.47 split 兩段):
+- 3-step pipeline,phase A 等 t1 running → POST /pause → phase B 等收 paused
+- 結果:t1 done + 1 commit + pipeline=paused、t2/t3 仍 draft(pause 確實「跑完當前 ticket 才停」)
+- phase C resume → 跑 t2 + t3 → 3 unique commit hash 各自獨立、pipeline=ready
+- 順手:atomic write(`writeJson` 改 .tmp + JSON.parse round-trip + renameSync,防 partial write / serialize 炸)
+
+**Inbox 重構(同時間做的 UX cleanup)**:
+- panel 砍 sev 分組(`block`/`info`/`muted`)三段 section header → flat 列表
+- strip 砍三層視覺(block 大 icon / info 大 icon / muted 小 pip)→ 全部 8px pip,sev 走色、unread 走 ring
+- 砍 ~50 行 dead CSS(`.inbox-section-*`、`.inbox-strip-item`、`.inbox-strip-tooltip`、`.has-pulse`)、`SECTION_LABEL` 常數
+- inbox-item ts 改絕對定位右下角(原本跟 hover X 衝)
+- iter-stage-pulse 改 box 內右上 notification badge(原本浮 box 外 right:-3px 像野點)
+- IterStages pulse 條件加 `s !== "✓"`(✓ 是 round 結束 marker 不該脈衝)
+- 砍 elapsed 後面 redundant live-dot
+
+### 第四刀(merge,phase 3 完整收尾)
+
+**Backend** [server/lib/git.ts](../../../../server/lib/git.ts):
+- `merge(projectPath, branch, base, strategy)` 函式
+  - strategy: `"merge"`(no-ff)/`"squash"`/`"ff-only"`;default 從 project config `defaults.merge_strategy`(預設 squash)
+  - 流程:checkout base → merge(視 strategy 選旗標)→ squash 模式追加 commit → 抓 HEAD hash + subject
+  - 衝突 / not-fast-forward / 其他失敗 → `merge --abort` + 回 reason+stderr
+- `MergeResult` discriminated union(`{ok:true, commitHash, commitSubject}` vs `{ok:false, reason, stderr}`)
+
+**Route** [server/routes/projects.ts](../../../../server/routes/projects.ts):
+- `POST /pipelines/:id/merge`
+- guard:`!hasGit` 400、`isRunning` 409、ticket 未全 done 409、state==merged 409
+- 成功:`writePipeline` state=merged + mergedAt + mergeCommit{hash,subject,ts} + emit `pipeline_merged` notif
+
+**Orchestrator state guard 補**:state==merged 也擋 `/run`(原本只擋 running/stopping/ready+all-done)
+
+**Frontend**:
+- `api.mergePipeline()`
+- ReadyBanner 從兩個 disabled 按鈕 → onMerge / onRevealWorktree props
+  - View diff 改成「開 worktree」(用 git diff main..HEAD 看,不另寫 diff viewer)
+  - Merge 接 confirm dialog + POST
+- BoardScreen handler:成功 reload + 借用 actionError channel 顯示「✓ Merged → <hash> <subject>」(無專門 success toast)
+
+**E2E 驗證**(vp-autotest project,hash `cf94d1b2`):
+- 建 single-step `merge-test` pipeline 跑 → ready
+- POST /merge → 200,`commitHash 5e9581e` + subject `Squash merge pipeline/merge-test into main`
+- pipeline.json 真標 state=merged + mergeCommit 寫入
+- vp-autotest main git log 確實多一個 squash merge commit + MERGE.txt 進 main(file diff 看得到)
+- ~$0.5 成本
+
+### Phase 3 整段收尾
+
+走完第四刀,phase 3 「runner + UX + 操作 + merge」完整。**剩到下一階段**:transient retry 真實作測試(無自然 fixture)、multi-pipeline 平行、SQLite log、budget tracker、Settings 內容、log/notif GC、pixel-diff 修復(獨立 sprint)、charset guard for PUT body。
+
+下一階段建議從 (g) log/notif GC(小,直接做)或 (b) merge 之外的 P3 大件(merge + budget 一起會構成完整 production 體驗)挑。

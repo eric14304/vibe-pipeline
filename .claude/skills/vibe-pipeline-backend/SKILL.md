@@ -1,6 +1,6 @@
 ---
 name: vibe-pipeline-backend
-description: vibe-pipeline 後端 / 執行層規格與計畫 — Phase 1 (Project / Pipeline CRUD) + Phase 2 (QA-driven ticket 建立) + Phase 3 第一/二刀 (pipeline runner + worktree + notif emit + iter rounds 寫回 + ticket commit + run log API) 已落地。本 SKILL 是 spec 索引與架構記憶。SQLite log、budget tracker、`vp` CLI、SKILL 蒸餾、merge ops 之前先讀。
+description: vibe-pipeline 後端 / 執行層規格與計畫 — Phase 1 (Project / Pipeline CRUD) + Phase 2 (QA-driven ticket 建立) + Phase 3 第一/二/三/四刀 (pipeline runner + worktree + notif emit + iter rounds 寫回 + ticket commit + run log API + multi-ticket pause/resume + merge to base branch) 已落地。本 SKILL 是 spec 索引與架構記憶。SQLite log、budget tracker、`vp` CLI、SKILL 蒸餾 之前先讀。
 ---
 
 ## 現況(2026-05-10)
@@ -11,8 +11,10 @@ description: vibe-pipeline 後端 / 執行層規格與計畫 — Phase 1 (Projec
 - Phase 3 第一刀:Pipeline runner — 主 agent (claude CLI session,Task tool 派 sub-agent)、git worktree per pipeline、Run/Pause UX、log file、crash recovery、notif emit (pipeline 級 + ticket 級透過 fs.watch)
 - Phase 3 第二刀:Runner 寫回 `ticket.iter.rounds[]`(每輪 executor summary + critic verdict/feedback + 時間戳)、ticket done 後自動 git commit(`ticket(<n>): <title>`,寫回 `ticket.commits[]`)、Run log API (`GET /pipelines/:id/runs[/:filename]`,parse log 末尾 JSON 取 cost/duration/turns/tokens)、Bash 工具白名單擴增(允許 git add / commit / diff / rev-parse,僅限 ticket commit 流程)
 - Phase 3 第三刀:Backend 操作補齊 + 安全網 — Project type 加 `currentBranch`、新 endpoint(`GET /branches`、`POST /pipelines/:id/worktree/reveal`、`DELETE /pipelines/:id`)、orchestrator state guard(running/stopping/ready 拒 /run,不 spawn 燒錢)、savePipeline shape 驗證(name/branch/tickets 必備)+ race guard(running/stopping 不准 PUT)+ PUT-as-upsert 擋(non-existent → 404,要 POST 建立)、QA `close` 自動 cancel 空 draft
+- Phase 3 第二.五刀:iter FAIL → PASS round chain 驗證 + multi-ticket pause/resume 驗證 + atomic write(`writeJson` .tmp + JSON.parse round-trip + renameSync,防 partial write / serialize 炸)
+- Phase 3 第四刀:Pipeline merge — `git.ts:merge(projectPath, branch, base, strategy)` 函式(支援 merge / squash / ff-only,strategy 從 project config `defaults.merge_strategy` 讀,預設 squash);conflict / not-fast-forward 自動 abort 不留半 merge;`POST /pipelines/:id/merge` route(isRunning + state==merged + 全 ticket done guard);成功標 state=merged + mergedAt + mergeCommit + emit `pipeline_merged` notif;orchestrator state guard 補 merged 也擋 /run
 
-**還沒做(P2+ / P3)**:iter mode FAIL → 第二輪實測(目前只跑出 1 round PASS)、transient retry 邏輯實測、多 ticket 順序 + 中途 paused 介入、SQLite log、merge ops、budget tracker、Q&A engine 進化版、SKILL 蒸餾、`vp` CLI、log/notif GC、atomic write 安全網。
+**還沒做(P2+ / P3)**:transient retry 真實作測試、多 pipeline 平行、SQLite log / runs.db、budget tracker、Q&A engine 進化版、SKILL 蒸餾、`vp` CLI、log/notif GC、charset guard for PUT body。
 
 要開工 backend 前:
 
