@@ -56,17 +56,17 @@ export function RunButton({
     case "planning":
     case "paused":
     case "failed": {
-      // 沒「可跑」的 ticket = 沒 ticket 或 ticket 都已收尾(done / failed_*)。
-      // 後者通常是失敗 merge ticket 卡住,讓 user 走 ReadyBanner 重試;runner 不接這些。
-      const noRunnable =
-        noTickets ||
-        !pipeline.tickets.some(
-          (t) => t.status === "draft" || t.status === "ready" || t.status === "paused"
-        );
-      if (noRunnable) {
+      // 沒「可跑」的 real ticket = 沒 ticket / 都 done / 只剩 merge ticket。
+      // merge ticket 不認列(它的 retry 走 ReadyBanner,RunButton 是 step/iter 用的)。
+      const hasRunnableReal = pipeline.tickets.some(
+        (t) =>
+          t.mode !== "merge" &&
+          (t.status === "draft" || t.status === "ready" || t.status === "paused")
+      );
+      if (noTickets || !hasRunnableReal) {
         const title = noTickets
           ? "按上方「+ ticket」開 QA 建第一張"
-          : "沒可跑的 ticket(失敗 / done 不算可跑;看 banner 處理 merge)";
+          : "沒可跑的 ticket(失敗 / done 不算可跑;merge 處理走 banner)";
         return (
           <button type="button" className="btn" disabled title={title}>
             無ticket可執行
@@ -283,7 +283,6 @@ export function FocusColumn({
           <ReadyBanner
             pipeline={pipeline}
             onMerge={onMerge}
-            onRevealWorktree={onRevealWorktree}
             mergeStrategy={mergeStrategy}
             projectHash={projectHash}
           />
@@ -681,13 +680,11 @@ function FocusTitle({
 export function ReadyBanner({
   pipeline,
   onMerge,
-  onRevealWorktree,
   mergeStrategy,
   projectHash,
 }: {
   pipeline: Pipeline;
   onMerge?: (id: string) => void;
-  onRevealWorktree?: (id: string) => void;
   mergeStrategy?: string;
   projectHash?: string;
 }) {
@@ -746,15 +743,6 @@ export function ReadyBanner({
           title="看 worktree vs base 的完整 diff"
         >
           View Diff
-        </button>
-      )}
-      {onRevealWorktree && (
-        <button type="button"
-          className="btn"
-          onClick={() => onRevealWorktree(pipeline.id)}
-          title="開資料夾"
-        >
-          開 worktree
         </button>
       )}
       {diffOpen && projectHash && (
@@ -967,11 +955,9 @@ function TicketCard({
         </div>
       )}
 
-      {isPaused && (
+      {isPaused && ticket.reason && (
         <div className="ticket-paused-actions">
           <span className="paused-reason">{ticket.reason}</span>
-          <button type="button" className="btn btn-ghost">retry as-is</button>
-          <button type="button" className="btn btn-primary">介入 →</button>
         </div>
       )}
     </div>
