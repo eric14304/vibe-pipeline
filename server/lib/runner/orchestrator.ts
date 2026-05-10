@@ -296,8 +296,32 @@ async function spawnDirect(opts: {
         const final = (await pipelineDir.readPipeline(projectPath, pipelineId)) as {
           state?: string;
           name?: string;
+          baseBranch?: string;
         } | null;
         const name = final?.name || pipelineId;
+
+        // Auto-rebase worktree onto base after AI merge done。merge 完 worktree 仍在舊 branch tip,
+        // base 已吸收 ticket commits → rebase 是 FF,hash 不變。把 worktree 拉到新 base 後
+        // sync chip 自然 = 0(base 沒往前),banner 也不會重觸發 re-merge。
+        // 只在 strategy=merge / ff-only 跑;squash 模式 base 沒 ticket commits chain,rebase 會 replay → 跳過。
+        if (final?.state === "merged") {
+          try {
+            const cfg = await pipelineDir.readConfig(projectPath);
+            const strategy = cfg.defaults?.merge_strategy as string | undefined;
+            if (strategy !== "squash") {
+              const base = final?.baseBranch || "main";
+              const rebaseRes = await worktree.rebaseOntoBase(projectPath, pipelineId, base);
+              if (rebaseRes.ok) {
+                console.log(`[runner ${pipelineId}] auto-rebase post-merge ok`);
+              } else {
+                console.warn(`[runner ${pipelineId}] auto-rebase skipped: ${rebaseRes.err}`);
+              }
+            }
+          } catch (e) {
+            console.warn(`[runner ${pipelineId}] auto-rebase failed:`, e);
+          }
+        }
+
         if (final?.state === "ready") {
           notifs.emit(projectPath, {
             type: "pipeline_ready_to_merge",

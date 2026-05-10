@@ -106,6 +106,25 @@ function parseShortstat(s: string): DiffStat {
   };
 }
 
+// AI merge 完後 worktree 仍指在舊 branch tip(沒含 base 上剛吸收的 merge commit)。
+// 跑 rebase baseBranch 把 worktree 拉到 base HEAD(已 merged 過的 pipeline branch_unique=0,等同 FF;
+// hash 不變)。失敗(罕見:user 自己加 commit 撞)→ 回 ok=false,呼叫端 log warn,user 之後可手動 sync。
+export async function rebaseOntoBase(
+  projectPath: string,
+  pipelineId: string,
+  baseBranch: string
+): Promise<{ ok: boolean; out: string; err: string }> {
+  const wt = worktreePath(projectPath, pipelineId);
+  if (!existsSync(wt)) return { ok: false, out: "", err: "worktree 不存在" };
+  // 預檢:worktree 必須乾淨,否則 rebase 失敗
+  const status = await spawnGit(["status", "--porcelain"], wt);
+  if (!status.ok) return { ok: false, out: status.out, err: "status 失敗:" + status.err };
+  if (status.out.trim().length > 0) {
+    return { ok: false, out: status.out, err: "worktree 不乾淨,跳過 auto-rebase" };
+  }
+  return await spawnGit(["rebase", baseBranch], wt);
+}
+
 // 看 worktree 上 branch 落後 base 幾個 commit(從 base merge-base 算起 base 多走的 commit 數)。
 // 用 rev-list --count baseBranch ^HEAD(只在 baseBranch 上 reachable 的 commit,而 worktree HEAD 還沒拿到的)。
 // 沒 worktree / git 異常 → 回 null,UI 自己處理。
