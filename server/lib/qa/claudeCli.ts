@@ -67,7 +67,7 @@ export async function runTurn({
   } else {
     args.push("--resume", sessionId);
     const hint =
-      "提醒:你只負責對話收斂 ticket 需求,不要實際執行任何工具(Bash/Read/Edit/Grep/...)。回覆永遠用單一 JSON 物件 {message, options, complete, spec},不要解釋、不要 markdown 包裝。" +
+      "提醒:你只負責對話收斂 ticket 需求,不要實際執行任何工具(Bash/Read/Edit/Grep/...)。回覆永遠用單一 JSON 物件 {message, options, complete, spec, splitInto?},splitInto 只在 complete=true 且範圍跨多件獨立 ticket 時填 N 個完整 spec(見系統 prompt ## splitInto 段)。不要解釋、不要 markdown 包裝。" +
       (pipelineContext ? "\n\n" + pipelineContext : "") +
       (progressHint ? "\n\n" + progressHint : "");
     args.push("--append-system-prompt", hint);
