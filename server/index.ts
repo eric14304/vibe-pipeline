@@ -128,6 +128,20 @@ async function handle(req: Request): Promise<Response> {
     const qaStartMatch = rest.match(/^\/pipelines\/([a-z0-9_-]+)\/qa\/start$/);
     if (qaStartMatch && method === "POST") return qa.start(hash, qaStartMatch[1], req);
 
+    // ticket-level operations(split / delete)— 跑 qa.ts 因為 split 用 claude CLI(同 stack)
+    const ticketSplitMatch = rest.match(
+      /^\/pipelines\/([a-z0-9_-]+)\/tickets\/([a-z0-9_-]+)\/split$/
+    );
+    if (ticketSplitMatch && method === "POST") {
+      return qa.splitTicket(hash, ticketSplitMatch[1], ticketSplitMatch[2]);
+    }
+    const ticketDeleteMatch = rest.match(
+      /^\/pipelines\/([a-z0-9_-]+)\/tickets\/([a-z0-9_-]+)$/
+    );
+    if (ticketDeleteMatch && method === "DELETE") {
+      return qa.deleteTicket(hash, ticketDeleteMatch[1], ticketDeleteMatch[2]);
+    }
+
     if (rest === "/qa/drafts" && method === "GET") return qa.listDrafts(hash);
 
     const qaDraftMatch = rest.match(/^\/qa\/([a-f0-9]+)(\/.*)?$/);

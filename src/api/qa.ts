@@ -71,3 +71,29 @@ export function listDrafts(hash: string): Promise<Draft[]> {
 export function getDraft(hash: string, draftId: string): Promise<Draft> {
   return call<Draft>(`/api/projects/${hash}/qa/${draftId}`);
 }
+
+export type SplitResp =
+  | { count: number; nothingToSplit: true }
+  | { count: number; replacedTicketId: string; newTickets: Array<{ id: string; n: number; title: string }> };
+
+export function splitTicket(
+  hash: string,
+  pipelineId: string,
+  ticketId: string
+): Promise<SplitResp> {
+  return call<SplitResp>(
+    `/api/projects/${hash}/pipelines/${pipelineId}/tickets/${ticketId}/split`,
+    { method: "POST" }
+  );
+}
+
+export function deleteTicket(
+  hash: string,
+  pipelineId: string,
+  ticketId: string
+): Promise<{ ok: true; removedId: string }> {
+  return call<{ ok: true; removedId: string }>(
+    `/api/projects/${hash}/pipelines/${pipelineId}/tickets/${ticketId}`,
+    { method: "DELETE" }
+  );
+}

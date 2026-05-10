@@ -14,6 +14,7 @@ import { useTriConfirm } from "../../ui/ConfirmDialog";
 import type { NotifItem } from "../../types/notif";
 import { useActiveProjectHash } from "../../hooks/useActiveProject";
 import * as api from "../../api/projects";
+import * as qaApi from "../../api/qa";
 import type { Pipeline, Ticket } from "../../types/pipeline";
 import type { Project } from "../../../shared/types";
 import type { InboxFilter, InboxState } from "../../types/notif";
@@ -475,6 +476,33 @@ export function BoardScreen({
           setReloadKey((k) => k + 1);
         } catch (e) {
           setActionError(`重置 ticket 失敗: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }}
+      onSplitTicket={async (ticketId) => {
+        if (!project || !active) return;
+        setActionError("AI 拆分中…(~10-30s)");
+        try {
+          const r = await qaApi.splitTicket(project.hash, active.id, ticketId);
+          if ("nothingToSplit" in r) {
+            setActionError("✓ AI 認為這張 ticket 不需拆");
+          } else {
+            setActionError(`✓ 已拆成 ${r.count} 張 ticket`);
+            setOpenTicket(null); // 關 drawer,讓 user 看到新 ticket 列表
+          }
+          setReloadKey((k) => k + 1);
+        } catch (e) {
+          setActionError(`AI 拆分失敗: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }}
+      onDeleteTicket={async (ticketId) => {
+        if (!project || !active) return;
+        try {
+          await qaApi.deleteTicket(project.hash, active.id, ticketId);
+          setOpenTicket(null);
+          setReloadKey((k) => k + 1);
+          setActionError("✓ ticket 已刪除");
+        } catch (e) {
+          setActionError(`刪除 ticket 失敗: ${e instanceof Error ? e.message : String(e)}`);
         }
       }}
     />
