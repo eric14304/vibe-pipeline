@@ -153,7 +153,6 @@ export function FocusColumn({
   existingNames = [],
   onTicketClick,
   projectHash,
-  mergeStrategy,
   queuePosition,
 }: {
   pipeline: Pipeline;
@@ -171,7 +170,6 @@ export function FocusColumn({
   existingNames?: string[];
   onTicketClick?: (ticket: Ticket) => void;
   projectHash?: string;
-  mergeStrategy?: string;
   queuePosition?: number;
 }) {
   // Runs summary 給 head chip + RunButton 預估用。pipeline.id / state 變動就 refetch
@@ -421,7 +419,6 @@ export function FocusColumn({
           <ReadyBanner
             pipeline={pipeline}
             onMerge={onMerge}
-            mergeStrategy={mergeStrategy}
           />
         )}
       </div>
@@ -819,11 +816,9 @@ function FocusTitle({
 export function ReadyBanner({
   pipeline,
   onMerge,
-  mergeStrategy,
 }: {
   pipeline: Pipeline;
   onMerge?: (id: string) => void;
-  mergeStrategy?: string;
 }) {
   const confirm = useConfirm();
   const commitCount = pipeline.tickets.reduce(
@@ -876,19 +871,13 @@ export function ReadyBanner({
         <button type="button"
           className="btn btn-primary"
           onClick={async () => {
-            const strategyLabel =
-              mergeStrategy === "squash"
-                ? "squash(壓成一個 commit)"
-                : mergeStrategy === "ff-only"
-                ? "ff-only(線性,base 沒前進才行)"
-                : "merge --no-ff(保留 ticket commit + 加 merge commit)";
             const isRetry = !!failedMerge;
             const ok = await confirm({
               title: isRetry
                 ? `重試 AI 合併 ${pipeline.branch} → ${baseBranch}?`
                 : `AI 合併 ${pipeline.branch} → ${baseBranch}?`,
               description:
-                `策略:${strategyLabel}\n\n` +
+                `策略:merge --no-ff(保留 ticket commit + 加 merge commit)\n\n` +
                 (isRetry
                   ? `會 reset 失敗的 merge ticket 重跑(prompt 會用最新 strategy 重灌)。\n` +
                     `若是 working tree 髒導致失敗,先 commit / stash 再重試,不然又 FAIL。`

@@ -3,14 +3,9 @@ import * as api from "../../api/projects";
 
 const MIN = 1;
 const MAX = 8;
-const MERGE_STRATEGIES: api.MergeStrategy[] = ["merge", "squash", "ff-only"];
-const MERGE_STRATEGY_LABEL: Record<api.MergeStrategy, string> = {
-  merge: "Merge commit",
-  squash: "Squash",
-  "ff-only": "Fast-forward only",
-};
 
-// Project-level Settings popover。露 max_parallel / default_base_branch / merge_strategy / cost_limit_usd。
+// Project-level Settings popover。露 max_parallel / default_base_branch / cost_limit_usd。
+// (merge_strategy 已鎖 'merge',不再露,因為 squash/ff-only 跟 auto-rebase + sync chip 不相容)
 export function SettingsPopover({
   hash,
   open,
@@ -27,7 +22,6 @@ export function SettingsPopover({
   const [cfg, setCfg] = useState<api.ProjectConfig | null>(null);
   const [draftMaxParallel, setDraftMaxParallel] = useState<number>(2);
   const [draftBaseBranch, setDraftBaseBranch] = useState<string>("");
-  const [draftMergeStrategy, setDraftMergeStrategy] = useState<api.MergeStrategy>("merge");
   const [draftCostLimit, setDraftCostLimit] = useState<string>("0");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +38,6 @@ export function SettingsPopover({
         setCfg(c);
         setDraftMaxParallel(c.defaults.max_parallel);
         setDraftBaseBranch(c.defaults.base_branch ?? "");
-        setDraftMergeStrategy(c.defaults.merge_strategy);
         setDraftCostLimit(String(c.defaults.cost_limit_usd ?? 0));
       })
       .catch((e: Error) => {
@@ -87,7 +80,6 @@ export function SettingsPopover({
   const dirty = cfg
     ? clampedMaxParallel !== cfg.defaults.max_parallel ||
       trimmedBase !== (cfg.defaults.base_branch ?? "") ||
-      draftMergeStrategy !== cfg.defaults.merge_strategy ||
       parsedCost !== cfg.defaults.cost_limit_usd
     : false;
   const canSave = dirty && baseValid && costValid;
@@ -101,14 +93,12 @@ export function SettingsPopover({
         defaults: {
           max_parallel: clampedMaxParallel,
           default_base_branch: trimmedBase,
-          merge_strategy: draftMergeStrategy,
           cost_limit_usd: parsedCost,
         },
       });
       setCfg(next);
       setDraftMaxParallel(next.defaults.max_parallel);
       setDraftBaseBranch(next.defaults.base_branch ?? "");
-      setDraftMergeStrategy(next.defaults.merge_strategy);
       setDraftCostLimit(String(next.defaults.cost_limit_usd ?? 0));
       onSaved?.(next);
     } catch (e) {
@@ -217,23 +207,6 @@ export function SettingsPopover({
       />
       <div style={hintStyle}>
         新 pipeline 預設從這個 branch 切;merge 也回到這裡。空白不可送。
-      </div>
-
-      <label style={labelStyle}>合併方式</label>
-      <select
-        value={draftMergeStrategy}
-        onChange={(e) => setDraftMergeStrategy(e.target.value as api.MergeStrategy)}
-        disabled={busy}
-        style={{ ...inputStyle, width: "100%", marginBottom: 6, boxSizing: "border-box" }}
-      >
-        {MERGE_STRATEGIES.map((s) => (
-          <option key={s} value={s}>
-            {MERGE_STRATEGY_LABEL[s]}
-          </option>
-        ))}
-      </select>
-      <div style={hintStyle}>
-        AI 合併執行 git merge 時的策略。Merge commit 保留 ticket commit chain。
       </div>
 
       <label style={labelStyle}>Cost 上限 (USD)</label>

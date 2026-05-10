@@ -606,7 +606,6 @@ export function BoardScreen({
             pipeline={active}
             tick={tick}
             projectHash={project.hash}
-            mergeStrategy={project.mergeStrategy}
             queuePosition={queuePositionOf(active.id)}
             onAddTicket={(pid) => qa.open(pid)}
             hasActiveDraft={!!qa.draftFor(active.id)}

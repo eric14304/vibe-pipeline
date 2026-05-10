@@ -35,17 +35,14 @@ export const DEFAULT_MAX_PARALLEL = 2;
 export const MAX_PARALLEL_MIN = 1;
 export const MAX_PARALLEL_MAX = 8;
 
-export const MERGE_STRATEGIES = ["merge", "squash", "ff-only"] as const;
-export type MergeStrategy = (typeof MERGE_STRATEGIES)[number];
-export const DEFAULT_MERGE_STRATEGY: MergeStrategy = "merge";
+// merge strategy 已鎖定 merge --no-ff(squash 跟新版 auto-rebase + sync 不相容;ff-only 條件太苛)。
+// 留 const 供 mergeTicketPrompt / 任何呼叫端參照,不再走 config。
+export const FIXED_MERGE_STRATEGY = "merge" as const;
 export const DEFAULT_COST_LIMIT_USD = 0;
 
 const DEFAULT_CONFIG = {
   defaults: {
     base_branch: "main",
-    // merge --no-ff 保留 ticket commit 鏈,bisect / git log 看得出 pipeline 邊界
-    // (squash 適合「main 極乾淨」的個人專案,要的話改本檔)
-    merge_strategy: DEFAULT_MERGE_STRATEGY,
     max_parallel: DEFAULT_MAX_PARALLEL,
     cost_limit_usd: DEFAULT_COST_LIMIT_USD,
   },
@@ -62,7 +59,6 @@ const DEFAULT_CONFIG = {
 export type ProjectConfig = {
   defaults?: {
     base_branch?: string;
-    merge_strategy?: string;
     max_parallel?: number;
     cost_limit_usd?: number;
   };
@@ -73,7 +69,6 @@ export type ProjectConfig = {
 // 已 fallback / 驗證過的完整 config defaults。GET / status 拿這個即可,不用每處再 ?? "main"。
 export type ResolvedDefaults = {
   base_branch: string;
-  merge_strategy: MergeStrategy;
   max_parallel: number;
   cost_limit_usd: number;
 };
@@ -108,14 +103,6 @@ export async function getMaxParallel(projectPath: string): Promise<number> {
   return clampMaxParallel(cfg.defaults?.max_parallel);
 }
 
-export function isMergeStrategy(raw: unknown): raw is MergeStrategy {
-  return typeof raw === "string" && (MERGE_STRATEGIES as readonly string[]).includes(raw);
-}
-
-export function normalizeMergeStrategy(raw: unknown): MergeStrategy {
-  return isMergeStrategy(raw) ? raw : DEFAULT_MERGE_STRATEGY;
-}
-
 export function normalizeCostLimitUsd(raw: unknown): number {
   if (typeof raw !== "number" || !Number.isFinite(raw) || raw < 0) return DEFAULT_COST_LIMIT_USD;
   return raw;
@@ -137,7 +124,6 @@ export async function getResolvedDefaults(projectPath: string): Promise<Resolved
   }
   return {
     base_branch,
-    merge_strategy: normalizeMergeStrategy(d.merge_strategy),
     max_parallel: clampMaxParallel(d.max_parallel),
     cost_limit_usd: normalizeCostLimitUsd(d.cost_limit_usd),
   };

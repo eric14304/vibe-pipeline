@@ -33,10 +33,7 @@ export async function registerProject(req: Request): Promise<Response> {
     if (!existsSync(pipelinesDir)) mkdirSync(pipelinesDir, { recursive: true });
     const configPath = join(dir, "config.json");
     if (!existsSync(configPath)) {
-      writeFileSync(
-        configPath,
-        JSON.stringify({ defaults: { merge_strategy: "squash" } }, null, 2)
-      );
+      writeFileSync(configPath, JSON.stringify({ defaults: {} }, null, 2));
     }
     if (Array.isArray(body.seedPipelines)) {
       for (const p of body.seedPipelines) {

@@ -73,15 +73,12 @@ export async function openProject(req: Request): Promise<Response> {
 export async function status(hash: string): Promise<Response> {
   const project = await projectStore.findByHash(hash);
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);
-  // 順帶夾 config 摘要(merge_strategy / base_branch / cost_limit_usd),
-  // 前端 confirm 文字、SettingsPopover 顯目前值用
-  let mergeStrategy: string | undefined;
+  // 順帶夾 config 摘要(base_branch / cost_limit_usd),SettingsPopover 顯目前值用
   let defaultBaseBranch: string | undefined;
   let costLimitUsd: number | undefined;
   if (project.hasInit) {
     try {
       const resolved = await pipelineDir.getResolvedDefaults(project.path);
-      mergeStrategy = resolved.merge_strategy;
       defaultBaseBranch = resolved.base_branch;
       costLimitUsd = resolved.cost_limit_usd;
     } catch {
@@ -90,11 +87,9 @@ export async function status(hash: string): Promise<Response> {
   }
   return ok({
     ...project,
-    mergeStrategy,
     defaultBaseBranch,
     costLimitUsd,
   } satisfies Project & {
-    mergeStrategy?: string;
     defaultBaseBranch?: string;
     costLimitUsd?: number;
   });
@@ -409,15 +404,8 @@ export async function mergePipeline(hash: string, pipelineId: string): Promise<R
   const branch = pipeline.branch || `pipeline/${pipeline.name || pipelineId}`;
   const baseBranch = pipeline.baseBranch || "main";
 
-  // strategy 從 project config 拿(沒設 / 髒值 → fallback DEFAULT_MERGE_STRATEGY,Phase 4 第三刀的 'merge')
-  const cfg = await pipelineDir.readConfig(project.path);
-  const rawStrategy = cfg.defaults?.merge_strategy;
-  const strategy = pipelineDir.normalizeMergeStrategy(rawStrategy);
-  if (rawStrategy !== undefined && !pipelineDir.isMergeStrategy(rawStrategy)) {
-    console.warn(
-      `[merge ${pipelineId}] config.defaults.merge_strategy 髒值 ${JSON.stringify(rawStrategy)},fallback ${strategy}`
-    );
-  }
+  // strategy 鎖死 merge --no-ff:squash / ff-only 跟新版 auto-rebase + sync chip 不相容
+  const strategy = pipelineDir.FIXED_MERGE_STRATEGY;
 
   // 把 real ticket(非 merge mode)的歷史塞進 prompt,給 sub-agent 解衝突 / 寫 commit message 上下文
   const history = (pipeline.tickets ?? [])
@@ -668,17 +656,8 @@ export async function updateConfig(hash: string, req: Request): Promise<Response
     nextDefaults.base_branch = trimmed;
   }
 
-  // merge_strategy:enum
-  if ("merge_strategy" in incomingDefaults) {
-    const v = incomingDefaults.merge_strategy;
-    if (!pipelineDir.isMergeStrategy(v)) {
-      return fieldErr(
-        "merge_strategy",
-        `merge_strategy 必須為 ${pipelineDir.MERGE_STRATEGIES.join(" | ")}`
-      );
-    }
-    nextDefaults.merge_strategy = v;
-  }
+  // merge_strategy 已鎖死(merge --no-ff),不接受設定;若 body 有此欄位 silently ignore
+  // (舊呼叫端不擋,但寫回 config 時不留)
 
   // cost_limit_usd:number >= 0
   if ("cost_limit_usd" in incomingDefaults) {

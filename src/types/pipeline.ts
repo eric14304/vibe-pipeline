@@ -73,7 +73,6 @@ export type Pipeline = {
   state: PipelineState;
   tickets: Ticket[];
   baseBranch?: string;
-  mergeStrategy?: string;
 };
 
 export type Project = {

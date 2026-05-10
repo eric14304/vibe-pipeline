@@ -52,12 +52,9 @@ export function listBranches(hash: string): Promise<string[]> {
   return call<string[]>(`/api/projects/${hash}/branches`);
 }
 
-export type MergeStrategy = "merge" | "squash" | "ff-only";
-
 export type ProjectConfig = {
   defaults: {
     base_branch: string;
-    merge_strategy: MergeStrategy;
     max_parallel: number;
     cost_limit_usd: number;
   };
@@ -67,7 +64,6 @@ export type ProjectConfigPatch = {
   defaults?: {
     max_parallel?: number;
     default_base_branch?: string;
-    merge_strategy?: MergeStrategy;
     cost_limit_usd?: number;
   };
 };
