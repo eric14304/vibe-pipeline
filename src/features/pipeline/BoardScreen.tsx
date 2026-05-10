@@ -281,6 +281,7 @@ export function BoardScreen({
       setPipelines((arr) => [created, ...arr]);
       setActiveId(created.id);
       setCreating(false);
+      setActionError(`✓ pipeline "${name}" 已建立`);
     } catch (e) {
       setActionError(`建立 pipeline 失敗: ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -474,6 +475,7 @@ export function BoardScreen({
         try {
           await api.savePipeline(project.hash, active.id, next);
           setReloadKey((k) => k + 1);
+          setActionError("✓ ticket 已重置回 draft");
         } catch (e) {
           setActionError(`重置 ticket 失敗: ${e instanceof Error ? e.message : String(e)}`);
         }
@@ -615,12 +617,14 @@ export function BoardScreen({
               try {
                 await api.pausePipeline(project.hash, pid);
                 setReloadKey((k) => k + 1);
+                setActionError("✓ 已送出暫停請求(等 ticket 收完)");
               } catch (e) {
                 setActionError(`暫停失敗: ${e instanceof Error ? e.message : String(e)}`);
               }
             }}
             onDelete={async (pid) => {
               if (!project) return;
+              const targetName = pipelines.find((p) => p.id === pid)?.name ?? pid;
               try {
                 await api.deletePipeline(project.hash, pid);
                 // 從本地移除,順便切到下一條(若有)
@@ -629,6 +633,7 @@ export function BoardScreen({
                   if (pid === activeId) setActiveId(next[0]?.id ?? "");
                   return next;
                 });
+                setActionError(`✓ pipeline "${targetName}" 已刪除`);
               } catch (e) {
                 setActionError(`刪除失敗: ${e instanceof Error ? e.message : String(e)}`);
               }
@@ -644,6 +649,7 @@ export function BoardScreen({
                 setPipelines((arr) =>
                   arr.map((p) => (p.id === pid ? next : p))
                 );
+                setActionError(`✓ 已改名為 "${newName}"`);
               } catch (e) {
                 setActionError(`改名失敗: ${e instanceof Error ? e.message : String(e)}`);
               }
@@ -670,6 +676,8 @@ export function BoardScreen({
               try {
                 await api.savePipeline(project.hash, pid, next);
                 setReloadKey((k) => k + 1);
+                const cnt = next.tickets.filter((t) => t.status === "draft").length;
+                setActionError(`✓ 已重置 ${cnt} 張 ticket 回 draft`);
               } catch (e) {
                 setActionError(`重跑全部失敗: ${e instanceof Error ? e.message : String(e)}`);
               }
