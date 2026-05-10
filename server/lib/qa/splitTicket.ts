@@ -77,11 +77,15 @@ export async function splitTicketSpec(opts: {
 
   // userMessage 走 stdin,別當 positional arg(Windows 下 --system-prompt 後接 long positional 會被
   // claude CLI 當成 input 缺失,踩過)
+  // model 用 Haiku 4.5:split 是結構化輸出任務(spec → JSON 陣列),Haiku 速度 ~3-5x 快、成本 ~1/10,
+  // 品質夠用(這不需要深度推理)。User 預設 model 通常是 Opus,split 不該佔那麼多
   const args = [
     "claude",
     "-p",
     "--output-format",
     "json",
+    "--model",
+    "claude-haiku-4-5-20251001",
     "--system-prompt",
     SPLIT_BEHAVIOR_PROMPT,
     "--disallowedTools",
