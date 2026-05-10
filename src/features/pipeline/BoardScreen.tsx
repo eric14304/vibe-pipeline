@@ -605,6 +605,7 @@ export function BoardScreen({
               try {
                 await api.runPipeline(project.hash, pid);
                 setReloadKey((k) => k + 1);
+                setActionError("✓ pipeline 已啟動,runner 接手中…");
               } catch (e) {
                 setActionError(`開始運行失敗: ${e instanceof Error ? e.message : String(e)}`);
               }
