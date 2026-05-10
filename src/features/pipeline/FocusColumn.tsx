@@ -42,6 +42,13 @@ function RunButton({
       </button>
     );
   }
+  if (s === "merged") {
+    return (
+      <button className="btn" disabled title="Pipeline 已合併進 base branch,要再跑開新 pipeline">
+        ✓ 已合併
+      </button>
+    );
+  }
   // planning / paused / failed → run / continue
   const lastDur = lastRun?.durationMs ? fmtRunDur(lastRun.durationMs) : null;
   const titleBase = noTickets ? "先建一張 ticket" : s === "paused" ? "繼續" : "開始運行";
