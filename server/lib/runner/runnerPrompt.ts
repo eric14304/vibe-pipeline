@@ -82,31 +82,41 @@ JSON 結構:
 **merge ticket 不跑「ticket commit」流程**(merge commit 已在 main repo 由 sub-agent commit 完;worktree 不會有改動)。
 
 ### mode = "sync" (AI sync ticket — synthetic,/sync endpoint append)
-這張 ticket 把 base branch 的最新內容 merge 進 worktree(branch side),讓 pipeline branch 跟上 base。sub-agent 在 worktree 內操作。
+這張 ticket 用 **rebase** 把 base branch 拉進 worktree。sub-agent 在 worktree 內操作。
 
-跑法跟 merge ticket 對稱(三選一回應 + iter 上限),但**完成後不改 pipeline.state**(只是 ticket done,pipeline 保持原 state ready/paused)。
+跑法跟 merge ticket 對稱(三選一回應 + iter 上限),但**完成後不改 pipeline.state**(只是 ticket done,pipeline 保持原 state ready/paused/merged)。
 
-讓 N = ticket.iterLimit ?? 3(sync ticket 預設 3 輪)。
+讓 N = ticket.iterLimit ?? 3。
 
 迴圈最多 N 輪:
 1. Bash "date +%s%3N" 抓 startedAt;標 stage="doer";派 Task sub-agent;寫回 JSON
 2. sub-agent 回應開頭三選一:
-   - "PASS\\n..." → 從回應抽 SYNC_COMMIT_HASH(可能是 "NOTHING_TO_SYNC" 表示 base 沒比 branch 新);verdict="PASS"
+   - "PASS\\nNOTHING_TO_SYNC" → 已最新,沒 rebase 任何東西(等同 FF 0 commit);verdict="PASS"
+   - "PASS\\nSYNC_DONE" → rebase 成功(可能含衝突解);verdict="PASS"。**主 agent 必須跑 hash remap(見步驟 4b)**
    - "FAIL\\n<reason>" → 可重試;verdict="FAIL",feedback=reason
    - "FAIL_NORETRY\\n<reason>" → 致命(worktree 髒 / branch 不存在);verdict="FAIL",feedback=reason,**立刻終止 iter**
 3. Bash "date +%s%3N" 抓 endedAt;append round;current+=1;寫回 JSON
-4. PASS →
-   - 標 ticket.status = "done"
-   - **不改 pipeline.state**(維持 ready / paused 等);若有 SYNC_COMMIT_HASH,寫 ticket.syncCommit = { hash, ts }
-   - 寫回 JSON,主迴圈會繼續找下一張 ticket(通常沒了 → ready)
-5. FAIL_NORETRY → 直接跳到「終止」流程(status=failed_iter_limit + state=paused)
+4. PASS:
+   - **4a. NOTHING_TO_SYNC** → 直接標 ticket.status = "done";寫回 JSON,跳出迴圈
+   - **4b. SYNC_DONE** → 跑 hash remap:
+     i. cwd = worktree。Bash: git -C . log --format='%H %s' <baseBranch>..HEAD
+        (列出 rebase 後 branch 上的 unique commits;baseBranch 從 pipeline.baseBranch 拿,沒有的話預設 'main')
+     ii. 解析每行成 (newHash, subject) pairs
+     iii. 讀 pipeline.json,逐張 ticket 看 commits[] 陣列:
+          對每個 commit { hash: oldHash, subject, ts }:
+            - 在 step ii 結果裡找 subject 完全相同的 → 寫新 hash 取代 oldHash
+            - 找不到(可能 rebase 中被 skip 因 empty)→ 在 commit 物件加 'emptiedByRebase': true,保留 oldHash 給歷史紀錄
+            - 多個 subject 相同(罕見) → 用「pipeline.json 裡此 ticket 的第幾個 commits[i] 對應 git log 順序的第幾個 subject 相同 commit」匹配
+     iv. 寫回 pipeline.json
+   - 標 ticket.status = "done";寫回 JSON,跳出迴圈
+   - **不改 pipeline.state**(維持原 state)
+5. FAIL_NORETRY → status=failed_iter_limit + state=paused,結束 session
 6. FAIL → 下輪繼續,feedback 加進下輪 prompt
 
 跑完 N 輪還沒 PASS / FAIL_NORETRY 觸發:
-- 標 ticket.status = "failed_iter_limit",pipeline.state = "paused"
-- 結束 session
+- 標 ticket.status = "failed_iter_limit",pipeline.state = "paused",結束 session
 
-**sync ticket 不跑「ticket commit」流程**(sync merge commit 已在 worktree 由 sub-agent commit 完)。
+**sync ticket 不跑「ticket commit」流程**(rebase 已在 worktree 完成,沒新增 commit 可 add)。
 
 ### mode = "iter" (迭代任務)
 讓 N = ticket.iterLimit ?? 5,iterStop = ticket.iterStopAtLimit ?? true。
