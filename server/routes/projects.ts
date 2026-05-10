@@ -242,6 +242,21 @@ export async function pipelineDiffStat(hash: string, pipelineId: string): Promis
   return ok(stat);
 }
 
+// GET /api/projects/:hash/pipelines/:id/diff
+// 完整 diff:檔案列表 + raw unified diff 文字。前端自己 parse 顯示。
+export async function pipelineDiff(hash: string, pipelineId: string): Promise<Response> {
+  const project = await projectStore.findByHash(hash);
+  if (!project) return err("not_found", `Project not found: ${hash}`, 404);
+  if (!project.hasGit) return ok(null);
+  const pipeline = (await pipelineDir.readPipeline(project.path, pipelineId)) as {
+    baseBranch?: string;
+  } | null;
+  if (!pipeline) return err("not_found", `Pipeline not found: ${pipelineId}`, 404);
+  const baseBranch = pipeline.baseBranch || "main";
+  const diff = await worktree.fullDiff(project.path, pipelineId, baseBranch);
+  return ok(diff);
+}
+
 export async function pausePipeline(hash: string, pipelineId: string): Promise<Response> {
   const project = await projectStore.findByHash(hash);
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);

@@ -105,3 +105,34 @@ function parseShortstat(s: string): DiffStat {
     deleted: deleted ? Number(deleted) : 0,
   };
 }
+
+// 完整 unified diff:跟 base 比對 worktree 全部改動。
+// 回 { files: [{path, added, deleted}], raw } — raw 是 git diff 全文,前端自己 render。
+export type DiffFile = { path: string; added: number; deleted: number };
+export type FullDiff = { files: DiffFile[]; raw: string };
+
+export async function fullDiff(
+  projectPath: string,
+  pipelineId: string,
+  baseBranch: string
+): Promise<FullDiff | null> {
+  const wt = worktreePath(projectPath, pipelineId);
+  if (!existsSync(wt)) return null;
+  // numstat 給檔案級加減行數;raw diff 給前端整段顯示
+  const stat = await spawnGit(["diff", "--numstat", baseBranch], wt);
+  const raw = await spawnGit(["diff", baseBranch], wt);
+  if (!stat.ok || !raw.ok) return null;
+  const files: DiffFile[] = stat.out
+    .split(/\r?\n/)
+    .filter((l) => l.trim().length > 0)
+    .map((line) => {
+      // numstat 格式:"<added>\t<deleted>\t<path>" — binary file 時 added/deleted 會是 "-"
+      const parts = line.split("\t");
+      if (parts.length < 3) return null;
+      const a = parts[0] === "-" ? 0 : Number(parts[0]) || 0;
+      const d = parts[1] === "-" ? 0 : Number(parts[1]) || 0;
+      return { path: parts.slice(2).join("\t"), added: a, deleted: d };
+    })
+    .filter((f): f is DiffFile => f !== null);
+  return { files, raw: raw.out };
+}

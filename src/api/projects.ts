@@ -102,6 +102,13 @@ export function getDiffStat(hash: string, id: string): Promise<DiffStat | null> 
   return call<DiffStat | null>(`/api/projects/${hash}/pipelines/${id}/diff-stat`);
 }
 
+export type DiffFile = { path: string; added: number; deleted: number };
+export type FullDiff = { files: DiffFile[]; raw: string };
+
+export function getFullDiff(hash: string, id: string): Promise<FullDiff | null> {
+  return call<FullDiff | null>(`/api/projects/${hash}/pipelines/${id}/diff`);
+}
+
 export type NotifRecord = {
   id: string;
   type: string;

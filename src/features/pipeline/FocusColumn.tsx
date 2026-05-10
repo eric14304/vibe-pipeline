@@ -3,6 +3,7 @@ import { CheckCircleIcon, FolderIcon, MergeIcon, PlusIcon } from "../../ui/icons
 import { STATE_COLOR, STATE_LABEL, fmtElapsed } from "../../data/pipelines";
 import { MODE_LABELS } from "../../api/qa";
 import { useConfirm } from "../../ui/ConfirmDialog";
+import { DiffModal } from "./DiffModal";
 import type { IterStage, Pipeline, Ticket, TicketStatus } from "../../types/pipeline";
 import * as api from "../../api/projects";
 import type { RunSummary } from "../../api/projects";
@@ -284,6 +285,7 @@ export function FocusColumn({
             onMerge={onMerge}
             onRevealWorktree={onRevealWorktree}
             mergeStrategy={mergeStrategy}
+            projectHash={projectHash}
           />
         )}
       </div>
@@ -681,13 +683,16 @@ export function ReadyBanner({
   onMerge,
   onRevealWorktree,
   mergeStrategy,
+  projectHash,
 }: {
   pipeline: Pipeline;
   onMerge?: (id: string) => void;
   onRevealWorktree?: (id: string) => void;
   mergeStrategy?: string;
+  projectHash?: string;
 }) {
   const confirm = useConfirm();
+  const [diffOpen, setDiffOpen] = useState(false);
   const commitCount = pipeline.tickets.reduce(
     (sum, t) => sum + (t.commits?.length ?? 0),
     0
@@ -734,14 +739,32 @@ export function ReadyBanner({
           {pipeline.branch} → {baseBranch} · {commitCount} commit{commitCount === 1 ? "" : "s"}
         </div>
       </div>
+      {projectHash && (
+        <button type="button"
+          className="btn"
+          onClick={() => setDiffOpen(true)}
+          title="看 worktree vs base 的完整 diff"
+        >
+          View Diff
+        </button>
+      )}
       {onRevealWorktree && (
         <button type="button"
           className="btn"
           onClick={() => onRevealWorktree(pipeline.id)}
-          title="開啟 worktree(裡面 git status / git diff 看現場)"
+          title="開資料夾"
         >
-          看現場
+          開 worktree
         </button>
+      )}
+      {diffOpen && projectHash && (
+        <DiffModal
+          projectHash={projectHash}
+          pipelineId={pipeline.id}
+          pipelineBranch={pipeline.branch}
+          baseBranch={pipeline.baseBranch || "main"}
+          onClose={() => setDiffOpen(false)}
+        />
       )}
       {onMerge && !isMerged && (
         <button type="button"
