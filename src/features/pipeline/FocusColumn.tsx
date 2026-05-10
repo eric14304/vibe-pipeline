@@ -266,7 +266,14 @@ export function FocusColumn({
         t.status === "paused")
   );
   // ready = 全 ticket done 還沒合併;merged = 已合併;有失敗 merge → 也顯 banner 給 user 重試。
-  const showMergeBanner = allDone || pipeline.state === "merged" || !!failedMergeTicket;
+  // 防護網:worktree 跟 base 沒 diff(rebase 完了 / 已 merged 過再 sync 完了 / 純讀 ticket)
+  // → allDone 路徑不顯 merge prompt(merge 出去也是 no-op);merged / failedMerge 仍顯
+  // (前者是「✓ 已合併」狀態 banner,後者要 user 重試,不分 diff)。
+  const noWorktreeDiff = diffStat !== null && diffStat.files === 0 && diffStat.added === 0 && diffStat.deleted === 0;
+  const showMergeBanner =
+    (allDone && !noWorktreeDiff) ||
+    pipeline.state === "merged" ||
+    !!failedMergeTicket;
   const hasResettable = pipeline.tickets.some((t) =>
     t.status === "done" ||
     t.status === "failed" ||
