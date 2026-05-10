@@ -272,7 +272,13 @@ export function FocusColumn({
               background: "color-mix(in srgb, " + stateColor + " 14%, transparent)",
             }}
           >
-            <span className="dot" style={{ background: stateColor }} /> {stateLabel}
+            <span
+              className={
+                "dot" +
+                (pipeline.state === "running" || pipeline.state === "stopping" ? " pulse" : "")
+              }
+              style={{ background: stateColor }}
+            />{" "}{stateLabel}
           </span>
           <span className="focus-count mono">
             {done} / {total} done
