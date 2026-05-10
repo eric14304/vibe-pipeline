@@ -95,6 +95,7 @@ export type ApiErrorCode =
   | "invalid_path"
   | "not_initialized"
   | "already_initialized"
+  | "budget_exceeded"
   | "internal_error";
 
 // ─── Notification taxonomy ─────────────────────────────────────────
@@ -130,6 +131,7 @@ export type NotifEventType =
   | "pipeline_failed"
   | "budget_warn"
   | "budget_hard_cap"
+  | "pipeline_blocked_budget"
   | "runner_stall"
   | "runner_crash"
   // P3(SKILL / 跨 pipeline / 排程)
@@ -167,6 +169,7 @@ export const NOTIF_EVENTS: Record<NotifEventType, NotifEventMeta> = {
   pipeline_failed: { sev: "block", phase: "P2", label: "Pipeline failed" },
   budget_warn: { sev: "info", phase: "P2", label: "Budget 80% 警告" },
   budget_hard_cap: { sev: "block", phase: "P2", label: "Budget 硬上限" },
+  pipeline_blocked_budget: { sev: "block", phase: "P2", label: "Pipeline 被預算上限擋下" },
   runner_stall: { sev: "block", phase: "P2", label: "Runner 卡住" },
   runner_crash: { sev: "block", phase: "P2", label: "Runner crash" },
 

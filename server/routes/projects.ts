@@ -255,6 +255,21 @@ export async function runPipeline(hash: string, pipelineId: string): Promise<Res
     pipelineId,
   });
   if (!r.ok) {
+    // budget_exceeded → 402 Payment Required + body 帶 spent/limit 給前端顯示
+    if (r.reason === "budget_exceeded") {
+      return Response.json(
+        {
+          ok: false,
+          error: {
+            code: "budget_exceeded" satisfies ApiErrorCode,
+            message: r.error,
+            spent: r.spent,
+            limit: r.limit,
+          },
+        },
+        { status: 402 }
+      );
+    }
     // 邏輯阻擋(state guard / 已在跑等)用 409 conflict;真正爆炸用 500
     const isConflict = /已在|stopping|完成|排隊|merge/.test(r.error);
     return err("invalid_path", r.error, isConflict ? 409 : 500);
