@@ -1,5 +1,12 @@
 import { join } from "node:path";
-import { existsSync, mkdirSync, statSync, readdirSync, unlinkSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  statSync,
+  readdirSync,
+  unlinkSync,
+  renameSync,
+} from "node:fs";
 
 const DIR = ".vibe-pipeline";
 const RUNTIME_GITIGNORE_ENTRY = `${DIR}/.runtime/`;
@@ -54,8 +61,24 @@ export async function readConfig(projectPath: string): Promise<ProjectConfig> {
   }
 }
 
-function writeJson(path: string, data: unknown): Promise<number> {
-  return Bun.write(path, JSON.stringify(data, null, 2) + "\n");
+// Atomic write:先寫 .tmp,parse 驗一次,再 rename 蓋過原檔。
+// 中途任何失敗(序列化炸 / 磁碟滿 / parse 不過)→ 原檔不動。
+async function writeJson(path: string, data: unknown): Promise<void> {
+  const text = JSON.stringify(data, null, 2) + "\n";
+  // round-trip check:確認自己生的 JSON 真能 parse 回(防超大 number / Date 物件等惡作劇)
+  JSON.parse(text);
+  const tmp = path + ".tmp";
+  await Bun.write(tmp, text);
+  try {
+    renameSync(tmp, path);
+  } catch (e) {
+    try {
+      unlinkSync(tmp);
+    } catch {
+      // ignore
+    }
+    throw e;
+  }
 }
 
 export async function init(projectPath: string): Promise<void> {

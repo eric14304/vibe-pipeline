@@ -730,7 +730,10 @@ function IterStages({ stage, status }: { stage: IterStage; status: TicketStatus 
           >
             {STAGE_LABEL[s]}
             {status === "paused" && i === idx && " ⏸"}
-            {status === "running" && i === idx && <span className="iter-stage-pulse pulse" />}
+            {/* pulse 只給「進行中」階段(doer / critic);✓ 是 round 結束 marker,不該脈衝 */}
+            {status === "running" && i === idx && s !== "✓" && (
+              <span className="iter-stage-pulse pulse" />
+            )}
           </span>
           {i < stages.length - 1 && <span className="iter-stage-arrow">→</span>}
         </span>

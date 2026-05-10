@@ -1,0 +1,54 @@
+{
+    "name": "iter-fail-test",
+    "branch": "pipeline/iter-fail-test",
+    "baseBranch": "main",
+    "state": "ready",
+    "tickets": [
+        {
+            "id": "t1-iterfail",
+            "n": 1,
+            "status": "done",
+            "title": "iter test:hello world 檔案",
+            "goal": "測 iter mode FAIL → 下輪 PASS,讓 round 寫回完整。",
+            "acceptance": [
+                "worktree 根目錄存在 X.txt",
+                "X.txt 內容必須是 hello world(不只 hello,要包含 world)"
+            ],
+            "prompt": "在 worktree 根目錄建一個 X.txt,內容 hello。",
+            "mode": "iter",
+            "iterLimit": 5,
+            "iterStopAtLimit": true,
+            "commits": [
+                {
+                    "hash": "5f39250f8b1917dc735ed0b2039d217bd41e4ba5",
+                    "subject": "ticket(1): iter test:hello world 檔案",
+                    "ts": 1778399346697
+                }
+            ],
+            "iter": {
+                "current": 2,
+                "stage": "done",
+                "verdicts": ["FAIL", "PASS"],
+                "rounds": [
+                    {
+                        "n": 1,
+                        "startedAt": 1778399227420,
+                        "endedAt": 1778399264210,
+                        "executorSummary": "已在 worktree 根目錄建立 X.txt,內容為 hello(依 prompt 指示寫入,未加 world)。",
+                        "criticVerdict": "FAIL",
+                        "criticFeedback": "X.txt 存在但內容只有 \"hello\",缺少 \"world\"。修法:把 X.txt 內容改成 hello world(單行,可含或不含結尾換行)。"
+                    },
+                    {
+                        "n": 2,
+                        "startedAt": 1778399278886,
+                        "endedAt": 1778399318811,
+                        "executorSummary": "已將 worktree 根目錄的 X.txt 內容由 hello 改為 hello world,符合本輪審核 feedback 要求。",
+                        "criticVerdict": "PASS",
+                        "criticFeedback": "X.txt 存在且內容為 hello world,兩條件均通過。"
+                    }
+                ]
+            }
+        }
+    ],
+    "id": "019e10d9fa83-iter-fail-test"
+}
