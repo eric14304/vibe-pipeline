@@ -87,7 +87,6 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                 autoFocus={state.danger}
               >
                 {state.cancelLabel ?? "取消"}
-                <span className="kbd-inline mono">Esc</span>
               </button>
               {state.tertiaryLabel && (
                 <button
