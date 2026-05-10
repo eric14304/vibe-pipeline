@@ -111,6 +111,65 @@ export function TicketDrawer({
               <span>上限 {spec.iterLimit} 輪</span>
             )}
           </div>
+          {(onResetTicket || onSplitTicket || onDeleteTicket) &&
+            (isTerminalStatus(ticket.status) || isSplittable(ticket) || isDeletable(ticket)) && (
+              <div className="tdrw-actions">
+                {onResetTicket && isTerminalStatus(ticket.status) && (
+                  <button type="button"
+                    className="btn btn-ghost tdrw-action"
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: `重置 ticket "${ticket.title}" 狀態到 draft?`,
+                        description:
+                          `會清掉:iter rounds / verdicts / commits 紀錄;但 worktree 內已 commit 的程式碼會留著。\n` +
+                          `下次執行 pipeline 會重新跑這張(可能再產生新 commit)。`,
+                        confirmLabel: "重置",
+                        danger: true,
+                      });
+                      if (ok) onResetTicket(ticket.id);
+                    }}
+                  >
+                    ↺ 重置
+                  </button>
+                )}
+                {onSplitTicket && isSplittable(ticket) && (
+                  <button type="button"
+                    className="btn btn-ghost tdrw-action"
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: `用 AI 把 "${ticket.title}" 拆成多張獨立 ticket?`,
+                        description:
+                          "AI 會分析這張 ticket 的 prompt / acceptance,拆成 N 張各自可獨立執行的 ticket。\n" +
+                          "原本這張會被取代(N=1 時 AI 認為不需拆,不動)。\n" +
+                          "預估花 ~$0.05-0.20 一次 claude session。",
+                        confirmLabel: "AI 拆分",
+                      });
+                      if (ok) onSplitTicket(ticket.id);
+                    }}
+                  >
+                    ✂ AI 拆分
+                  </button>
+                )}
+                {onDeleteTicket && isDeletable(ticket) && (
+                  <button type="button"
+                    className="btn btn-ghost tdrw-action tdrw-action-danger"
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: `刪除 ticket "${ticket.title}"?`,
+                        description:
+                          "刪掉這張 ticket(後續 pipeline 不會再跑這張)。\n" +
+                          "worktree 上已 commit 的程式碼留著(這只是 spec 紀錄消失)。",
+                        confirmLabel: "刪除",
+                        danger: true,
+                      });
+                      if (ok) onDeleteTicket(ticket.id);
+                    }}
+                  >
+                    🗑 刪除
+                  </button>
+                )}
+              </div>
+            )}
         </div>
 
         <div className="drawer-body tdrw-body">
@@ -167,67 +226,6 @@ export function TicketDrawer({
           <Section label="pipeline 執行紀錄">
             <RunHistory projectHash={projectHash} pipelineId={pipelineId} />
           </Section>
-          {(onResetTicket || onSplitTicket || onDeleteTicket) && (
-            <Section label="操作">
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
-                {onResetTicket && isTerminalStatus(ticket.status) && (
-                  <button type="button"
-                    className="btn btn-ghost"
-                    onClick={async () => {
-                      const ok = await confirm({
-                        title: `重置 ticket "${ticket.title}" 狀態到 draft?`,
-                        description:
-                          `會清掉:iter rounds / verdicts / commits 紀錄;但 worktree 內已 commit 的程式碼會留著。\n` +
-                          `下次執行 pipeline 會重新跑這張(可能再產生新 commit)。`,
-                        confirmLabel: "重置",
-                        danger: true,
-                      });
-                      if (ok) onResetTicket(ticket.id);
-                    }}
-                  >
-                    ↺ 重置 ticket 狀態(可重跑)
-                  </button>
-                )}
-                {onSplitTicket && isSplittable(ticket) && (
-                  <button type="button"
-                    className="btn btn-ghost"
-                    onClick={async () => {
-                      const ok = await confirm({
-                        title: `用 AI 把 "${ticket.title}" 拆成多張獨立 ticket?`,
-                        description:
-                          "AI 會分析這張 ticket 的 prompt / acceptance,拆成 N 張各自可獨立執行的 ticket。\n" +
-                          "原本這張會被取代(N=1 時 AI 認為不需拆,不動)。\n" +
-                          "預估花 ~$0.05-0.20 一次 claude session。",
-                        confirmLabel: "AI 拆分",
-                      });
-                      if (ok) onSplitTicket(ticket.id);
-                    }}
-                  >
-                    ✂ AI 拆分成多張
-                  </button>
-                )}
-                {onDeleteTicket && isDeletable(ticket) && (
-                  <button type="button"
-                    className="btn btn-ghost"
-                    style={{ color: "var(--failed)" }}
-                    onClick={async () => {
-                      const ok = await confirm({
-                        title: `刪除 ticket "${ticket.title}"?`,
-                        description:
-                          "刪掉這張 ticket(後續 pipeline 不會再跑這張)。\n" +
-                          "worktree 上已 commit 的程式碼留著(這只是 spec 紀錄消失)。",
-                        confirmLabel: "刪除",
-                        danger: true,
-                      });
-                      if (ok) onDeleteTicket(ticket.id);
-                    }}
-                  >
-                    🗑 刪除 ticket
-                  </button>
-                )}
-              </div>
-            </Section>
-          )}
         </div>
       </div>
     </div>
