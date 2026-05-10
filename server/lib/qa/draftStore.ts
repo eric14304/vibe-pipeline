@@ -140,6 +140,11 @@ export async function appendTurn(
   // Auto-complete:5 欄位齊就 force complete=true,不等 AI 主動 set。
   // (AI 常多問一輪「確認送出?」,frontend SpecReview 才是真正的 user confirm step。)
   d.complete = reply.complete || specAllFieldsValid(d.spec);
+  // splitInto: 只在 complete=true 那輪採信 AI 提案(coerceSpec 已過 length>=2 + 每元素 complete 驗)
+  // 之後 turn 若 AI 又出 splitInto 也採新值;沒出就維持上一輪結果
+  if (d.complete && Array.isArray(reply.splitInto) && reply.splitInto.length >= 2) {
+    d.splitInto = reply.splitInto;
+  }
   d.updatedAt = now;
   await writeJson(file(projectPath, draftId), d);
   return d;

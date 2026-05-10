@@ -10,7 +10,6 @@ import { InitPopup } from "../init/InitPopup";
 import { InboxColumn } from "../notifications/InboxColumn";
 import { QADrawer } from "../qa/QADrawer";
 import { useQA } from "../qa/useQA";
-import { useTriConfirm } from "../../ui/ConfirmDialog";
 import type { NotifItem } from "../../types/notif";
 import { useActiveProjectHash } from "../../hooks/useActiveProject";
 import * as api from "../../api/projects";
@@ -41,7 +40,6 @@ export function BoardScreen({
   const [popupDismissed, setPopupDismissed] = useState(false);
 
   const qa = useQA(hash);
-  const triConfirm = useTriConfirm();
   const [openTicket, setOpenTicket] = useState<Ticket | null>(null);
   const [branches, setBranches] = useState<string[]>([]);
   const [maxParallel, setMaxParallel] = useState<number>(0);
@@ -433,31 +431,9 @@ export function BoardScreen({
       onSendTurn={qa.sendTurn}
       onCancel={qa.cancel}
       onClose={qa.close}
-      onFinalize={async (edits) => {
-        // 三步:1) preview-split(drawer 內 busy spinner,~5-15s) → 2) 結果 = 1 → 直接 finalize 1 張;
-        // 結果 >= 2 → 跳 confirm 三選一;3) finalize(splitInto?) 寫入 + 關 drawer
-        type Preview = { count: number; specs: qaApi.TicketSpec[] };
-        let preview: Preview | null;
-        try {
-          preview = (await qa.previewSplit(edits)) as Preview | null;
-        } catch (e) {
-          setActionError(`分析範圍失敗: ${e instanceof Error ? e.message : String(e)}`);
-          return;
-        }
-        let splitInto: qaApi.TicketSpec[] | undefined;
-        if (preview && preview.count >= 2) {
-          const pv = preview;
-          const ok = await triConfirm({
-            title: `AI 認為這張 ticket 含 ${pv.count} 件事`,
-            description: `要拆成 ${pv.count} 張獨立 ticket 還是保留 1 張原樣?`,
-            confirmLabel: `拆成 ${pv.count} 張`,
-            tertiaryLabel: "保留 1 張",
-            cancelLabel: "取消(回 QA)",
-          });
-          if (ok === "cancel") return; // drawer 留著
-          if (ok === "confirm") splitInto = pv.specs;
-          // tertiary → 保留 1 張,splitInto 維持 undefined
-        }
+      onFinalize={async (edits, splitInto) => {
+        // QA AI 已在對話中提案 splitInto(若範圍多件)→ QADrawer 上 user 已選好拆/保 1。
+        // 這裡直接 finalize,沒額外 AI call,瞬間關 drawer。
         try {
           const result = (await qa.finalize(edits, splitInto)) as
             | { pipeline: Pipeline; tickets: Array<{ id: string }>; splitCount: number }
@@ -468,7 +444,7 @@ export function BoardScreen({
             );
             setActionError(
               result.splitCount > 1
-                ? `✓ 已拆成 ${result.splitCount} 張 ticket 建立`
+                ? `✓ 已建立 ${result.splitCount} 張 ticket`
                 : "✓ ticket 已建立"
             );
           }

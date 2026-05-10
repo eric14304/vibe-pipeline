@@ -42,6 +42,9 @@ export type QAReply = {
   optionsMode?: "single" | "multi";
   complete: boolean;
   spec: PartialSpec | null;
+  // 選填:complete=true 時若 AI 判斷範圍橫跨多件獨立 ticket → 填 N 個完整 spec。
+  // 用於零延遲 split(取代後跑的 splitTicketSpec call)。length < 2 等同沒拆建議,前端忽略
+  splitInto?: TicketSpec[];
 };
 
 export type Turn = {
@@ -65,6 +68,9 @@ export type Draft = {
   // QA 開始時 snapshot 的 pipeline 內既有 ticket 摘要,供 AI 引導時避免重複定義。
   // 不在後續 turn 重抓 — 一條 draft 整段對話用同一份上下文,避免 AI 看到漂移。
   pipelineContext?: string;
+  // QA AI 在 complete=true 那輪若認為範圍橫跨多件 → 提供 N 個完整 spec。
+  // 替代後跑 splitTicketSpec(零額外 latency)。frontend 在 finalize 前讓 user 選拆/不拆
+  splitInto?: TicketSpec[];
 };
 
 export function isCompleteSpec(s: unknown): s is TicketSpec {

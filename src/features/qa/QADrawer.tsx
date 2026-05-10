@@ -21,7 +21,7 @@ export function QADrawer({
   busy: boolean;
   error: string | null;
   onSendTurn: (userMessage: string) => void;
-  onFinalize: (edits?: Partial<TicketSpec>) => void;
+  onFinalize: (edits?: Partial<TicketSpec>, splitInto?: TicketSpec[]) => void;
   onCancel: () => void;
   onClose: () => void;
 }) {
@@ -89,6 +89,7 @@ export function QADrawer({
           <div className="drawer-body qadr-body qadr-spec-body">
             <SpecReview
               spec={draft!.spec as TicketSpec}
+              splitInto={draft?.splitInto}
               busy={busy}
               onCancel={onCancel}
               onFinalize={onFinalize}
@@ -416,20 +417,53 @@ function Composer({
 
 function SpecReview({
   spec,
+  splitInto,
   busy,
   onCancel,
   onFinalize,
 }: {
   spec: TicketSpec;
+  splitInto?: TicketSpec[];
   busy: boolean;
   onCancel: () => void;
-  onFinalize: (edits?: Partial<TicketSpec>) => void;
+  onFinalize: (edits?: Partial<TicketSpec>, splitInto?: TicketSpec[]) => void;
 }) {
   const [edited, setEdited] = useState<TicketSpec>(spec);
+  // 預設「拆」(若 AI 提案了);user 可 toggle 改成保留 1 張
+  const hasSplit = Array.isArray(splitInto) && splitInto.length >= 2;
+  const [useSplit, setUseSplit] = useState<boolean>(hasSplit);
 
   return (
     <div className="qadr-spec">
       <div className="qadr-spec-head mono">收齊了。確認後送出。</div>
+      {hasSplit && (
+        <div className="qadr-split-proposal">
+          <div className="qadr-split-title mono">
+            <strong>AI 評估這 ticket 範圍橫跨 {splitInto!.length} 件獨立工作</strong>
+          </div>
+          <ol className="qadr-split-list">
+            {splitInto!.map((s, i) => (
+              <li key={i}>
+                <span className="qadr-split-num mono">#{i + 1}</span>
+                <span>{s.title}</span>
+                <span className={"chip ticket-mode" + (s.mode === "iter" ? " is-iter" : "")} style={{ marginLeft: 6, fontSize: 10 }}>
+                  {s.mode === "iter" ? "迭代" : "單次"}
+                </span>
+              </li>
+            ))}
+          </ol>
+          <div className="qadr-split-toggle">
+            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+              <input
+                type="checkbox"
+                checked={useSplit}
+                onChange={(e) => setUseSplit(e.target.checked)}
+              />
+              送出時拆成 {splitInto!.length} 張獨立 ticket(取消勾選 = 合 1 張下方 spec)
+            </label>
+          </div>
+        </div>
+      )}
       <Field label="title">
         <input
           className="qadr-input"
@@ -526,14 +560,16 @@ function SpecReview({
           取消 draft
         </button>
         <span style={{ flex: 1 }} />
-        <button type="button" className="btn btn-primary" onClick={() => onFinalize(edited)} disabled={busy}>
+        <button type="button" className="btn btn-primary" onClick={() => onFinalize(edited, useSplit ? splitInto : undefined)} disabled={busy}>
           {busy ? (
             <>
               <span className="qadr-thinking-dots" style={{ display: "inline-flex", verticalAlign: "middle" }}>
                 <span /><span /><span />
               </span>{" "}
-              AI 分析範圍中…
+              送出中…
             </>
+          ) : useSplit && hasSplit ? (
+            `送出建立 ${splitInto!.length} 張 ticket`
           ) : (
             "送出建立 ticket"
           )}

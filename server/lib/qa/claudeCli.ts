@@ -1,5 +1,6 @@
 import { QA_BEHAVIOR_PROMPT } from "./systemPrompt";
 import type { QAReply } from "./schema";
+import type { TicketSpec } from "../../../shared/types";
 import { isTestMode, nextQAReply } from "../testMode";
 import { projectHash } from "../hash";
 
@@ -172,10 +173,29 @@ function specHasAllFields(s: unknown): boolean {
 
 function enforceContract(reply: QAReply): QAReply {
   // 1. Coerce common mode synonyms (iterative → iter, one-shot → step etc).
-  const coerced = { ...reply, spec: coerceSpec(reply.spec) as QAReply["spec"] };
+  const coerced: QAReply = {
+    ...reply,
+    spec: coerceSpec(reply.spec) as QAReply["spec"],
+  };
   // 2. Even if AI declares complete=true, override to false when spec is incomplete.
   if (coerced.complete && !specHasAllFields(coerced.spec)) {
-    return { ...coerced, complete: false };
+    return { ...coerced, complete: false, splitInto: undefined };
+  }
+  // 3. splitInto:每元素都跑 coerceSpec + completeness 檢查;只留合法 entries。
+  //    length < 2 → 不算拆,丟掉 splitInto(主 spec 仍可用)
+  if (Array.isArray(reply.splitInto) && reply.splitInto.length > 0) {
+    const cleaned: TicketSpec[] = [];
+    for (const raw of reply.splitInto) {
+      const c = coerceSpec(raw);
+      if (c && specHasAllFields(c)) cleaned.push(c as TicketSpec);
+    }
+    if (cleaned.length >= 2) {
+      coerced.splitInto = cleaned;
+    } else {
+      coerced.splitInto = undefined;
+    }
+  } else {
+    coerced.splitInto = undefined;
   }
   return coerced;
 }
