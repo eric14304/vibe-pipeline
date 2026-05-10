@@ -63,17 +63,19 @@ JSON 結構:
 
 迴圈最多 N 輪:
 1. Bash "date +%s%3N" 抓 startedAt;標 stage="doer";派 Task sub-agent(prompt = ticket.prompt + 上輪 feedback 如有);寫回 JSON
-2. sub-agent 回應開頭應該是 "PASS\\n..." 或 "FAIL\\n<reason>";解析:
-   - PASS → 從回應抽 MERGE_COMMIT_HASH=<hash> / MERGE_COMMIT_SUBJECT=<subject>(若 sub-agent 沒寫,用 Bash 'git -C "<projectPath>" rev-parse HEAD' 抓);verdict="PASS"
-   - FAIL → verdict="FAIL",feedback = sub-agent 給的 reason
+2. sub-agent 回應開頭應該是**三選一**:
+   - "PASS\\n..." → 從回應抽 MERGE_COMMIT_HASH / MERGE_COMMIT_SUBJECT(沒寫就 Bash 'git -C "<projectPath>" rev-parse HEAD' 抓);verdict="PASS"
+   - "FAIL\\n<reason>" → 可重試的失敗(衝突解錯 / 驗證 fail);verdict="FAIL",feedback=reason
+   - "FAIL_NORETRY\\n<reason>" → **致命條件不會自動好**(working tree 髒 / branch 不存在 / 權限);verdict="FAIL",feedback=reason,但**立刻終止 iter,不再跑後續輪**(浪費 token)
 3. Bash "date +%s%3N" 抓 endedAt;append round { n, startedAt, endedAt, executorSummary, criticVerdict, criticFeedback };current+=1;寫回 JSON
 4. PASS →
    - 標 ticket.status = "done"
    - 標 pipeline.state = "merged",寫 mergedAt = <Bash "date +%s%3N">,mergeCommit = { hash, subject, ts }
    - 寫回 JSON,跳出迴圈,結束 session
-5. FAIL → 下輪繼續,feedback 加進下輪 prompt
+5. FAIL_NORETRY → 直接跳到「終止」流程(同 iter 上限處理:status=failed_iter_limit + state=paused)
+6. FAIL → 下輪繼續,feedback 加進下輪 prompt
 
-跑完 N 輪還沒 PASS:
+跑完 N 輪還沒 PASS,或 FAIL_NORETRY 觸發終止:
 - 標 ticket.status = "failed_iter_limit",pipeline.state = "paused"(merge ticket 也走 iterStopAtLimit=true 邏輯)
 - 結束 session
 
