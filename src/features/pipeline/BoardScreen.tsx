@@ -189,7 +189,7 @@ export function BoardScreen({
   // - 加 visibilitychange / focus refetch,tab 重新可見立刻 sync
   // Fetch branch list once when project loads (for CreateCard base picker)
   useEffect(() => {
-    if (!project || !project.hasGit) {
+    if (!project?.hasGit) {
       setBranches([]);
       return;
     }
@@ -200,7 +200,7 @@ export function BoardScreen({
   }, [project]);
 
   useEffect(() => {
-    if (!project || !project.hasInit) {
+    if (!project?.hasInit) {
       setPipelines([]);
       return;
     }

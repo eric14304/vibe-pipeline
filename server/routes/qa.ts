@@ -69,7 +69,7 @@ async function projectFor(hash: string) {
   return { project: p };
 }
 
-export async function start(hash: string, pipelineId: string, req: Request): Promise<Response> {
+export async function start(hash: string, pipelineId: string, _req: Request): Promise<Response> {
   const r = await projectFor(hash);
   if ("error" in r) return r.error;
   const { project } = r;

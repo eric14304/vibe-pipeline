@@ -1,5 +1,5 @@
 import { QA_BEHAVIOR_PROMPT } from "./systemPrompt";
-import { type QAReply } from "./schema";
+import type { QAReply } from "./schema";
 
 export class ClaudeCliError extends Error {
   constructor(public code: "not_available" | "exec_failed" | "parse_failed", message: string) {
@@ -121,7 +121,7 @@ function coerceSpec(spec: unknown): unknown {
   if (typeof o.acceptance === "string") {
     o.acceptance = (o.acceptance as string)
       .split(/\r?\n/)
-      .map((s) => s.replace(/^\s*[-*•]?\s*\d*[.\)]?\s*/, "").trim())
+      .map((s) => s.replace(/^\s*[-*•]?\s*\d*[.)]?\s*/, "").trim())
       .filter((s) => s.length > 0);
   }
   return o;
