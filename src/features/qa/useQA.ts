@@ -48,7 +48,17 @@ export function useQA(projectHash: string | null) {
     async (pipelineId: string) => {
       if (!projectHash) return;
       setState((s) => ({ ...s, open: true, pipelineId, busy: true, error: null }));
-      const existing = drafts.find((d) => d.pipelineId === pipelineId);
+      // 接續 QA 時:不靠 in-memory drafts(可能 stale,e.g. 別 tab 改、或 close 後沒同步)
+      // 直接打 backend listDrafts 拿最新,再決定 resume / start
+      let latest: Draft[] = [];
+      try {
+        latest = await qaApi.listDrafts(projectHash);
+        setDrafts(latest);
+      } catch {
+        // 拉清單失敗 → 用 in-memory 的 drafts fallback,不擋
+        latest = drafts;
+      }
+      const existing = latest.find((d) => d.pipelineId === pipelineId);
       if (existing) {
         try {
           const d = await qaApi.getDraft(projectHash, existing.draftId);
@@ -82,7 +92,7 @@ export function useQA(projectHash: string | null) {
   );
 
   // close 時若 draft 還是空(沒任何 user turn、沒 spec 進展)→ auto-cancel,
-  // 不留殘骸佔 rail QA badge
+  // 不留殘骸佔 rail QA badge。非空 draft 也要 refreshDrafts,確保 hasActiveDraft / draftFor 正確
   const close = useCallback(async () => {
     const draft = state.draft;
     setState(INITIAL);
@@ -95,8 +105,9 @@ export function useQA(projectHash: string | null) {
       } catch {
         // 失敗就算了,下次 open 同 pipeline 會 resume 看到空 draft
       }
-      await refreshDrafts();
     }
+    // 永遠 refresh,讓 FocusColumn 的「+ ticket / 接續 QA」label 即時對齊 disk 狀態
+    await refreshDrafts();
   }, [projectHash, state.draft, refreshDrafts]);
 
   const sendTurn = useCallback(
