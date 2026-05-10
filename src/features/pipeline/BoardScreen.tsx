@@ -782,6 +782,7 @@ const SEV_BY_EVENT: Record<string, "block" | "info" | "muted"> = {
   pipeline_ready_to_merge: "info",
   pipeline_failed: "block",
   pipeline_merged: "info",
+  pipeline_merge_cleanup_failed: "info",
   pipeline_auto_merge_started: "info",
   merge_started: "muted",
   merge_blocked: "block",

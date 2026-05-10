@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { projectHash } from "../hash";
 import { vibeHome } from "../paths";
 import type { DiffStat, DiffFile, FullDiff } from "../../../shared/types";
@@ -75,6 +75,55 @@ export async function remove(projectPath: string, pipelineId: string): Promise<v
 
 export async function prune(projectPath: string): Promise<void> {
   await spawnGit(["worktree", "prune"], projectPath);
+}
+
+// Throw-safe 版本:remove worktree(git worktree remove --force → 移除實體 dir → 失敗 fallback prune)。
+// merge / delete 完成後呼叫,讓 caller 不必擔心 worktree dir 已被外部刪 / git metadata 損壞等情況。
+// 永遠不 throw;回 { ok, error } 給 caller 決定要不要降級為 warning。
+export async function removeQuiet(
+  projectPath: string,
+  pipelineId: string
+): Promise<{ ok: boolean; error?: string }> {
+  const wt = worktreePath(projectPath, pipelineId);
+  try {
+    // 1. git worktree remove(若 dir 還在 git 註冊表)
+    if (existsSync(wt)) {
+      const res = await spawnGit(["worktree", "remove", "--force", wt], projectPath);
+      if (!res.ok) {
+        // remove 失敗常見:dir 已被外部刪掉 / locked / metadata 壞掉 → 走 fallback
+        // 試著手動刪 dir + prune,把 git 註冊表清掉
+        try {
+          if (existsSync(wt)) rmSync(wt, { recursive: true, force: true });
+        } catch {
+          // ignore
+        }
+        const pruneRes = await spawnGit(["worktree", "prune"], projectPath);
+        if (!pruneRes.ok) {
+          return {
+            ok: false,
+            error: `worktree remove + prune 都失敗:remove=${res.err || res.out};prune=${pruneRes.err || pruneRes.out}`,
+          };
+        }
+        // remove 失敗但 prune 救回 — 已從 git worktree list 拿掉,視為成功
+        return { ok: true };
+      }
+      // remove 成功;若 dir 仍殘留(極少數)手動清
+      if (existsSync(wt)) {
+        try {
+          rmSync(wt, { recursive: true, force: true });
+        } catch {
+          // ignore
+        }
+      }
+      return { ok: true };
+    }
+    // dir 不存在 → 只需 prune 清 git 註冊表(若有殘留紀錄)
+    await spawnGit(["worktree", "prune"], projectPath);
+    return { ok: true };
+  } catch (e) {
+    // 兜底:任何例外都當失敗回去,不要 throw
+    return { ok: false, error: String(e) };
+  }
 }
 
 // 看當下 worktree 跟 base 的 diff stat(已 commit + working tree 都算)。

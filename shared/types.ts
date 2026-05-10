@@ -294,6 +294,7 @@ export type NotifEventType =
   | "merge_blocked"
   | "pipeline_auto_merge_started"
   | "pipeline_merged"
+  | "pipeline_merge_cleanup_failed"
   | "pipeline_failed"
   | "budget_warn"
   | "budget_hard_cap"
@@ -344,6 +345,7 @@ export const NOTIF_EVENTS: Record<NotifEventType, NotifEventMeta> = {
   merge_blocked: { sev: "block", phase: "P2", label: "AI 合併失敗,需處理" },
   pipeline_auto_merge_started: { sev: "info", phase: "P2", label: "Pipeline 自動合併已觸發" },
   pipeline_merged: { sev: "info", phase: "P2", label: "Pipeline merge 完成" },
+  pipeline_merge_cleanup_failed: { sev: "info", phase: "P2", label: "Merge 後 worktree 清理失敗" },
   pipeline_failed: { sev: "block", phase: "P2", label: "Pipeline failed" },
   budget_warn: { sev: "info", phase: "P2", label: "Budget 80% 警告" },
   budget_hard_cap: { sev: "block", phase: "P2", label: "Budget 硬上限" },

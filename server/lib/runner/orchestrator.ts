@@ -384,21 +384,23 @@ async function spawnDirect(opts: {
         } | null;
         const name = final?.name || pipelineId;
 
-        // Auto-rebase worktree onto base after AI merge done。merge 完 worktree 仍在舊 branch tip,
-        // base 已吸收 ticket commits → rebase 是 FF,hash 不變。把 worktree 拉到新 base 後
-        // sync chip 自然 = 0(base 沒往前),banner 也不會重觸發 re-merge。
-        // strategy 鎖 merge,一律跑 auto-rebase。
+        // Merge 完 worktree 已沒用 — 直接 prune,讓 `git worktree list` / VSCode Source Control
+        // 不再堆積已合併的分支。pipeline.json 保留作紀錄,只清磁碟與 git 註冊表。
+        // 失敗時 emit warning notif 但不阻斷 merge 成功狀態。
         if (final?.state === "merged") {
           try {
-            const base = final?.baseBranch || "main";
-            const rebaseRes = await worktree.rebaseOntoBase(projectPath, pipelineId, base);
-            if (rebaseRes.ok) {
-              console.log(`[runner ${pipelineId}] auto-rebase post-merge ok`);
-            } else {
-              console.warn(`[runner ${pipelineId}] auto-rebase skipped: ${rebaseRes.err}`);
+            const r = await worktree.removeQuiet(projectPath, pipelineId);
+            if (!r.ok) {
+              console.warn(`[runner ${pipelineId}] worktree prune failed: ${r.error}`);
+              notifs.emit(projectPath, {
+                type: "pipeline_merge_cleanup_failed",
+                title: `${name} merge 後 worktree 清理失敗`,
+                sub: r.error,
+                pipelineId,
+              });
             }
           } catch (e) {
-            console.warn(`[runner ${pipelineId}] auto-rebase failed:`, e);
+            console.warn(`[runner ${pipelineId}] worktree prune threw:`, e);
           }
         }
 
@@ -687,6 +689,23 @@ async function startMockRunner(opts: {
       }
 
       const name = pipeline.name || pipelineId;
+      // Mock merge 後也要 prune worktree(mock 不一定有真 worktree dir,但 git 註冊表可能有)
+      if (finalState === "merged") {
+        try {
+          const r = await worktree.removeQuiet(projectPath, pipelineId);
+          if (!r.ok) {
+            console.warn(`[mock runner ${pipelineId}] worktree prune failed: ${r.error}`);
+            notifs.emit(projectPath, {
+              type: "pipeline_merge_cleanup_failed",
+              title: `${name} merge 後 worktree 清理失敗`,
+              sub: r.error,
+              pipelineId,
+            });
+          }
+        } catch (e) {
+          console.warn(`[mock runner ${pipelineId}] worktree prune threw:`, e);
+        }
+      }
       if (finalState === "ready") {
         notifs.emit(projectPath, {
           type: "pipeline_ready_to_merge",

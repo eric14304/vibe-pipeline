@@ -146,7 +146,17 @@ export async function deletePipeline(hash: string, id: string): Promise<Response
       pipelineId: id,
     });
   }
-  // 刪 pipeline.json + qa drafts(若有)。worktree 留著,user 自己 git worktree remove 清。
+  // 順手 prune worktree(不論 state — merged / failed / draft / queued 都該清);
+  // 失敗只 warn,不擋 pipeline.json 刪除
+  try {
+    const r = await worktree.removeQuiet(project.path, id);
+    if (!r.ok) {
+      console.warn(`[delete ${id}] worktree prune failed: ${r.error}`);
+    }
+  } catch (e) {
+    console.warn(`[delete ${id}] worktree prune threw:`, e);
+  }
+  // 刪 pipeline.json + qa drafts(若有)
   const removed = pipelineDir.deletePipeline(project.path, id);
   if (!removed) return err("not_found", `Pipeline not found: ${id}`, 404);
   return ok({ ok: true });

@@ -26,7 +26,7 @@ export type RunnerScriptTicket = {
 
 export type RunnerScript = {
   tickets: RunnerScriptTicket[];
-  finalState?: "ready" | "paused" | "failed";
+  finalState?: "ready" | "paused" | "failed" | "merged";
   pauseAfterTicketIndex?: number;
 };
 
