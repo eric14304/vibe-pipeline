@@ -2,9 +2,12 @@ node_modules/
 dist/
 .vite/
 .DS_Store
-tests/.snapshots/
-tests/.diffs/
-tests/*.png
+
+# playwright
+playwright-report/
+playwright-report-real/
+test-results/
+playwright/.cache/
 
 # vibe-pipeline runtime (session drafts etc, regenerated)
 .vibe-pipeline/.runtime/
