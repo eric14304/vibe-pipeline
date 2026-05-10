@@ -147,6 +147,10 @@ function coerceSpec(spec: unknown): unknown {
       .map((s) => s.replace(/^\s*[-*•]?\s*\d*[.)]?\s*/, "").trim())
       .filter((s) => s.length > 0);
   }
+  // iterLimit clamp 到 [1, 5](AI 常自作主張寫 8-10,超過 UI 上限)
+  if (typeof o.iterLimit === "number" && Number.isFinite(o.iterLimit)) {
+    o.iterLimit = Math.max(1, Math.min(5, Math.floor(o.iterLimit)));
+  }
   return o;
 }
 

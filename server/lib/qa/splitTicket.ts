@@ -192,7 +192,8 @@ function coerceSpec(raw: unknown): TicketSpec | null {
   }
   if (!title || !goal || !prompt || acceptance.length === 0 || !mode) return null;
   const spec: TicketSpec = { title, goal, acceptance, prompt, mode };
-  if (typeof o.iterLimit === "number" && o.iterLimit > 0) spec.iterLimit = Math.floor(o.iterLimit);
+  if (typeof o.iterLimit === "number" && o.iterLimit > 0)
+    spec.iterLimit = Math.max(1, Math.min(5, Math.floor(o.iterLimit)));
   if (typeof o.iterStopAtLimit === "boolean") spec.iterStopAtLimit = o.iterStopAtLimit;
   return spec;
 }

@@ -104,21 +104,28 @@ export function QADrawer({
                 </div>
               )}
               {!draft && error && <div className="qadr-error">{error}</div>}
-              {draft && (
-                <>
-                  <Bubble kind="ai" message={FIRST_AI_MESSAGE} />
-                  {draft.turns.map((t) => (
-                    <Bubble key={t.ts + ":" + t.role} kind={t.role} message={t.message} />
-                  ))}
-                  {busy && (
-                    <div className="qadr-loading mono">
-                      <span>AI 思考中</span>
-                      <ThinkingDots />
-                    </div>
-                  )}
-                  {error && <div className="qadr-error">{error}</div>}
-                </>
-              )}
+              {draft && (() => {
+                const lastTurn = draft.turns[draft.turns.length - 1];
+                // last 是 user → AI 還在跑(或 user 中途關 drawer 再回來,backend 仍 pending),
+                // 顯思考中。useQA 會 poll 把 AI 回覆寫回 state.draft
+                const waitingForAI = lastTurn?.role === "user";
+                const showThinking = busy || waitingForAI;
+                return (
+                  <>
+                    <Bubble kind="ai" message={FIRST_AI_MESSAGE} />
+                    {draft.turns.map((t) => (
+                      <Bubble key={t.ts + ":" + t.role} kind={t.role} message={t.message} />
+                    ))}
+                    {showThinking && (
+                      <div className="qadr-loading mono">
+                        <span>AI 思考中</span>
+                        <ThinkingDots />
+                      </div>
+                    )}
+                    {error && <div className="qadr-error">{error}</div>}
+                  </>
+                );
+              })()}
             </div>
             <div className="drawer-foot qadr-foot">
               {/* spec 進度提示:防 AI 嘴砲「可以建 ticket」但實際還沒齊讓 user 困惑 */}
