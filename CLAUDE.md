@@ -34,8 +34,8 @@
 - vp-autotest project(`d:/sugarfungit/vp-autotest`,hash `cf94d1b2`)— Claude 跑 runner 測試專用,user 主 project 不污染
 
 **計畫 ref**
-- [phase 1 plan(已落地)](.claude/skills/vibe-pipeline/refs/integration-plan-v1-2026-05-09.md)
-- [phase 2 QA plan(已落地)](.claude/skills/vibe-pipeline/refs/integration-plan-v2-qa-2026-05-09.md)
+- [phase 1 plan(已落地)](.claude/skills/vibe-pipeline/refs/archive/integration-plan-v1-2026-05-09.md)
+- [phase 2 QA plan(已落地)](.claude/skills/vibe-pipeline/refs/archive/integration-plan-v2-qa-2026-05-09.md)
 - [phase 3 runner plan(進行中)](.claude/skills/vibe-pipeline/refs/integration-plan-v3-runner-2026-05-10.md)
 - [git design](.claude/skills/vibe-pipeline/refs/git-design-2026-05-09.md)
 
@@ -179,15 +179,16 @@ vibe-pipeline/
 
 `.claude/skills/vibe-pipeline/refs/` 下有:
 
+**Active(當前還參考)**:
+
 | 檔 | 用途 |
 |---|---|
-| [`spec-2026-05-09.md`](.claude/skills/vibe-pipeline/refs/spec-2026-05-09.md) | 完整 [M]/[P2]/[P3] 功能清單(2026-05-09 版,「不是最終結果」) |
-| [`integration-plan-v1-2026-05-09.md`](.claude/skills/vibe-pipeline/refs/integration-plan-v1-2026-05-09.md) | 第一條 vertical slice 完整計畫(現在這刻最該讀) |
-| [`vibe-kanban-2026-05-09.md`](.claude/skills/vibe-pipeline/refs/vibe-kanban-2026-05-09.md) | BloopAI vibe-kanban 對照(已 sunset、26k stars、人為主編排) |
-| [`symphony-2026-05-09.md`](.claude/skills/vibe-pipeline/refs/symphony-2026-05-09.md) | OpenAI Symphony 對照(reference impl、22.7k stars、寄生 Linear、無 DB) |
-| [`composio-ao-2026-05-09.md`](.claude/skills/vibe-pipeline/refs/composio-ao-2026-05-09.md) | Composio agent-orchestrator 對照(production-ready、6.9k stars、橫向 fan-out) |
-| [`integration-plan-v2-qa-2026-05-09.md`](.claude/skills/vibe-pipeline/refs/integration-plan-v2-qa-2026-05-09.md) | Phase 2 計畫:QA-driven ticket 建立(claude CLI session、drawer UI、fenced JSON 約定) |
-| [`git-design-2026-05-09.md`](.claude/skills/vibe-pipeline/refs/git-design-2026-05-09.md) | 多 pipeline 平行的 git worktree 設計 — [P2] runner 階段才實作,phase 2 預留欄位 |
+| [`spec-2026-05-09.md`](.claude/skills/vibe-pipeline/refs/spec-2026-05-09.md) | 完整 [M]/[P2]/[P3] 功能清單 |
+| [`integration-plan-v3-runner-2026-05-10.md`](.claude/skills/vibe-pipeline/refs/integration-plan-v3-runner-2026-05-10.md) | Phase 3 整段(第一/二/二.五/三/四刀)落地紀錄 + 待第五刀清單 |
+| [`git-design-2026-05-09.md`](.claude/skills/vibe-pipeline/refs/git-design-2026-05-09.md) | 多 pipeline 平行的 git worktree 設計 |
+| [`state-matrix-2026-05-10.md`](.claude/skills/vibe-pipeline/refs/state-matrix-2026-05-10.md) | Pipeline state × condition → UI behavior 決策表(改 button / banner 前對齊) |
+
+**Archive(已落地或一次性閱讀)**:`refs/archive/` 下:`integration-plan-v1` / `integration-plan-v2-qa`(phase 1/2 計畫,均已落地)/ `vibe-kanban` / `symphony` / `composio-ao`(競品對照,設計初期一次性參考)。需要再翻時還在 git 裡。
 
 新加 ref 規範見主 SKILL「外部對照 ref」段最後。
 
