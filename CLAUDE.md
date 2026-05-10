@@ -17,21 +17,22 @@
 - Phase 3 第二.五刀 — iter FAIL → PASS round chain 驗證(test pipeline,$1.51,verdicts ["FAIL","PASS"] + criticFeedback 全寫入 + executor 第二輪確實 incorporate feedback + 真實 ms 時間戳)、multi-ticket 順序 + pause/resume 驗證(3-step pipeline,$1.47 split 兩段,pause 後 runner 跑完 t1 才收 paused、resume 從 t2 接,3 commit 各自獨立)、atomic write(.tmp + JSON.parse round-trip + renameSync,防 partial write / serialize 炸)、inbox panel + strip 改 flat 列表(不分 sev 群組,strip 改全 8px pip)、iter-stage-pulse 改 box 內右上角 notification badge 樣式
 - Phase 3 第四刀 — Pipeline merge:`POST /pipelines/:id/merge` 用 project config `defaults.merge_strategy`(預設 squash;支援 merge/squash/ff-only),checkout base → merge → squash 模式追加 commit,衝突 / not-fast-forward / 其他 abort + 訊息;成功標 `state="merged"` + `mergedAt` + `mergeCommit{hash,subject,ts}` + emit `pipeline_merged` notif。ReadyBanner 的 View diff(改開 worktree)/ Merge 按鈕從 disabled 接通。orchestrator state guard 補擋 merged 狀態的 /run。E2E 驗過 squash → main
 
-**架構決策**:Bun local server + browser(前端 Vite 5173 / 後端 Bun 3001 / `/api/*` 透過 Vite proxy)。Runner 主 agent 工具白名單只准 Edit/Write 改 pipeline.json + Bash 跑 read-only 指令 + git add/commit;source code 改動 100% 透過 Task 派 sub-agent。Theme 偏好走 localStorage(URL `?theme=` 仍 override 給 pixel-diff variant 用),非 backend config — 簡單 + 無 round-trip + first-paint 不閃。
+**架構決策**:Bun local server + browser(前端 Vite 5173 / 後端 Bun 3001 / `/api/*` 透過 Vite proxy)。Runner 主 agent 工具白名單只准 Edit/Write 改 pipeline.json + Bash 跑 read-only 指令 + git add/commit;source code 改動 100% 透過 Task 派 sub-agent。Theme 偏好走 localStorage(URL `?theme=` 仍 override 給分享連結用),非 backend config — 簡單 + 無 round-trip + first-paint 不閃。
 
 **還沒做(下個 iteration)**
 - Transient retry 真正觸發測試(沒自然 fixture,需 fault injection;低優先,留 production 真踩到再補)
 - Multi-pipeline 平行執行
-- Budget tracker / SQLite log / SKILL 蒸餾(P2+/P3)
-- Settings 畫面實際內容(default base branch / merge_strategy / cost 上限 / theme override 等;button 已 disabled stub)
-- Pixel-diff broken(0/36 perfect — 真實後端 vs static prototype mock 的本質分歧;單獨 sprint 修)
-- atomic write 已落地(`writeJson` .tmp + JSON.parse round-trip + renameSync);**charset guard for PUT body 還沒**(real frontend fetch 沒事,只 shell 端 mojibake 風險)
-- log files `.runtime/logs/` 累積無上限 / `notifs.jsonl` 沒 GC
+- Budget tracker(P2+;不需 SQLite,直接 sum log JSON)
+- Settings 畫面實際內容(default base branch / merge_strategy / cost 上限等;button 已 disabled stub)
+- atomic write 已落地;**charset guard for PUT body 還沒**(real frontend fetch 沒事,只 shell 端 mojibake 風險)
+- log/notif GC 已落地(per-pipeline 留 10 / 全 project 留 500)
 
 **已 final 決定**(不再討論)
 - Theme 偏好 → localStorage(URL `?theme=` 仍 override)
 - Worktree 位置 → global `~/.vibe-pipeline/worktrees/<projHash>/<pipelineId>/`
 - vp-autotest project(`d:/sugarfungit/vp-autotest`,hash `cf94d1b2`)— Claude 跑 runner 測試專用,user 主 project 不污染
+- **Pixel-diff 不救**(2026-05-10 phase 3-5 砍):prototype variant routes(/init, /drawer, /qa, /notifications)+ NotifBanner / NotificationsScreen / DrawerStage / QAScreen / InitScreen 全刪,tests/ 整個刪,playwright/pixelmatch/pngjs 從 devDeps 移除,`bun run diff` script 移除。design/ 留作歷史紀錄不再對齊
+- log/notif GC 走 per-pipeline 10 / 全 project 500 上限,trigger 在 /run spawn 前
 
 **計畫 ref**
 - [phase 1 plan(已落地)](.claude/skills/vibe-pipeline/refs/archive/integration-plan-v1-2026-05-09.md)
@@ -72,19 +73,18 @@ vibe-pipeline/
 │   │   ├── notifications/     NotificationsScreen + InboxColumn + NotifBanner
 │   │   ├── pipeline/          BoardScreen + FocusColumn + EmptyProject + TicketDrawer + RunHistory + ticketDrawer.css
 │   │   ├── pipelineCreate/    CreateCard + CreatePlaceholder
-│   │   ├── init/              InitScreen (全屏 prototype) + InitPopup (modal,phase 1 用)
-│   │   ├── drawer/            DrawerStage + 4 個 state 元件 (prototype 用,還沒接資料)
-│   │   └── qa/                QADrawer + useQA (phase 2 — 真接 backend) + QAScreen (prototype 4 variant)
-│   ├── styles/                從 prototype 1:1 移植
+│   │   ├── init/              InitPopup (修改後直接接 BoardScreen)
+│   │   ├── qa/                QADrawer + useQA (真接 backend)
+│   │   ├── notifications/    InboxColumn (panel + strip,flat list)
+│   │   └── dev/               StatesGallery (狀態 gallery /dev/states)
+│   ├── styles/                CSS(原本從 prototype 移植,phase 3-5 後 prototype variant 砍了,這些是 real UI 用的)
 │   │   ├── tokens.css         設計 token (CSS 變數,顏色/字型/spacing)
-│   │   ├── board.css
-│   │   ├── notif.css
-│   │   ├── init.css
-│   │   ├── drawer.css
-│   │   └── qa.css
-│   ├── data/                  mock seed (尚未全接 backend)
-│   │   ├── pipelines.ts       STATE_COLOR/LABEL + fmtElapsed (PROJECTS dead, 之後刪)
-│   │   └── notifications.ts   NOTIFS_SEED + SEV_COLOR + SECTION_LABEL
+│   │   ├── board.css          board / focus / iter-stage / ticket card
+│   │   ├── notif.css          inbox panel + strip + item
+│   │   ├── init.css           InitPopup
+│   │   ├── drawer.css         共用 drawer base(TicketDrawer + QADrawer 共用)
+│   │   └── qa.css             QADrawer
+│   ├── data/                  純 helper(STATE_COLOR / SEV_COLOR / fmtElapsed),mock seed 已全砍
 │   ├── types/                 過渡型別 (UI-only)
 │   │   ├── pipeline.ts        UI 計算用 IterState / ChatMsg 等
 │   │   └── notif.ts           InboxState / InboxFilter / NotifItem (UI display)
@@ -124,26 +124,11 @@ vibe-pipeline/
 ├── shared/                    跨 backend/frontend 持久化型別
 │   └── types.ts               Project / TicketSpec / QAReply / Turn / Draft / NOTIF_EVENTS
 │
-├── design/                    Claude Design 匯出的 handoff bundle
+├── design/                    Claude Design 匯出的 handoff bundle(初期設計參考,目前 prototype variant + pixel-diff 已砍)
 │   └── vibe-pipeline/
 │       ├── README.md          設計師給 coding agent 的引導
 │       ├── chats/             8 份設計過程對話 (chat1.md ~ chat8.md)
-│       └── project/
-│           ├── Prototype - {Notifications,Board,Init,Pipeline Create,Ticket Drawer,Ticket QA}.html
-│           ├── Prototype Overview.html
-│           ├── Wireframe v3.html
-│           ├── proto/         {board,notif,init,drawer,qa}.{jsx,css} + tokens.css
-│           ├── wireframes/    早期 wireframe jsx
-│           ├── tweaks-panel.jsx
-│           └── ...
-│
-├── tests/                     pixel-diff harness
-│   ├── pixel-diff.ts          主測試,跑 36 個變體 (notif×18 + board×4 + create×2 + init×2 + drawer×8 + qa×2)
-│   ├── smoke.ts               Playwright launch debug
-│   ├── crop-diff.ts           crop 指定區域 (debug AA noise)
-│   ├── find-diff.ts           找差異 bbox + raw px count
-│   ├── .snapshots/            (gitignored) 各變體 .proto.png + .mine.png
-│   └── .diffs/                (gitignored) 各變體 .diff.png
+│       └── project/           prototype HTML / proto jsx / wireframes(歷史紀錄,real code 已不引用)
 │
 ├── .claude/
 │   ├── skills/
@@ -197,16 +182,16 @@ vibe-pipeline/
 ```bash
 bun install                                            # 裝套件
 bun run dev                                            # Vite frontend → http://127.0.0.1:5173/
-# bun run server                                       # (規劃中) Bun backend → http://127.0.0.1:3001/
+bun run server                                         # Bun backend → http://127.0.0.1:3001/
+bun run dev:all                                        # 同時跑兩個(concurrently)
 bunx tsc --noEmit                                      # TypeScript check
-
-# Prototype 對照 server (做前端 / 跑 pixel-diff 才需要)
-cd design/vibe-pipeline/project && bunx serve -l 5174 .
-
-# Pixel-diff (確認 prototype 對齊)
-npx tsx tests/pixel-diff.ts                            # 全部 36 變體
-npx tsx tests/pixel-diff.ts notif                      # filter
+bun run build                                          # 產 dist/
 ```
+
+routes:
+- `/` → redirect `/board`
+- `/board` → 主介面
+- `/dev/states` → 狀態 gallery(改 RunButton / ReadyBanner 視覺驗收)
 
 ## 三 SKILL 對應路由
 
@@ -214,10 +199,12 @@ npx tsx tests/pixel-diff.ts notif                      # filter
 - 做 backend(Bun server / fs / spawn / SQLite / runner / Q&A / budget) → **`vibe-pipeline-backend`**
 - 思考 scope / 決策優先順序 / 看完整功能清單 / 看外部產品對照 → **`vibe-pipeline`**(主)
 
-## 不踩的雷(最關鍵 5 條)
+## 不踩的雷
 
-1. **不開 `<StrictMode>`** — `useEffect([])` 雙觸發會破 pixel-diff(QA 重複初始 turn 等)。`src/main.tsx` 已關。
-2. **CSS 從 prototype 1:1 搬,DOM/className 一字不差** — pixel-diff 靠這個,改了就破。token 走 `tokens.css` 變數,別寫 hex / px 原值。
-3. **theme class 用 `index.html` 的 inline script 設**,不靠 React useEffect — 否則第一個 frame 用 stale theme,變體切換有 1-frame flash。
-4. **HIDE_CSS 用 `animation: none` 不用 `0s`** — `0s` 會留下 fade-up 起始 opacity:0 狀態,整個元件透明。
-5. **跨畫面 state 用 URL query param,不用 React Context / global store** — pixel-diff 靠這個驅動變體;refresh 不掉 state;bookmark / 分享連結直接帶完整 context。例外:active project hash(`useActiveProject()` hook,fallback localStorage)、theme(已實作)。
+1. **不開 `<StrictMode>`** — `useEffect([])` 雙觸發會讓 QA 第一輪 AI message 跑兩次等。`src/main.tsx` 已關。
+2. **token 走 `tokens.css` 變數**,別寫 hex / px 原值;新顏色加 token 不要 hard-code。
+3. **theme class 用 `index.html` 的 inline script 設**,不靠 React useEffect — 否則第一個 frame 用 stale theme,有 1-frame flash。已配 localStorage 偏好(URL `?theme=` 仍 override)。
+4. **HIDE_CSS / fade-up 用 `animation: none` 不用 `0s`** — `0s` 會留下 fade-up 起始 opacity:0,整個元件透明。
+5. **跨畫面 state 用 URL query param**(refresh / bookmark 不掉),例外:active project hash 走 localStorage、theme 走 localStorage(URL override)。
+6. **server prompt template literal 內禁用 inline backtick** — `` `code` `` 在 backtick template literal 內會關閉外層字串。改寫純文字。踩過兩次。
+7. **改 `server/lib/qa/systemPrompt.ts` 或 `runnerPrompt.ts` 後 grep `\``** 確認沒殘留 inner backtick。Bun --watch reload 噴 syntax error 後 server 不會自己復活。

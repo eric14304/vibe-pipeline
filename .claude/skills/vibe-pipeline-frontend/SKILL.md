@@ -1,6 +1,6 @@
 ---
 name: vibe-pipeline-frontend
-description: vibe-pipeline 前端開發規範 — shell 結構、設計 token、共用元件、加新畫面 SOP、pixel-diff 驗證、routing 慣例。改 src/features、src/shell、src/ui、src/styles、src/App.tsx 或加任何新畫面之前先讀。
+description: vibe-pipeline 前端開發規範 — shell 結構、設計 token、共用元件、加新畫面 SOP、狀態 gallery 驗證、routing 慣例。改 src/features、src/shell、src/ui、src/styles、src/App.tsx 或加任何新畫面之前先讀。
 ---
 
 ## 當前 phase 提醒
@@ -23,7 +23,7 @@ description: vibe-pipeline 前端開發規範 — shell 結構、設計 token、
 - Notifications inbox:`/api/.../notifs/*`(list / read / dismiss / mark-all-read),走 `aside` slot
 
 **還是 mock 的(等之後接)**
-- `src/data/notifications.ts` NOTIFS_SEED:已切走,留作 prototype 對照
+- `src/data/notifications.ts` 只剩 `SEV_COLOR`(NOTIFS_SEED 已隨 prototype variant 砍掉)
 - `src/data/pipelines.ts` PROJECTS / 大部分 PIPELINES seed:dead,留 STATE_COLOR/LABEL/fmtElapsed 給 UI 算
 
 加新東西的優先序(下個 sprint):
@@ -63,7 +63,7 @@ EmptyShell (src/shell/EmptyShell.tsx)    ← Init 用
 └─ children  (全屏自由排版)
 ```
 
-`<Drawer>` 與 `<QAScreen variant="drawer">` 自帶 `.drawer-stage` / `qa-drawer-backdrop`,不走 AppShell(它們是覆蓋型 overlay,自己處理背景)。
+`<TicketDrawer>` 與 `<QADrawer>` 自帶 `.drawer-stage` / `qa-drawer-backdrop`,不走 AppShell(它們是覆蓋型 overlay,自己處理背景)。
 
 ## src/ 內各層約定
 
@@ -112,56 +112,25 @@ EmptyShell (src/shell/EmptyShell.tsx)    ← Init 用
 
 ## 加新畫面 SOP
 
-當 `design/vibe-pipeline/project/Prototype - X.html` 出現新畫面、或要加變體:
+phase 3-5 後 prototype variant + pixel-diff 已砍。新畫面流程:
 
-1. **讀全套**: HTML(看 mount 方式 + TWEAK_DEFAULTS)、`proto/X.jsx`(元件邏輯)、`proto/X.css`(樣式)
-2. **搬 CSS**: `cp design/vibe-pipeline/project/proto/X.css src/styles/X.css`(不改一個字)
-3. **找可重用元件**: 先翻 `src/ui/`、`src/shell/`、`src/features/pipeline/`,別重發明
-4. **Port JSX → TS**: 在 `src/features/X/XScreen.tsx`(或拆多檔)
-   - **className 必須與 prototype 一字不差**,DOM 結構 1:1
-   - 在最上面 `import "../../styles/X.css"`
-   - 不寫 comment、不 refactor、不「為清晰調整」
-5. **加 route**: 在 `src/App.tsx` 加 `<Route path="/x" element={<XRoute />} />`,XRoute 用 `useTheme()` 跟 `useSearchParams()` 解 query
-6. **加 pixel-diff 變體**: 在 `tests/pixel-diff.ts` 的對應 array 加項;每個變體要有 prototype HTML 對照(否則沒辦法 diff)
-7. **跑驗證**: `npx tsx tests/pixel-diff.ts X` → 看到 0 px diff 才算完成
+1. **找可重用元件**: 先翻 `src/ui/`、`src/shell/`、`src/features/pipeline/`,別重發明
+2. **建 component**: `src/features/X/XScreen.tsx`,接真 backend(`api.*`)— 不再 mock
+3. **加 CSS**: 用 `tokens.css` 變數,別寫 hex / px 原值
+4. **加 route**: 在 `src/App.tsx` 加 `<Route>`,用 `useTheme()` 同步 theme
+5. **狀態 gallery**: 多 state 的元件加進 `src/features/dev/StatesGallery.tsx`(`/dev/states`),fixture 涵蓋所有 (state × condition) 組合
+6. **加 TS exhaustive switch**:`switch (s) { case ... } default: const _: never = s`,加新 state 沒接 case 編譯就 fail
 
-## Pixel-diff harness
-
-`tests/pixel-diff.ts` 是維持 prototype-impl 一致性的核心。
-
-**運作機制**:
-- Playwright 起兩個 page:左邊跑 prototype HTML,右邊跑 vite dev server
-- 對 prototype HTML 用 `page.route()` 攔截,把 `/*EDITMODE-BEGIN*/.../*EDITMODE-END*/` 區塊改寫,注入該變體的 TWEAK_DEFAULTS
-- 兩邊都 inject `HIDE_CSS`(殺所有 animation/transition、藏 proto-jumpback 與 tweaks panel)
-- 等 `document.fonts.ready` + 800 ms settle
-- 截圖 → pixelmatch 比對(threshold 0.1, includeAA: false)
-- 寫 `tests/.snapshots/{name}.proto.png` / `.mine.png` + `tests/.diffs/{name}.diff.png`(紅色 = 不同)
-
-**指令**:
-```bash
-npx tsx tests/pixel-diff.ts            # 跑全部 (~36 變體, ~3 分鐘)
-npx tsx tests/pixel-diff.ts notif      # filter: 只跑 notifications
-npx tsx tests/pixel-diff.ts drawer
-```
-
-退出碼:全 0 px → 0,任何變體有 diff → 1。
-
-**新加變體時**:
-- prototype URL 要有對應檔案(否則無法對照,跳過或不加)
-- 變體名稱用 `{screen}-{state}-{theme}`(底線斷字)
-- `editmode` 物件對應 prototype 的 TWEAK_DEFAULTS schema
-- `query` 對應我的 route 的 query param,確保 my impl 渲出同樣的 state
-
-## 已知 pitfall(踩過,別重踩)
+## Pitfall
 
 ### 1. **不用 `<StrictMode>`**
-React StrictMode 在 dev 會把 `useEffect([])` 觸發兩次。`QAScreen` 的初始 `emitTurn(0)` 會雙觸發產生重複 AI 訊息,pixel-diff 直接掛掉 5%。`src/main.tsx` 已關。**不要再加回來**(StrictMode 的好處 < pixel parity 的需求)。
+React StrictMode 在 dev 會把 `useEffect([])` 觸發兩次。`src/main.tsx` 已關,不要加回來。
 
-### 2. **theme class 必須在 React mount 前同步設好**
-`index.html` 內 inline `<script>` 讀 `?theme=` 設 `html.light` class。原因:若靠 React `useEffect`,第一個 frame 會用 stale theme 渲染,變體切換有 1-frame flash → diff 失敗。
+### 2. **theme class 在 React mount 前同步設好**
+`index.html` 內 inline `<script>` 讀 `?theme=` + localStorage,設 `html.light` class。靠 React `useEffect` 會 first-paint flash。
 
 ### 3. **animation 要 `none`,不要 `0s`**
-HIDE_CSS 用 `animation: none !important`。曾經寫 `animation-duration: 0s`,但 `fade-up` keyframe 起始是 `opacity: 0`,duration 0s 後仍套用「from」狀態 → 整個元件透明。
+`animation: none !important`。`0s` 對 `fade-up` 等 from-opacity-0 keyframe 仍套起始狀態,元件透明。
 
 ### 4. **字型 ready 才能截圖**
 若沒等 `document.fonts.ready`,中文字 fallback 字型差幾 px,diff 會出現整段文字邊緣噪音。

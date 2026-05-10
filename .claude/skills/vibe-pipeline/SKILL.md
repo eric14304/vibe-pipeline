@@ -10,37 +10,21 @@ description: vibe-pipeline 專案總覽 — 產品定位、已實作畫面與功
 
 vibe-pipeline 是 **多 AI agent(執行AI + 審核AI)的 ticket / pipeline 編排器**,以 Web 應用為主介面,將來會配 `vp` CLI。每張 ticket 由 執行AI 跑、審核AI 審,iterative 模式會自動迴圈到 審核AI pass;pipeline 是 ticket 的有序組合,每條跑在獨立 git branch 上,完成後 merge 回 base。
 
-## 產品形態(2026-05-09 確認)
+## 產品形態
 
-- **主介面**: Web 應用(Bun + Vite + React 18 + TypeScript),不只一個畫面
-- **CLI**: 命令名 `vp`(原 spec 寫 `tt` 已棄)。CLI 與 Web 共用底層
-- **資料**: 目前全 mock(`src/data/`)。Backend / SQLite / git 操作 / runner 尚未實作
+- **主介面**: Web 應用(Bun + Vite + React 18 + TypeScript)
+- **CLI**: 命令名 `vp`(規劃中,跟 Web 共用底層)
+- **資料**: phase 1-3 已落地,真接 backend(無 mock seed)
 
-## 已實作畫面(6 個 — 純 view + mock data)
+## Routes
 
-**警告**:目前所有 action 都是 stub(無 onClick handler 或只改 local state),**沒有任何跨畫面 state**,**沒接 backend**。進串接期後這部分會大改。pixel-diff 只證明 render 對齊 prototype,不證明 functional。
+| route | 用途 |
+|---|---|
+| `/` | redirect `/board` |
+| `/board` | 主介面(Rail + FocusColumn + Inbox) |
+| `/dev/states` | 狀態 gallery(改 RunButton / ReadyBanner 等視覺驗收用) |
 
-
-
-| 畫面 | route | 主元件 | 變體 / 參數 |
-|---|---|---|---|
-| Notifications | `/notifications` | `src/features/notifications/NotificationsScreen.tsx` | `?state=expanded\|collapsed\|hidden` `?filter=all\|unread\|blocking` `?theme=light\|dark` |
-| Board | `/board` | `src/features/pipeline/BoardScreen.tsx` | `?density=medium\|compact` `?creating=1` `?theme=` |
-| Pipeline Create | `/board?creating=1` | 同上 + `src/features/pipelineCreate/CreateCard.tsx` | `?theme=` |
-| Init | `/init` | `src/features/init/InitScreen.tsx` | `?theme=` |
-| Ticket Drawer | `/drawer` | `src/features/drawer/DrawerStage.tsx` | `?state=iter-done\|iter-running\|step-done\|step-running` `?theme=` |
-| Ticket Q&A | `/qa` | `src/features/qa/QAScreen.tsx` | `?variant=drawer\|chat\|form\|step` `?theme=` `?autoplay=0\|1` |
-
-每個畫面都已通過 pixel-diff 對 prototype 驗證:32/36 變體 0 px diff,4/36 < 0.01% sub-pixel AA 噪音。詳見前端 SKILL 的「pixel-diff」段。
-
-## 設計來源
-
-設計 prototype 在 `design/vibe-pipeline/project/`(從 claude.ai/design 匯出的 handoff bundle):
-- `Prototype - {Notifications,Board,Init,Pipeline Create,Ticket Drawer,Ticket QA}.html`
-- 對應 `proto/{notif,board,init,drawer,qa}.{jsx,css}` + `tokens.css`
-- `chats/chat{1..8}.md` 是設計過程對話,有需要還原原意時讀
-
-**新加畫面 / 改現有畫面前**: 先看 prototype HTML+JSX+CSS。實作必須與 prototype DOM/className 1:1(否則 pixel-diff 會破)。
+之前 phase 1 prototype variant routes(`/notifications` `/init` `/drawer` `/qa`)已於 phase 3-5 砍掉,連同 pixel-diff 整套(playwright / pixelmatch / pngjs / 4 個 prototype component / NOTIFS_SEED / PIPELINES seed / tests/ 整個刪)。設計時確認 pixel-diff 不救,專心做 production code。`design/` 留歷史紀錄,real code 已不引用。
 
 ## 未實作 / 計畫中
 
