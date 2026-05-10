@@ -86,9 +86,32 @@ function normalizeMode(v: unknown): "step" | "iter" | undefined {
   return undefined;
 }
 
+const ALLOWED_SPEC_KEYS = new Set([
+  "title",
+  "goal",
+  "acceptance",
+  "prompt",
+  "mode",
+  "iterLimit",
+  "iterStopAtLimit",
+]);
+
 function coerceSpec(spec: unknown): unknown {
   if (!spec || typeof spec !== "object") return spec;
-  const o = { ...(spec as Record<string, unknown>) };
+  const raw = spec as Record<string, unknown>;
+  const o: Record<string, unknown> = {};
+  // Strip 非合法 key — AI 偶爾自創 scope/loop/deliverable 等,丟掉
+  const dropped: string[] = [];
+  for (const k of Object.keys(raw)) {
+    if (ALLOWED_SPEC_KEYS.has(k)) {
+      o[k] = raw[k];
+    } else {
+      dropped.push(k);
+    }
+  }
+  if (dropped.length > 0) {
+    console.warn(`[qa] AI invented non-canonical spec keys (dropped): ${dropped.join(", ")}`);
+  }
   const mode = normalizeMode(o.mode);
   if (mode) o.mode = mode;
   // acceptance 偶爾被 AI 寫成字串(多行 join);split 成陣列

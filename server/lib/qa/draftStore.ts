@@ -3,7 +3,34 @@ import { existsSync, mkdirSync, readdirSync, unlinkSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { ensureRuntime } from "../pipelineDir";
 import { writeJson } from "../jsonFile";
-import type { QAReply, Draft } from "../../../shared/types";
+import type { QAReply, Draft, PartialSpec } from "../../../shared/types";
+
+// 高水位 merge:新值有實質內容才覆蓋,否則保留 prev。
+// 防 AI 漏寫某欄位讓既有值掉光。
+function mergeSpec(prev: PartialSpec | null, next: PartialSpec | null | undefined): PartialSpec | null {
+  if (!next) return prev;
+  if (!prev) return next;
+  const merged: Record<string, unknown> = { ...prev };
+  for (const [k, v] of Object.entries(next)) {
+    if (v == null) continue;
+    if (typeof v === "string" && v.trim() === "") continue;
+    if (Array.isArray(v) && v.length === 0) continue;
+    merged[k] = v;
+  }
+  return merged as PartialSpec;
+}
+
+// 5 canonical 欄位是否齊
+function specAllFieldsValid(s: PartialSpec | null): boolean {
+  if (!s) return false;
+  return (
+    typeof s.title === "string" && s.title.length > 0 &&
+    typeof s.goal === "string" && s.goal.length > 0 &&
+    Array.isArray(s.acceptance) && s.acceptance.length > 0 &&
+    typeof s.prompt === "string" && s.prompt.length > 0 &&
+    (s.mode === "step" || s.mode === "iter")
+  );
+}
 
 export type { Draft, Turn } from "../../../shared/types";
 
@@ -87,8 +114,11 @@ export async function appendTurn(
     optionsMode: reply.optionsMode ?? "single",
     ts: now,
   });
-  d.spec = reply.spec ?? d.spec;
-  d.complete = reply.complete;
+  // 高水位 merge:不讓 AI 因為這輪沒寫某欄位就讓既有值掉光。
+  d.spec = mergeSpec(d.spec, reply.spec ?? null);
+  // Auto-complete:5 欄位齊就 force complete=true,不等 AI 主動 set。
+  // (AI 常多問一輪「確認送出?」,frontend SpecReview 才是真正的 user confirm step。)
+  d.complete = reply.complete || specAllFieldsValid(d.spec);
   d.updatedAt = now;
   await writeJson(file(projectPath, draftId), d);
   return d;
