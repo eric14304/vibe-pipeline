@@ -193,10 +193,11 @@ routes:
 - `/board` → 主介面
 - `/dev/states` → 狀態 gallery(改 RunButton / ReadyBanner 視覺驗收)
 
-## 三 SKILL 對應路由
+## 四 SKILL 對應路由
 
 - 改前端(畫面 / 元件 / styles / route / API 串接) → **`vibe-pipeline-frontend`**
 - 做 backend(Bun server / fs / spawn / SQLite / runner / Q&A / budget) → **`vibe-pipeline-backend`**
+- 寫 / 改 / 跑 E2E(Playwright mock + real,覆蓋矩陣) → **`vibe-pipeline-e2e`**
 - 思考 scope / 決策優先順序 / 看完整功能清單 / 看外部產品對照 → **`vibe-pipeline`**(主)
 
 ## 不踩的雷
