@@ -291,6 +291,21 @@
   color: var(--accent, var(--running));
   font-size: 11px;
 }
+/* button 形式 — 按下複製。保留 hash text 樣式 */
+.tdrw-commit-hash-btn {
+  background: transparent;
+  border: 1px dashed transparent;
+  padding: 1px 4px;
+  border-radius: 3px;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-mono);
+  transition: background 100ms, border-color 100ms;
+}
+.tdrw-commit-hash-btn:hover {
+  background: color-mix(in srgb, var(--accent, var(--running)) 14%, transparent);
+  border-color: var(--line);
+}
 .tdrw-commit-subject {
   color: var(--fg);
   overflow: hidden;

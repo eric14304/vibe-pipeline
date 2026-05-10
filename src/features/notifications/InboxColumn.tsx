@@ -1,4 +1,4 @@
-import { BannerIcon, ChevronLeftIcon, ChevronRightIcon, InboxEmptyIcon } from "../../ui/icons";
+import { BannerIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon, InboxEmptyIcon } from "../../ui/icons";
 import { SECTION_LABEL, SEV_COLOR } from "../../data/notifications";
 import type { InboxFilter, InboxState, NotifItem, NotifSeverity } from "../../types/notif";
 
@@ -48,9 +48,13 @@ function InboxStrip({
   onExpand: () => void;
   onItemClick: (id: string, pipelineId?: string) => void;
 }) {
-  const blocks = items.filter((i) => i.sev === "block");
+  // 只把「未讀」的 block / info 升到大 icon;讀過的全部下沉到 muted pip
+  // (避免讀過的 block 還在 strip 上紅點脈衝,使用者不知為何)
+  const blocks = items.filter((i) => i.sev === "block" && i.unread);
   const infos = items.filter((i) => i.sev === "info" && i.unread);
-  const muted = items.filter((i) => i.sev === "muted" || (i.sev === "info" && !i.unread));
+  const muted = items.filter(
+    (i) => i.sev === "muted" || ((i.sev === "info" || i.sev === "block") && !i.unread)
+  );
 
   return (
     <div className="inbox-strip">
@@ -191,11 +195,19 @@ function InboxPanel({
       </div>
 
       <div className="inbox-foot">
-        <span>3 days · 24 通知</span>
+        <span>共 {items.length} 通知{unreadCount > 0 ? ` · ${unreadCount} 未讀` : ""}</span>
         <span style={{ flex: 1 }} />
-        <a className="inbox-foot-link" href="#" onClick={(e) => e.preventDefault()}>
-          檢視全部 →
-        </a>
+        {items.length > 0 && unreadCount > 0 && (
+          <button
+            className="inbox-foot-link"
+            onClick={(e) => {
+              e.preventDefault();
+              onMarkAllRead();
+            }}
+          >
+            全部標已讀
+          </button>
+        )}
       </div>
     </div>
   );
@@ -214,6 +226,7 @@ function InboxItem({
   onDismiss: (id: string) => void;
   onClick: () => void;
 }) {
+  void onMarkRead;
   const c = SEV_COLOR[item.sev];
   return (
     <div
@@ -224,14 +237,25 @@ function InboxItem({
       tabIndex={0}
     >
       {item.unread && <span className="inbox-item-unread-dot" />}
+      <button
+        className="inbox-item-x"
+        title="移除"
+        aria-label="移除"
+        onClick={(e) => {
+          e.stopPropagation();
+          onDismiss(item.id);
+        }}
+      >
+        <CloseIcon />
+      </button>
       <div className="inbox-item-head">
         <span className="inbox-item-icon">
           <BannerIcon kind={item.iconKind} small />
         </span>
         <span className="inbox-item-title">{item.title}</span>
-        <span className="inbox-item-ts mono">{item.ts}</span>
       </div>
       <div className="inbox-item-sub">{item.sub}</div>
+      <span className="inbox-item-ts mono">{item.ts}</span>
       {(item.primary || item.secondary) && (
         <div className="inbox-item-actions">
           {item.secondary && (

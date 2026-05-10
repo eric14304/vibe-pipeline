@@ -1,4 +1,4 @@
-import { FolderIcon, PlusIcon } from "../ui/icons";
+import { PlusIcon } from "../ui/icons";
 import { STATE_COLOR } from "../data/pipelines";
 import type { Pipeline } from "../types/pipeline";
 
@@ -45,13 +45,7 @@ export function Rail({
         ))}
       </div>
       <div className="rail-spacer" />
-      <div className={"rail-archive" + (creating ? " is-muted" : "")}>
-        <FolderIcon />
-        <span>Archive</span>
-        <span className="mono" style={{ opacity: 0.55 }}>
-          12
-        </span>
-      </div>
+      {/* Archive 功能未實作,prototype 留下的假 chip 移除避免誤導 */}
     </aside>
   );
 }
@@ -93,7 +87,9 @@ function RailItem({ p, active, onClick, muted, hasDraft }: { p: Pipeline; active
               ? "var(--running)"
               : t.status === "paused"
               ? "var(--paused)"
-              : t.status === "failed"
+              : t.status === "failed" ||
+                t.status === "failed_iter_limit" ||
+                t.status === "failed_transient"
               ? "var(--failed)"
               : t.status === "ready"
               ? "var(--running-soft)"

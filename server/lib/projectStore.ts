@@ -2,6 +2,7 @@ import { homedir } from "node:os";
 import { join, basename, resolve } from "node:path";
 import { existsSync, mkdirSync, statSync } from "node:fs";
 import { projectHash } from "./hash";
+import { currentBranch } from "./git";
 import type { Project } from "../../shared/types";
 
 const STATE_DIR = join(homedir(), ".vibe-pipeline");
@@ -35,11 +36,12 @@ async function writeState(state: State): Promise<void> {
   await Bun.$`mv ${tmp} ${STATE_FILE}`.quiet();
 }
 
-function toProject(path: string, lastOpenedAt: number): Project {
+async function toProject(path: string, lastOpenedAt: number): Promise<Project> {
   const absolute = resolve(path);
   const dirPath = join(absolute, ".vibe-pipeline");
   const hasInit = existsSync(dirPath) && statSync(dirPath).isDirectory();
   const hasGit = existsSync(join(absolute, ".git"));
+  const branch = hasGit ? await currentBranch(absolute) : null;
   return {
     path: absolute,
     hash: projectHash(absolute),
@@ -47,14 +49,14 @@ function toProject(path: string, lastOpenedAt: number): Project {
     hasInit,
     hasGit,
     lastOpenedAt,
+    currentBranch: branch ?? undefined,
   };
 }
 
 export async function listRecent(): Promise<Project[]> {
   const state = await readState();
-  return state.recentProjects
-    .sort((a, b) => b.lastOpenedAt - a.lastOpenedAt)
-    .map((r) => toProject(r.path, r.lastOpenedAt));
+  const sorted = [...state.recentProjects].sort((a, b) => b.lastOpenedAt - a.lastOpenedAt);
+  return Promise.all(sorted.map((r) => toProject(r.path, r.lastOpenedAt)));
 }
 
 export async function getLastProject(): Promise<Project | null> {

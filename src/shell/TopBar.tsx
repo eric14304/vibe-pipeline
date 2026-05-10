@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Logo } from "../ui/Logo";
-import { BellIcon, CheckIconSm, ChevronIcon, FolderIcon, GearIcon, PlusIcon } from "../ui/icons";
+import { BellIcon, CheckIconSm, ChevronIcon, FolderIcon, GearIcon, MoonIcon, PlusIcon, SunIcon } from "../ui/icons";
 import * as api from "../api/projects";
 import { useActiveProjectHash } from "../hooks/useActiveProject";
 import type { Project } from "../../shared/types";
@@ -20,6 +21,27 @@ export function TopBar({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+  // theme 來源:URL ?theme= override → localStorage → light
+  // toggle 寫 localStorage 並同步 <html> class(useTheme hook 也會跑,雙保險;localStorage 觸發不了 React 重 render,所以這裡也手動 setIsDark)
+  const [searchParams] = useSearchParams();
+  const urlTheme = searchParams.get("theme");
+  const [isDark, setIsDark] = useState(() => {
+    if (urlTheme === "dark") return true;
+    if (urlTheme === "light") return false;
+    try {
+      return localStorage.getItem("vibe-pipeline:theme") === "dark";
+    } catch {
+      return false;
+    }
+  });
+  function toggleTheme() {
+    const next = !isDark;
+    setIsDark(next);
+    try {
+      localStorage.setItem("vibe-pipeline:theme", next ? "dark" : "light");
+    } catch {}
+    document.documentElement.classList.toggle("light", !next);
+  }
 
   useEffect(() => {
     api
@@ -43,6 +65,21 @@ export function TopBar({
       document.removeEventListener("keydown", onKey);
     };
   }, [open]);
+
+  // ⌘O / Ctrl+O 開選資料夾(對應 menu 裡的 kbd hint)
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const isMod = e.metaKey || e.ctrlKey;
+      if (isMod && (e.key === "o" || e.key === "O")) {
+        e.preventDefault();
+        pickAndOpen();
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+    // pickAndOpen 用 closure capture state(busy),不放進 deps 避免每 render 重綁
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const active = recents.find((p) => p.hash === hash) ?? null;
 
@@ -139,7 +176,7 @@ export function TopBar({
                 <PlusIcon />
                 <span>{busy ? "開啟中…" : "選擇其他資料夾…"}</span>
                 <span className="kbd mono" style={{ marginLeft: "auto" }}>
-                  ⌘O
+                  {isMac() ? "⌘O" : "Ctrl+O"}
                 </span>
               </button>
               {error && (
@@ -156,9 +193,15 @@ export function TopBar({
 
         {active && (
           <>
-            <span className="chip mono">
-              <span style={{ color: "var(--fg-mute)" }}>⎇</span> main
-            </span>
+            {active.hasGit && (
+              <span
+                className="chip mono"
+                title={active.currentBranch ? `當前 branch: ${active.currentBranch}` : "detached HEAD"}
+              >
+                <span style={{ color: "var(--fg-mute)" }}>⎇</span>{" "}
+                {active.currentBranch ?? "(detached)"}
+              </span>
+            )}
             <button
               className="chip"
               title="在檔案總管中開啟"
@@ -176,17 +219,37 @@ export function TopBar({
 
       <div className="topbar-right">
         <button
+          className="icon-btn topbar-theme-toggle"
+          onClick={toggleTheme}
+          title={isDark ? "切到亮色" : "切到暗色"}
+          aria-label={isDark ? "切到亮色主題" : "切到暗色主題"}
+        >
+          {isDark ? <SunIcon /> : <MoonIcon />}
+        </button>
+        <button
           className={"icon-btn" + (notifActive ? " is-active" : "")}
-          title="通知"
+          title={unreadCount > 0 ? `${unreadCount} 則未讀通知` : "通知"}
           onClick={onBellClick}
+          aria-label={unreadCount > 0 ? `通知 (${unreadCount} 未讀)` : "通知"}
         >
           <BellIcon />
-          {unreadCount > 0 && <span className="bell-dot" />}
+          {unreadCount > 0 && (
+            <span className="bell-dot bell-dot-num" aria-hidden="true">
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </span>
+          )}
         </button>
-        <button className="icon-btn" title="設定">
+        <button className="icon-btn" title="設定 (尚未實作)" disabled>
           <GearIcon />
         </button>
       </div>
     </div>
   );
+}
+
+function isMac(): boolean {
+  if (typeof navigator === "undefined") return false;
+  // 用 userAgentData (新版瀏覽器) 或 fallback 到 platform/userAgent
+  const ua = navigator.userAgent || "";
+  return /Mac|iPhone|iPad|iPod/i.test(ua);
 }

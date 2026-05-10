@@ -5,11 +5,15 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>vibe-pipeline</title>
     <script>
-      // Set theme class synchronously before any CSS or React loads so the
-      // first render is themed correctly (no flash when switching variants).
+      // Set theme class synchronously before any CSS or React loads (no first-paint flash).
+      // Priority: URL ?theme=  →  localStorage  →  default light
+      // (URL 留 pixel-diff / 分享連結 override;真正記住偏好走 localStorage)
       (function () {
         var p = new URLSearchParams(location.search);
-        var dark = p.get("theme") === "dark";
+        var urlTheme = p.get("theme");
+        var stored = null;
+        try { stored = localStorage.getItem("vibe-pipeline:theme"); } catch (e) {}
+        var dark = (urlTheme || stored) === "dark";
         if (!dark) document.documentElement.classList.add("light");
       })();
     </script>

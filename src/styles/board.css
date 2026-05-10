@@ -126,7 +126,23 @@
   width: 6px; height: 6px; border-radius: 50%;
   background: var(--accent); border: 1.5px solid var(--bg-elevated);
 }
+/* 帶數字版本(>0 時取代純圓點) */
+.bell-dot.bell-dot-num {
+  top: 1px; right: -2px;
+  width: auto; height: auto;
+  min-width: 14px;
+  padding: 0 4px;
+  border-radius: 8px;
+  font-size: 9px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  line-height: 14px;
+  color: var(--bg-elevated);
+  text-align: center;
+  display: inline-block;
+}
 .icon-btn { position: relative; }
+.icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ─── body grid ─── */
 .board-body {
@@ -222,7 +238,7 @@
   padding: 22px 28px 28px;
   background: var(--bg);
 }
-.focus-head { margin-bottom: 16px; }
+.focus-head { margin-bottom: 16px; position: relative; z-index: 5; }
 .focus-head-top {
   display: flex; align-items: center; gap: 10px;
   flex-wrap: wrap;

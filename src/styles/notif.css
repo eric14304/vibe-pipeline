@@ -257,8 +257,9 @@ html.light .inbox-strip-tooltip { background: var(--fg); color: var(--bg-elevate
 }
 
 .inbox-item {
+  position: relative;
   display: flex; flex-direction: column; gap: 4px;
-  padding: 9px 10px 10px 14px;
+  padding: 9px 28px 14px 14px;
   border-radius: 8px;
   border: 1px solid transparent;
   background: transparent;
@@ -283,6 +284,32 @@ html.light .inbox-strip-tooltip { background: var(--fg); color: var(--bg-elevate
   width: 6px; height: 6px; border-radius: 50%;
   background: var(--accent);
 }
+.inbox-item-x {
+  position: absolute;
+  right: 6px; top: 6px;
+  width: 18px; height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fg-faint);
+  cursor: pointer;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 120ms, background 120ms, color 120ms;
+  pointer-events: none;
+}
+.inbox-item:hover .inbox-item-x {
+  opacity: 1;
+  pointer-events: auto;
+}
+.inbox-item-x:hover {
+  background: var(--panel-2);
+  color: var(--fg);
+}
+.inbox-item-x svg { width: 10px; height: 10px; }
 .inbox-item-head {
   display: flex; align-items: flex-start; gap: 9px;
 }
@@ -308,12 +335,14 @@ html.light .inbox-strip-tooltip { background: var(--fg); color: var(--bg-elevate
 .inbox-item.is-unread .inbox-item-title { font-weight: 600; }
 .inbox-item.is-muted .inbox-item-title { color: var(--fg-mute); font-weight: 400; }
 .inbox-item-ts {
+  position: absolute;
+  right: 10px;
+  bottom: 6px;
   font-family: var(--font-mono);
   font-size: 10px;
   color: var(--fg-faint);
   white-space: nowrap;
-  flex-shrink: 0;
-  margin-top: 4px;
+  pointer-events: none;
 }
 .inbox-item.is-unread .inbox-item-ts { color: var(--accent); }
 .inbox-item-sub {

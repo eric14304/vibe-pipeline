@@ -7,13 +7,27 @@ import { DrawerStage, type DrawerState } from "./features/drawer/DrawerStage";
 import { QAScreen, type QAVariant } from "./features/qa/QAScreen";
 import type { InboxFilter, InboxState } from "./types/notif";
 
+// Theme priority: URL ?theme=  →  localStorage  →  default light
+// (URL 留 pixel-diff variants / 分享連結 override;真正記住偏好走 localStorage)
 function useTheme() {
   const [params] = useSearchParams();
-  const dark = params.get("theme") === "dark";
+  const urlTheme = params.get("theme");
+  const dark =
+    urlTheme === "dark" ||
+    (urlTheme == null && readStoredTheme() === "dark");
   useEffect(() => {
     document.documentElement.classList.toggle("light", !dark);
   }, [dark]);
   return dark;
+}
+
+function readStoredTheme(): "dark" | "light" | null {
+  try {
+    const v = localStorage.getItem("vibe-pipeline:theme");
+    return v === "dark" || v === "light" ? v : null;
+  } catch {
+    return null;
+  }
 }
 
 function NotificationsRoute() {

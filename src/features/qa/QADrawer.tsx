@@ -61,13 +61,19 @@ export function QADrawer({
           </div>
           <div className="drawer-titlerow">
             <div className="drawer-title">
-              {draft?.spec?.title || "新 Ticket (AI 未決定名稱)"}
+              {draft?.spec?.title || (draft ? "收斂中…" : "新 ticket")}
             </div>
           </div>
           <div className="drawer-meta mono">
-            <span>session</span>
-            <span className="sep">·</span>
-            <span style={{ opacity: 0.7 }}>{draft?.draftId ?? "(初始化中…)"}</span>
+            <span>{draft ? `${draft.turns.length} 輪對話` : "啟動中…"}</span>
+            {draft && (
+              <>
+                <span className="sep">·</span>
+                <span style={{ opacity: 0.55 }} title={`draftId: ${draft.draftId}`}>
+                  draft #{draft.draftId.slice(0, 6)}
+                </span>
+              </>
+            )}
           </div>
           <SpecChecklist spec={draft?.spec ?? null} />
         </div>

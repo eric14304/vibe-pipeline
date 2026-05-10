@@ -26,7 +26,11 @@ export function BoardScreen({
 }) {
   const { hash } = useActiveProjectHash();
   const [project, setProject] = useState<Project | null>(null);
+  // 切兩種 error:
+  // - loadError = 開專案時 status fetch 失敗 → 全屏 EmptyProject
+  // - actionError = 跑 / 暫停 / 刪 / 建 等動作失敗 → top banner 顯示+自動消
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [activeId, setActiveId] = useState<string>("");
   const [creating, setCreating] = useState(startCreating);
@@ -36,6 +40,7 @@ export function BoardScreen({
 
   const qa = useQA(hash);
   const [openTicket, setOpenTicket] = useState<Ticket | null>(null);
+  const [branches, setBranches] = useState<string[]>([]);
 
   const [inboxState, setInboxState] = useState<InboxState>("collapsed");
   const toggleInbox = () =>
@@ -120,8 +125,39 @@ export function BoardScreen({
     return () => document.removeEventListener("keydown", onKey);
   }, [creating]);
 
+  // actionError 自動消(6s),跟切換 project 一起 reset
+  useEffect(() => {
+    if (!actionError) return;
+    const t = setTimeout(() => setActionError(null), 6000);
+    return () => clearTimeout(t);
+  }, [actionError]);
+
+  // browser tab title 反映 project / pipeline 狀態(背景 tab 也看得見)
+  useEffect(() => {
+    const base = "vibe-pipeline";
+    if (!project) {
+      document.title = base;
+      return;
+    }
+    const projectName = project.name;
+    const running = pipelines.find(
+      (p) => p.state === "running" || p.state === "stopping"
+    );
+    const blockingNotifs = items.filter((i) => i.sev === "block" && i.unread).length;
+    let prefix = "";
+    if (blockingNotifs > 0) prefix = `[!${blockingNotifs}] `;
+    else if (running) prefix = `[▶] `;
+    else if (unreadCount > 0) prefix = `(${unreadCount}) `;
+    const main = running ? `${running.name} 跑中` : projectName;
+    document.title = `${prefix}${main} · ${base}`;
+    return () => {
+      document.title = base;
+    };
+  }, [project, pipelines, items, unreadCount]);
+
   useEffect(() => {
     setPopupDismissed(false);
+    setActionError(null);
   }, [hash]);
 
   useEffect(() => {
@@ -151,6 +187,18 @@ export function BoardScreen({
   // - 永遠跑 1.5s interval(原本 gate 在「有 running pipeline」會被 inactive tab 的 setInterval 節流卡死,
   //   切回 tab 時看到舊的 running 直到下一次 fire)
   // - 加 visibilitychange / focus refetch,tab 重新可見立刻 sync
+  // Fetch branch list once when project loads (for CreateCard base picker)
+  useEffect(() => {
+    if (!project || !project.hasGit) {
+      setBranches([]);
+      return;
+    }
+    api
+      .listBranches(project.hash)
+      .then((bs) => setBranches(bs))
+      .catch(() => setBranches([]));
+  }, [project]);
+
   useEffect(() => {
     if (!project || !project.hasInit) {
       setPipelines([]);
@@ -205,7 +253,7 @@ export function BoardScreen({
       setActiveId(created.id);
       setCreating(false);
     } catch (e) {
-      setLoadError(e instanceof Error ? e.message : String(e));
+      setActionError(`建立 pipeline 失敗: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
@@ -216,6 +264,50 @@ export function BoardScreen({
       unreadCount={unreadCount}
     />
   );
+  // actionError 用右下角小 toast 浮現,別用 NotifBanner(那是 prototype 用,真 notif 走 inbox)
+  const actionToast = actionError ? (
+    <div
+      role="alert"
+      className="action-toast"
+      style={{
+        position: "fixed",
+        right: 16,
+        bottom: 16,
+        zIndex: 2000,
+        maxWidth: 420,
+        padding: "10px 14px 10px 12px",
+        background: "var(--bg-elevated)",
+        border: "1px solid var(--failed)",
+        borderLeft: "3px solid var(--failed)",
+        borderRadius: 6,
+        boxShadow: "var(--shadow-lg)",
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 10,
+        fontSize: 12.5,
+        lineHeight: 1.45,
+        color: "var(--fg)",
+      }}
+    >
+      <span style={{ flex: 1, wordBreak: "break-word" }}>{actionError}</span>
+      <button
+        onClick={() => setActionError(null)}
+        title="關閉"
+        aria-label="關閉"
+        style={{
+          background: "transparent",
+          border: 0,
+          padding: 0,
+          cursor: "pointer",
+          color: "var(--fg-faint)",
+          fontSize: 14,
+          lineHeight: 1,
+        }}
+      >
+        ×
+      </button>
+    </div>
+  ) : null;
   const inboxAside = (
     <InboxColumn
       state={inboxState}
@@ -266,7 +358,7 @@ export function BoardScreen({
         rootClassName={shellRootClass}
         topBar={topBar}
         rail={<Rail pipelines={[]} activeId="" onSelect={() => {}} />}
-        main={<EmptyProject message="載入中…" hint="" />}
+        main={<EmptyProject message="載入中…" hint="" pointToTopBar={false} />}
         aside={inboxAside}
       />
     );
@@ -319,6 +411,27 @@ export function BoardScreen({
       pipelineId={active.id}
       projectHash={project.hash}
       onClose={() => setOpenTicket(null)}
+      onResetTicket={async (ticketId) => {
+        if (!project || !active) return;
+        const next: Pipeline = {
+          ...active,
+          // pipeline.state 也要回 planning,讓 RunButton 重出現
+          state: "planning",
+          tickets: active.tickets.map((t) => {
+            if (t.id !== ticketId) return t;
+            // strip iter/commits/liveLog/reason,status 回 draft
+            const { iter: _i, commits: _c, liveLog: _l, reason: _r, ...rest } = t;
+            void _i; void _c; void _l; void _r;
+            return { ...rest, status: "draft" };
+          }),
+        };
+        try {
+          await api.savePipeline(project.hash, active.id, next);
+          setReloadKey((k) => k + 1);
+        } catch (e) {
+          setActionError(`重置 ticket 失敗: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }}
     />
   ) : null;
 
@@ -327,6 +440,7 @@ export function BoardScreen({
       {initOverlay}
       {qaOverlay}
       {ticketOverlay}
+      {actionToast}
     </>
   );
 
@@ -353,6 +467,7 @@ export function BoardScreen({
               onCancel={() => setCreating(false)}
               onSubmit={handleCreate}
               existingNames={pipelines.map((p) => p.name)}
+              branches={branches}
             />
           }
         />
@@ -364,16 +479,19 @@ export function BoardScreen({
           <EmptyProject
             message="這個專案還沒初始化"
             hint="點左邊「開始初始化」打開引導,或在上方專案切換器選其他資料夾。"
+            pointToTopBar={false}
           />
         ) : pipelines.length === 0 ? (
           <EmptyProject
             message="還沒任何 pipeline"
             hint="點左邊「+ 新 pipeline」建立第一條。"
+            pointToTopBar={false}
           />
         ) : (
           <FocusColumn
             pipeline={active}
             tick={tick}
+            projectHash={project.hash}
             onAddTicket={(pid) => qa.open(pid)}
             hasActiveDraft={!!qa.draftFor(active.id)}
             onTicketClick={(t) => setOpenTicket(t)}
@@ -383,7 +501,7 @@ export function BoardScreen({
                 await api.runPipeline(project.hash, pid);
                 setReloadKey((k) => k + 1);
               } catch (e) {
-                setLoadError(e instanceof Error ? e.message : String(e));
+                setActionError(`開始運行失敗: ${e instanceof Error ? e.message : String(e)}`);
               }
             }}
             onPause={async (pid) => {
@@ -392,7 +510,71 @@ export function BoardScreen({
                 await api.pausePipeline(project.hash, pid);
                 setReloadKey((k) => k + 1);
               } catch (e) {
-                setLoadError(e instanceof Error ? e.message : String(e));
+                setActionError(`暫停失敗: ${e instanceof Error ? e.message : String(e)}`);
+              }
+            }}
+            onDelete={async (pid) => {
+              if (!project) return;
+              try {
+                await api.deletePipeline(project.hash, pid);
+                // 從本地移除,順便切到下一條(若有)
+                setPipelines((arr) => {
+                  const next = arr.filter((p) => p.id !== pid);
+                  if (pid === activeId) setActiveId(next[0]?.id ?? "");
+                  return next;
+                });
+              } catch (e) {
+                setActionError(`刪除失敗: ${e instanceof Error ? e.message : String(e)}`);
+              }
+            }}
+            onRename={async (pid, newName) => {
+              if (!project) return;
+              const target = pipelines.find((p) => p.id === pid);
+              if (!target) return;
+              // pipeline.id 與 .json filename 不變;branch 也不變(已 push 出去的可能有人引用)
+              const next: Pipeline = { ...target, name: newName };
+              try {
+                await api.savePipeline(project.hash, pid, next);
+                setPipelines((arr) =>
+                  arr.map((p) => (p.id === pid ? next : p))
+                );
+              } catch (e) {
+                setActionError(`改名失敗: ${e instanceof Error ? e.message : String(e)}`);
+              }
+            }}
+            onResetAll={async (pid) => {
+              if (!project) return;
+              const target = pipelines.find((p) => p.id === pid);
+              if (!target) return;
+              const next: Pipeline = {
+                ...target,
+                state: "planning",
+                tickets: target.tickets.map((t) => {
+                  const isTerminal =
+                    t.status === "done" ||
+                    t.status === "failed" ||
+                    t.status === "failed_iter_limit" ||
+                    t.status === "failed_transient";
+                  if (!isTerminal) return t;
+                  const { iter: _i, commits: _c, liveLog: _l, reason: _r, ...rest } = t;
+                  void _i; void _c; void _l; void _r;
+                  return { ...rest, status: "draft" };
+                }),
+              };
+              try {
+                await api.savePipeline(project.hash, pid, next);
+                setReloadKey((k) => k + 1);
+              } catch (e) {
+                setActionError(`重跑全部失敗: ${e instanceof Error ? e.message : String(e)}`);
+              }
+            }}
+            existingNames={pipelines.map((p) => p.name)}
+            onRevealWorktree={async (pid) => {
+              if (!project) return;
+              try {
+                await api.revealWorktree(project.hash, pid);
+              } catch (e) {
+                setActionError(`開啟 worktree 失敗: ${e instanceof Error ? e.message : String(e)}`);
               }
             }}
           />

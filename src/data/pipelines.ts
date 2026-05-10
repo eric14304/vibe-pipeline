@@ -85,25 +85,35 @@ export const PROJECTS: Project[] = [
 ];
 
 export const STATE_COLOR: Record<string, string> = {
+  // pipeline states
   paused: "var(--paused)",
   running: "var(--running)",
+  stopping: "var(--paused)",
   ready: "var(--done)",
   planning: "var(--draft)",
   failed: "var(--failed)",
   merged: "var(--fg-faint)",
+  // ticket statuses
   done: "var(--done)",
   draft: "var(--draft)",
+  failed_iter_limit: "var(--failed)",
+  failed_transient: "var(--failed)",
 };
 
 export const STATE_LABEL: Record<string, string> = {
+  // pipeline states
   paused: "paused",
   running: "running",
+  stopping: "stopping",
   ready: "ready to merge",
   planning: "planning",
   failed: "failed",
   merged: "merged",
+  // ticket statuses
   done: "done",
   draft: "draft",
+  failed_iter_limit: "iter 上限",
+  failed_transient: "transient 失敗",
 };
 
 export function fmtElapsed(s: number): string {

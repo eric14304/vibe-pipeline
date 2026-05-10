@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { existsSync, mkdirSync, statSync, readdirSync } from "node:fs";
+import { existsSync, mkdirSync, statSync, readdirSync, unlinkSync } from "node:fs";
 
 const DIR = ".vibe-pipeline";
 const RUNTIME_GITIGNORE_ENTRY = `${DIR}/.runtime/`;
@@ -124,4 +124,12 @@ export async function readPipeline(projectPath: string, id: string): Promise<unk
 
 export async function writePipeline(projectPath: string, id: string, data: unknown): Promise<void> {
   await writeJson(pipelineFile(projectPath, id), data);
+}
+
+// 刪 pipeline.json(worktree 不動,user 想清自己去)
+export function deletePipeline(projectPath: string, id: string): boolean {
+  const file = pipelineFile(projectPath, id);
+  if (!existsSync(file)) return false;
+  unlinkSync(file);
+  return true;
 }

@@ -81,9 +81,23 @@ export function useQA(projectHash: string | null) {
     [projectHash, drafts, refreshDrafts]
   );
 
-  const close = useCallback(() => {
+  // close 時若 draft 還是空(沒任何 user turn、沒 spec 進展)→ auto-cancel,
+  // 不留殘骸佔 rail QA badge
+  const close = useCallback(async () => {
+    const draft = state.draft;
     setState(INITIAL);
-  }, []);
+    if (!projectHash || !draft) return;
+    const userTurns = draft.turns.filter((t) => t.role === "user").length;
+    const specEntries = draft.spec ? Object.keys(draft.spec).length : 0;
+    if (userTurns === 0 && specEntries === 0) {
+      try {
+        await qaApi.cancelQA(projectHash, draft.draftId);
+      } catch {
+        // 失敗就算了,下次 open 同 pipeline 會 resume 看到空 draft
+      }
+      await refreshDrafts();
+    }
+  }, [projectHash, state.draft, refreshDrafts]);
 
   const sendTurn = useCallback(
     async (userMessage: string) => {

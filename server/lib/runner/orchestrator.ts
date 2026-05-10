@@ -41,8 +41,26 @@ export async function start(opts: {
     baseBranch?: string;
     name?: string;
     state?: string;
+    tickets?: Array<{ status?: string }>;
   } | null;
   if (!pipeline) return { ok: false, error: `Pipeline not found: ${pipelineId}` };
+
+  // State guard:不允許在這幾個狀態 spawn(避免重複跑、燒錢空轉)
+  if (pipeline.state === "running") {
+    return { ok: false, error: "Pipeline 已在 running" };
+  }
+  if (pipeline.state === "stopping") {
+    return { ok: false, error: "Pipeline 正在 stopping,等它收完再 run" };
+  }
+  if (pipeline.state === "ready") {
+    // 全部 ticket 都 done,沒事可跑。要重跑的話 user 要先 reset ticket 狀態。
+    const hasRunnable = (pipeline.tickets ?? []).some(
+      (t) => t.status === "draft" || t.status === "ready"
+    );
+    if (!hasRunnable) {
+      return { ok: false, error: "Pipeline 已完成,沒待跑的 ticket(reset ticket.status 才能重跑)" };
+    }
+  }
 
   const branch = pipeline.branch || `pipeline/${pipeline.name || pipelineId}`;
   const baseBranch = pipeline.baseBranch || "main";

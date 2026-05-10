@@ -48,6 +48,10 @@ export function reveal(hash: string): Promise<{ ok: true }> {
   return call<{ ok: true }>(`/api/projects/${hash}/reveal`, { method: "POST" });
 }
 
+export function listBranches(hash: string): Promise<string[]> {
+  return call<string[]>(`/api/projects/${hash}/branches`);
+}
+
 export function listPipelines(hash: string): Promise<unknown[]> {
   return call<unknown[]>(`/api/projects/${hash}/pipelines`);
 }
@@ -62,6 +66,17 @@ export function getPipeline(hash: string, id: string): Promise<unknown> {
 
 export function savePipeline(hash: string, id: string, body: unknown): Promise<unknown> {
   return call<unknown>(`/api/projects/${hash}/pipelines/${id}`, { method: "PUT", body });
+}
+
+export function deletePipeline(hash: string, id: string): Promise<{ ok: true }> {
+  return call<{ ok: true }>(`/api/projects/${hash}/pipelines/${id}`, { method: "DELETE" });
+}
+
+export function revealWorktree(hash: string, id: string): Promise<{ ok: true; path: string }> {
+  return call<{ ok: true; path: string }>(
+    `/api/projects/${hash}/pipelines/${id}/worktree/reveal`,
+    { method: "POST" }
+  );
 }
 
 export function runPipeline(hash: string, id: string): Promise<{ ok: true }> {

@@ -4,23 +4,30 @@
 
 ## 當前 phase(2026-05-10)
 
-**Phase 3 第二刀已落地**:Runner 寫回 iter 輪次 + ticket commit + Drawer feedback 完整化。Real-run 驗過(test pipeline、$1.20、commit `bf74aa8` 進 git)。
+**Phase 3 第三刀已落地**:UX 完整化 + 操作補齊 + 安全網。delete / rename / reset(per-ticket / per-pipeline)/ reveal worktree / overflow menu / theme 持久化 / actionError toast / state guard / shape guard。
 
 **已完成**
 - Phase 1 — Project / Pipeline CRUD + .vibe-pipeline/ JSON 持久化 + git init / reveal
 - Phase 2 — QA drawer + claude CLI 整合 + Draft store + Spec checklist + Multi-select option
 - Phase 3 第一刀 — git worktree per pipeline、runner orchestrator (claude CLI session as 主 agent + Task tool 派 sub-agent)、Pipeline state machine 加 stopping、Ticket 加 failed_iter_limit / failed_transient、Run/Pause endpoints + Frontend RunButton + polling、Crash recovery on startup、Notif store (`.runtime/notifs.jsonl`) + emit on pipeline_started/ready/paused/failed + ticket_started/done/failed (透過 fs.watch 偵測 pipeline.json 變化) + frontend inbox 接 backend
 - Phase 3 第二刀 — TicketDrawer 點 ticket 看內容(goal/acceptance/prompt/iter/commits/runs)、Runner 寫回 `ticket.iter.rounds[]`(n/startedAt/endedAt/executorSummary/criticVerdict/criticFeedback)、Runner 自動 git commit 每張 done ticket(`ticket(<n>): <title>`,寫 hash 到 `ticket.commits[]`)、Run log API + 解析 cost/duration/turns/tokens/result/sessionId、Drawer「pipeline 執行紀錄」section(可展開看 stdout/stderr 全文)、Polling 改不依賴 pipelines + visibilitychange/focus refetch(修 tab 切回 board 卡舊狀態)、UI 防禦(stage 同義 normalize、verdicts string/number 雙格式、totalElapsed 缺值 default)、iter labels 中文化(執行/審核/結果)
+- Phase 3 第三刀 — Pipeline 操作補齊(delete pipeline、rename inline ✎、reset ticket、reset all done/failed、reveal worktree)、TopBar(真實 currentBranch、⌘O / Ctrl+O 鍵盤捷徑、theme toggle 走 localStorage 持久化、Settings disabled stub)、UX 系列(bell unread 數字、actionError 右下 toast、collapsed inbox 讀過 block 沉降 muted、ts 絕對定位右下、commit hash click-to-copy、empty pipeline 空狀態 CTA、EmptyProject 箭頭指向 TopBar、browser tab title 動態、FocusColumn 累計成本 chip + RunButton 上次 duration 預估、overflow menu 收 worktree/重跑全部/刪除、QADrawer tech leak 清除)、Backend 安全網(orchestrator state guard 擋 ready/running/stopping 的 /run、savePipeline shape 驗證 + race guard + PUT-as-upsert 擋、auto-cancel 空 QA draft)、Backend 新 endpoint(GET /branches、POST /pipelines/:id/worktree/reveal、DELETE /pipelines/:id、GET /pipelines/:id/runs[/:filename])、Project type 加 currentBranch、Rail 漏狀態色補齊(stopping / failed_iter_limit / failed_transient)+ 移除假 Archive chip
 
-**架構決策**:Bun local server + browser(前端 Vite 5173 / 後端 Bun 3001 / `/api/*` 透過 Vite proxy)。Runner 主 agent 工具白名單只准 Edit/Write 改 pipeline.json + Bash 跑 read-only 指令 + git add/commit;source code 改動 100% 透過 Task 派 sub-agent。
+**架構決策**:Bun local server + browser(前端 Vite 5173 / 後端 Bun 3001 / `/api/*` 透過 Vite proxy)。Runner 主 agent 工具白名單只准 Edit/Write 改 pipeline.json + Bash 跑 read-only 指令 + git add/commit;source code 改動 100% 透過 Task 派 sub-agent。Theme 偏好走 localStorage(URL `?theme=` 仍 override 給 pixel-diff variant 用),非 backend config — 簡單 + 無 round-trip + first-paint 不閃。
 
 **還沒做(下個 iteration)**
-- iter mode FAIL → 下一輪實測(這次只跑出 1 round PASS,失敗 retry 路徑沒驗)
+- iter mode FAIL → 下一輪實測(到目前為止只跑出 1 round PASS,失敗 retry 路徑沒驗)
 - Transient retry 真正觸發(orchestrator hook 在,要邏輯)
 - 主 agent 寫的時間戳目前是估的,prompt 已收緊要求 `date +%s%3N` 抓真實值,要再驗
 - Pipeline 多 ticket 順序執行 + 中途 paused 介入流程
+- Pipeline merge to base branch [P3]
+- Multi-pipeline 平行執行
 - Budget tracker / SQLite log / SKILL 蒸餾(P2+/P3)
-- Worktree 是放 `~/.vibe-pipeline/worktrees/<projHash>/<pipelineId>/`(global)還是 target 內,還沒 final 決定
+- Settings 畫面實際內容(default base branch / cost 上限 / theme override 等;button 已 disabled stub)
+- Pixel-diff broken(0/36 perfect — 真實後端 vs static prototype mock 的本質分歧;預存 issue,要單獨 sprint 修)
+- Worktree 位置 final 決定:目前 global `~/.vibe-pipeline/worktrees/<projHash>/<pipelineId>/`,沒改 target 內
+- atomic write(.tmp + mv 安全網)— 目前 PUT 靠 git tracking 救回(已有事故案例)
+- log files / notif JSONL 累積無上限 / 沒 GC
 
 **計畫 ref**
 - [phase 1 plan(已落地)](.claude/skills/vibe-pipeline/refs/integration-plan-v1-2026-05-09.md)

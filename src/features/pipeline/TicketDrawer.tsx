@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import "../../styles/drawer.css";
 import "./ticketDrawer.css";
 import type { Ticket, IterRound, CommitRef } from "../../types/pipeline";
@@ -24,6 +24,7 @@ export function TicketDrawer({
   pipelineId,
   projectHash,
   onClose,
+  onResetTicket,
 }: {
   ticket: Ticket;
   pipelineName: string;
@@ -31,6 +32,7 @@ export function TicketDrawer({
   pipelineId: string;
   projectHash: string;
   onClose: () => void;
+  onResetTicket?: (ticketId: string) => Promise<void> | void;
 }) {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -149,10 +151,30 @@ export function TicketDrawer({
           <Section label="pipeline 執行紀錄">
             <RunHistory projectHash={projectHash} pipelineId={pipelineId} />
           </Section>
+          {onResetTicket && isTerminalStatus(ticket.status) && (
+            <Section label="操作">
+              <button
+                className="btn btn-ghost"
+                onClick={() => {
+                  const msg =
+                    `重置 ticket "${ticket.title}" 狀態到 draft?\n\n` +
+                    `會清掉:iter rounds / verdicts / commits 紀錄;但 worktree 內已 commit 的程式碼會留著。\n` +
+                    `下次執行 pipeline 會重新跑這張(可能再產生新 commit)。`;
+                  if (window.confirm(msg)) onResetTicket(ticket.id);
+                }}
+              >
+                ↺ 重置 ticket 狀態(可重跑)
+              </button>
+            </Section>
+          )}
         </div>
       </div>
     </div>
   );
+}
+
+function isTerminalStatus(s: string): boolean {
+  return s === "done" || s === "failed" || s === "failed_iter_limit" || s === "failed_transient";
 }
 
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
@@ -211,13 +233,39 @@ function IterRounds({ rounds }: { rounds: IterRound[] }) {
 }
 
 function Commits({ commits }: { commits: CommitRef[] }) {
+  const [copiedHash, setCopiedHash] = useState<string | null>(null);
+  useEffect(() => {
+    if (!copiedHash) return;
+    const t = setTimeout(() => setCopiedHash(null), 1400);
+    return () => clearTimeout(t);
+  }, [copiedHash]);
+
+  async function copy(hash: string) {
+    try {
+      await navigator.clipboard.writeText(hash);
+      setCopiedHash(hash);
+    } catch {
+      // 部分環境(non-https / older browsers)沒 clipboard API,fallback 暴力 select
+      const ta = document.createElement("textarea");
+      ta.value = hash;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); setCopiedHash(hash); } catch {}
+      document.body.removeChild(ta);
+    }
+  }
+
   return (
     <div className="tdrw-commits">
       {commits.map((c) => (
         <div key={c.hash} className="tdrw-commit">
-          <span className="mono tdrw-commit-hash" title={c.hash}>
-            {c.hash.slice(0, 7)}
-          </span>
+          <button
+            className="mono tdrw-commit-hash tdrw-commit-hash-btn"
+            title={copiedHash === c.hash ? "已複製!" : `點擊複製完整 hash\n${c.hash}`}
+            onClick={() => copy(c.hash)}
+          >
+            {copiedHash === c.hash ? "已複製" : c.hash.slice(0, 7)}
+          </button>
           <span className="tdrw-commit-subject">{c.subject}</span>
           <span className="mono tdrw-commit-ts">{fmtTimeShort(c.ts)}</span>
         </div>

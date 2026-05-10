@@ -1,19 +1,30 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PickerSelect } from "../../ui/PickerSelect";
 
-const BASE_BRANCHES = ["main", "develop", "release/2.4"];
+const FALLBACK_BRANCHES = ["main"];
 
 export function CreateCard({
   onCancel,
   onSubmit,
   existingNames = [],
+  branches,
 }: {
   onCancel: () => void;
   onSubmit: (data: { name: string; baseBranch: string }) => void;
   existingNames?: string[];
+  branches?: string[];
 }) {
+  const baseList = useMemo(
+    () => (branches && branches.length > 0 ? branches : FALLBACK_BRANCHES),
+    [branches]
+  );
+  const defaultBase = baseList.includes("main")
+    ? "main"
+    : baseList.includes("master")
+    ? "master"
+    : baseList[0];
   const [name, setName] = useState("");
-  const [baseBranch, setBaseBranch] = useState("main");
+  const [baseBranch, setBaseBranch] = useState(defaultBase);
   const [baseOpen, setBaseOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const cardRef = useRef<HTMLFormElement>(null);
@@ -74,7 +85,7 @@ export function CreateCard({
           value={baseBranch}
           onChange={setBaseBranch}
           icon={<span className="mono" style={{ color: "var(--fg-mute)" }}>⎇</span>}
-          options={BASE_BRANCHES.map((b) => ({ id: b, label: b, mono: true }))}
+          options={baseList.map((b) => ({ id: b, label: b, mono: true }))}
         />
       </div>
 

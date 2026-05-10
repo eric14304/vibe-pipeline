@@ -280,3 +280,61 @@ reset test pipeline → 跑 → 結果:
 - Worktree 位置最終決策(global vs target 內)
 
 走完第一刀,我們有 phase 3 骨架。
+
+## 12. 第三刀(已落地 2026-05-10)
+
+第二刀後 runner 跑得通、drawer 看得到細節。但**操作面只有 + ticket / Run / Pause**,沒法刪、改名、reset、開 worktree;畫面有 mock 數據假裝有功能(ReadyBanner 14 commits、InboxColumn 3 days · 24 通知);action 失敗用全屏 EmptyProject 顯示誤導訊息;theme 只能改 URL 切;runner 跑不該跑的狀態還會燒錢。
+
+第三刀補完整個操作 + UX 表面 + backend 安全網。
+
+### 做了什麼
+
+**Pipeline 操作補齊**
+1. **Delete pipeline**:`DELETE /api/projects/:hash/pipelines/:id`,`isRunning` guard 擋 409;UI 在 FocusColumn `⋯` overflow menu;worktree 不動(留 user 自己清)
+2. **Rename pipeline**:inline `✎` edit on FocusTitle,Enter 存 / Esc 取消,格式 + 撞名驗證,running/stopping 時 disabled;只改 `name` 不動 `id` / `branch` / .json 檔名
+3. **Reset ticket(per-ticket)**:TicketDrawer 底部 `↺ 重置 ticket 狀態`,terminal status (done / failed_*) 才出現;清 iter / commits / liveLog / reason,status → draft,pipeline.state → planning;走既有 `savePipeline` PUT
+4. **Reset all(per-pipeline)**:FocusColumn head `↺ 重跑全部`,有 done/failed_* 時出現;一次清所有 terminal ticket
+5. **Reveal worktree**:`POST /pipelines/:id/worktree/reveal` 開檔案總管;UI 在 overflow menu;worktree 不存在 → 404
+
+**TopBar 改進**
+6. **真實 currentBranch**:`Project.currentBranch` 經 `git symbolic-ref --short -q HEAD`(detached → null);`listRecent` async 化、`toProject` 改 async
+7. **⌘O / Ctrl+O 鍵盤捷徑**:keydown listener,文字 hint 平台感知(`isMac()` 用 navigator.userAgent)
+8. **Theme toggle**:Sun / Moon icon,寫 `localStorage["vibe-pipeline:theme"]`,index.html inline script 同步讀(no first-paint flash);URL `?theme=` 仍 override 給 pixel-diff variant 用
+9. **Settings 按鈕**:disabled + tooltip(尚未實作)— 不留誤點黑洞
+
+**Backend 安全網**
+10. **orchestrator state guard**:`/run` 在 running / stopping / ready(無 runnable ticket)時 409,**不 spawn**(避免燒錢空轉)
+11. **savePipeline shape 驗證**:body 缺 `name` / `branch` / `tickets` → 400(我自己用空 body PUT 一次清光 test pipeline 的事故後加的)
+12. **savePipeline race guard**:running / stopping 時 PUT → 409(避免覆蓋 runner 寫的 iter / commits)
+13. **savePipeline PUT-as-upsert 擋**:non-existent pipeline → 404 "建立用 POST /pipelines"
+14. **QA close auto-cancel 空 draft**:無 user turn + 無 spec → 自動 cancelQA;避免空 draft 卡 rail QA badge
+
+**UX 系列**
+15. **Bell unread 數字**:不只紅點,顯示實數(>99 顯示 99+);title / aria 帶 count
+16. **actionError → 右下 toast**:不再用 NotifBanner top stack(redundant with inbox);右下 fixed,X 關 + 6s 自動消;z-index 2000
+17. **Collapsed inbox 讀過 block 沉降**:原本 strip 把所有 sev=block 全列大圓 + 第一個一律 pulse;讀過了還在閃。改成只列 unread block;讀過併入 muted pip
+18. **inbox-item ts 絕對定位右下**:原本 hover X 跟 ts overlap,加 margin-right hack 不優;改 ts position absolute right:10 bottom:6,layout 穩
+19. **commit hash click-to-copy**:7 字 hash button,點擊 `clipboard.writeText` + 1.4s "已複製" feedback,有 execCommand fallback
+20. **Empty pipeline 空狀態 CTA**:pipeline.tickets 0 時顯示中央 CTA 引導 + ticket;有 active draft 時改 "接續 QA"
+21. **EmptyProject 箭頭指向 TopBar**:沒選 hash 時頂部 ↑ + "點上方專案切換器";其他空狀態 (init 缺 / pipelines 0 / 載入中) explicit 關箭頭
+22. **Browser tab title 動態**:`[!N]` block notif > `[▶] {pipeline} 跑中` > `(N)` unread > 純名字;不用 emoji
+23. **FocusColumn 累計成本**:`{N} runs · ${X.XX}` chip;hover 顯示完整描述
+24. **RunButton 上次 duration**:planning/paused 時顯示 `▶ 開始運行 ~3m`;title hover 完整 `(上次 3m47s)`
+25. **⋯ overflow menu**:head 從 11 個元素降到 9;worktree / reset all / delete 收進 menu;menu z-index 1000(避被 ticket card 蓋)+ `.focus-head` 加 `position: relative; z-index: 5`
+26. **QADrawer tech leak 清**:「session · {16 字 hex}」→「{N} 輪對話 · draft #{6 字短碼}」(hover 顯完整)
+27. **Rail 缺色補**:STATE_COLOR / STATE_LABEL 補 `stopping` / `failed_iter_limit` / `failed_transient`;rail-mini cell `failed_*` 全部歸紅;移除假 `Archive 12` chip(沒 archive 功能)
+28. **iter labels 中文化(已 phase 二刀做了一半,再補)**:`doer/critic/verdicts` → `執行/審核/結果`,IterStages 加 regex normalize 對 runner 的 "executing" 等變體
+29. **polling 修 inactive tab throttle**:pipelines / notifs polling 拆掉 `[pipelines]` 依賴改永遠跑、加 `visibilitychange` / `focus` refetch — tab 切回立即 sync 不等下次 throttled fire
+
+### Phase 3 收尾(待第四刀)
+
+- iter mode FAIL → 下輪實測 + transient retry 真實作
+- 主 agent 時間戳 `date +%s%3N` 落實驗(prompt 已收緊)
+- 多 ticket 順序 + 中途 paused → 介入 → 繼續
+- Pipeline merge to base branch [P3]
+- Multi-pipeline 平行
+- Budget tracker / SQLite log / SKILL 蒸餾
+- Settings 畫面實際內容
+- Pixel-diff 既存 broken(real backend vs static prototype mock)— 單獨 sprint
+- atomic write(.tmp + mv)安全網
+- Worktree 位置 final(目前 global)

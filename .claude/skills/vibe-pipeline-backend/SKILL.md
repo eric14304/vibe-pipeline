@@ -5,13 +5,14 @@ description: vibe-pipeline 後端 / 執行層規格與計畫 — Phase 1 (Projec
 
 ## 現況(2026-05-10)
 
-**Phase 1 + 2 + 3 第一/二刀 已落地**:
+**Phase 1 + 2 + 3 第一/二/三刀 已落地**:
 - Phase 1:Project 偵測 / 開啟 / git-init / reveal、Pipeline CRUD(JSON,tickets 內嵌)、`.vibe-pipeline/` 自動建立
 - Phase 2:QA-driven ticket 建立(claude CLI 對話收斂、draft store、tool 限制、Spec finalize 寫進 pipeline.tickets[])
 - Phase 3 第一刀:Pipeline runner — 主 agent (claude CLI session,Task tool 派 sub-agent)、git worktree per pipeline、Run/Pause UX、log file、crash recovery、notif emit (pipeline 級 + ticket 級透過 fs.watch)
 - Phase 3 第二刀:Runner 寫回 `ticket.iter.rounds[]`(每輪 executor summary + critic verdict/feedback + 時間戳)、ticket done 後自動 git commit(`ticket(<n>): <title>`,寫回 `ticket.commits[]`)、Run log API (`GET /pipelines/:id/runs[/:filename]`,parse log 末尾 JSON 取 cost/duration/turns/tokens)、Bash 工具白名單擴增(允許 git add / commit / diff / rev-parse,僅限 ticket commit 流程)
+- Phase 3 第三刀:Backend 操作補齊 + 安全網 — Project type 加 `currentBranch`、新 endpoint(`GET /branches`、`POST /pipelines/:id/worktree/reveal`、`DELETE /pipelines/:id`)、orchestrator state guard(running/stopping/ready 拒 /run,不 spawn 燒錢)、savePipeline shape 驗證(name/branch/tickets 必備)+ race guard(running/stopping 不准 PUT)+ PUT-as-upsert 擋(non-existent → 404,要 POST 建立)、QA `close` 自動 cancel 空 draft
 
-**還沒做(P2+ / P3)**:iter mode FAIL → 第二輪實測(目前只跑出 1 round PASS)、transient retry 邏輯實測、多 ticket 順序 + 中途 paused 介入、SQLite log、merge ops、budget tracker、Q&A engine 進化版、SKILL 蒸餾、`vp` CLI。
+**還沒做(P2+ / P3)**:iter mode FAIL → 第二輪實測(目前只跑出 1 round PASS)、transient retry 邏輯實測、多 ticket 順序 + 中途 paused 介入、SQLite log、merge ops、budget tracker、Q&A engine 進化版、SKILL 蒸餾、`vp` CLI、log/notif GC、atomic write 安全網。
 
 要開工 backend 前:
 

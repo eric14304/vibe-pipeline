@@ -40,6 +40,7 @@ async function handle(req: Request): Promise<Response> {
     if (rest === "/init" && method === "POST") return projects.init(hash);
     if (rest === "/git-init" && method === "POST") return projects.gitInit(hash);
     if (rest === "/reveal" && method === "POST") return projects.reveal(hash);
+    if (rest === "/branches" && method === "GET") return projects.listBranches(hash);
     if (rest === "/pipelines" && method === "GET") return projects.listPipelines(hash);
     if (rest === "/pipelines" && method === "POST") return projects.createPipeline(hash, req);
     const pipelineMatch = rest.match(/^\/pipelines\/([a-z0-9_-]+)$/);
@@ -47,6 +48,7 @@ async function handle(req: Request): Promise<Response> {
       const id = pipelineMatch[1];
       if (method === "GET") return projects.getPipeline(hash, id);
       if (method === "PUT") return projects.savePipeline(hash, id, req);
+      if (method === "DELETE") return projects.deletePipeline(hash, id);
     }
 
     const pipelineRunMatch = rest.match(/^\/pipelines\/([a-z0-9_-]+)\/(run|pause)$/);
@@ -55,6 +57,13 @@ async function handle(req: Request): Promise<Response> {
       const action = pipelineRunMatch[2];
       if (action === "run") return projects.runPipeline(hash, id);
       if (action === "pause") return projects.pausePipeline(hash, id);
+    }
+
+    const worktreeRevealMatch = rest.match(
+      /^\/pipelines\/([a-z0-9_-]+)\/worktree\/reveal$/
+    );
+    if (worktreeRevealMatch && method === "POST") {
+      return projects.revealWorktree(hash, worktreeRevealMatch[1]);
     }
 
     const pipelineRunsListMatch = rest.match(/^\/pipelines\/([a-z0-9_-]+)\/runs$/);

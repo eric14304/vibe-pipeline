@@ -5,7 +5,9 @@ description: vibe-pipeline 前端開發規範 — shell 結構、設計 token、
 
 ## 當前 phase 提醒
 
-**Phase 1+2+3 第一/二刀 已落地**(2026-05-10)。
+**Phase 1+2+3 第一/二/三刀 已落地**(2026-05-10)。
+
+第三刀(UX 完整化)新增:Pipeline 操作補齊(delete / rename inline ✎ / reset ticket / reset all / reveal worktree)、TopBar(真實 currentBranch / ⌘O Mac / Ctrl+O Win 鍵盤捷徑 / theme toggle 走 localStorage 持久化 + sun/moon icon / Settings disabled stub)、UX 系列(bell unread 數字 / actionError 改右下 toast 不再用 NotifBanner / collapsed inbox 讀過 block 沉 muted / inbox-item ts 絕對定位右下 / commit hash click-to-copy / empty pipeline CTA / EmptyProject 箭頭指 TopBar / browser tab title 動態 / FocusColumn 累計成本 chip + RunButton 上次 duration 預估 / ⋯ overflow menu / QADrawer tech leak 清)、Rail 漏色補(stopping / failed_iter_limit / failed_transient)+ 移除假 Archive chip。
 
 **已串 backend 的部分**
 - TopBar:project list / select / open / reveal 全走 `/api/projects/*`
