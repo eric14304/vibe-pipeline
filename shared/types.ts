@@ -25,9 +25,11 @@ export type TicketSpec = {
 
 export const DEFAULT_ITER_LIMIT = 5;
 export const DEFAULT_ITER_STOP_AT_LIMIT = true;
-export const MODE_LABELS: Record<TicketSpec["mode"], string> = {
+export const MODE_LABELS: Record<TicketSpec["mode"] | "merge" | "sync", string> = {
   iter: "迭代任務",
   step: "單次任務",
+  merge: "AI 合併",
+  sync: "AI 同步",
 };
 
 export type PartialSpec = Partial<TicketSpec>;

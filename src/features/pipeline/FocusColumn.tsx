@@ -917,8 +917,12 @@ function TicketCard({
   index: number;
   onClick?: () => void;
 }) {
-  // merge ticket 也跟 iter 一樣有 iter.rounds 結構,渲染走同分支
-  const isIter = ticket.mode === "iter" || ticket.mode === "merge";
+  // merge / sync ticket 也跟 iter 一樣有 iter.rounds 結構,渲染走同分支
+  const isIter = ticket.mode === "iter" || ticket.mode === "merge" || ticket.mode === "sync";
+  // 但 merge / sync 沒真的 critic AI(sub-agent 自己跑驗證自己回 PASS/FAIL),
+  // UI 不顯「審核」階段,直接 doer → 結果 兩段
+  const hasCritic = ticket.mode === "iter";
+  const stageList: IterStage[] = hasCritic ? ["doer", "critic", "✓"] : ["doer", "✓"];
   const isRunning = ticket.status === "running";
   const isPaused = ticket.status === "paused";
   const isDraft = ticket.status === "draft";
@@ -966,7 +970,7 @@ function TicketCard({
         <div className="ticket-title">{ticket.title}</div>
 
         <span className={"chip ticket-mode" + (isIter ? " is-iter" : "")}>
-          {MODE_LABELS[ticket.mode as "step" | "iter"] ?? ticket.mode}
+          {MODE_LABELS[ticket.mode as "step" | "iter" | "merge" | "sync"] ?? ticket.mode}
         </span>
 
         <StatusPill status={ticket.status} />
@@ -991,6 +995,7 @@ function TicketCard({
                 <IterStages
                   stage="✓"
                   status="done"
+                  stages={stageList}
                   lastVerdict={r.criticVerdict}
                 />
                 <span className="iter-meta mono">
@@ -1008,6 +1013,7 @@ function TicketCard({
                 <IterStages
                   stage={ticket.iter.stage}
                   status={ticket.status}
+                  stages={stageList}
                 />
                 <span className="iter-meta mono">
                   {fmtElapsed(tick)}
@@ -1015,12 +1021,13 @@ function TicketCard({
               </div>
             )}
             {rounds.length === 0 && !inProgress && (
-              // 還沒跑(ready 但 mode=iter 也屬此情形)
+              // 還沒跑(ready 但 mode=iter/merge/sync 也屬此情形)
               <div className="ticket-iter ticket-iter-row">
                 <span className="iter-round-num mono">#1</span>
                 <IterStages
                   stage="doer"
                   status={ticket.status}
+                  stages={stageList}
                 />
               </div>
             )}
@@ -1130,7 +1137,9 @@ function IterStages({
       : /exec|run|do|work/i.test(raw)
       ? "doer"
       : "doer";
-  const idx = stages.indexOf(normalized === "done" ? "✓" : normalized);
+  // stages 可能不含 critic(merge / sync 走 ["doer", "✓"]);如果 stage 落不到 stages 裡,fallback 到 doer 避免全顯 ?
+  let idx = stages.indexOf(normalized === "done" ? "✓" : normalized);
+  if (idx === -1) idx = 0;
   return (
     <div className="iter-stages">
       {stages.map((s, i) => {
