@@ -15,15 +15,31 @@ export function RunButton({
   onRun,
   onPause,
   lastRun,
+  spawning = false,
 }: {
   pipeline: Pipeline;
   onRun?: (id: string) => void;
   onPause?: (id: string) => void;
   lastRun?: RunSummary | null;
+  // user 點 開始/繼續/重試 後 → 等 polling 看到 state 跳出 planning/paused/failed 為止
+  // 避開「點下去看似沒反應」的視覺空窗(POST 回來到第一個 ticket 真跑可能 0-7s)
+  spawning?: boolean;
 }) {
   const s = pipeline.state;
   const noTickets = pipeline.tickets.length === 0;
   const lastDur = lastRun?.durationMs ? fmtRunDur(lastRun.durationMs) : null;
+
+  // spawning 期間統一顯「啟動中…」覆蓋掉原本的「開始/繼續/重試」狀態
+  if (spawning && (s === "planning" || s === "paused" || s === "failed")) {
+    return (
+      <button type="button" className="btn" disabled title="啟動 runner session…">
+        <span className="qadr-thinking-dots" style={{ display: "inline-flex", verticalAlign: "middle" }}>
+          <span /><span /><span />
+        </span>{" "}
+        啟動中
+      </button>
+    );
+  }
 
   switch (s) {
     case "running":
@@ -214,6 +230,26 @@ export function FocusColumn({
   const lockedByState =
     pipeline.state === "running" || pipeline.state === "stopping";
 
+  // Spawning state:點 開始/繼續/重試 後到 polling 看到 state 跳出 [planning/paused/failed]。
+  // 解掉「點下去看似沒反應」的視覺空窗(POST 回 → state.json 寫入 → polling 抓到 ≤ 1.5s + claude 啟動 0~5s)。
+  const [spawning, setSpawning] = useState(false);
+  // pipeline.state 跳出可點擊狀態 = 真的進場了 → 清 spawning
+  useEffect(() => {
+    if (
+      pipeline.state !== "planning" &&
+      pipeline.state !== "paused" &&
+      pipeline.state !== "failed"
+    ) {
+      setSpawning(false);
+    }
+  }, [pipeline.state]);
+  // 安全網:15s 還沒進場視同失敗(打了 API 沒生效),解除 spawning 讓 user 重試
+  useEffect(() => {
+    if (!spawning) return;
+    const id = setTimeout(() => setSpawning(false), 15000);
+    return () => clearTimeout(id);
+  }, [spawning]);
+
   return (
     <main className="focus" key={pipeline.id}>
       <div className="focus-head fade-up">
@@ -268,7 +304,16 @@ export function FocusColumn({
 
           <span style={{ flex: 1 }} />
 
-          <RunButton pipeline={pipeline} onRun={onRun} onPause={onPause} lastRun={lastRun} />
+          <RunButton
+            pipeline={pipeline}
+            onRun={(pid) => {
+              setSpawning(true);
+              onRun?.(pid);
+            }}
+            onPause={onPause}
+            lastRun={lastRun}
+            spawning={spawning}
+          />
           <OverflowMenu
             pipeline={pipeline}
             hasResettable={hasResettable}
