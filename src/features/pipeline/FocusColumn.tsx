@@ -561,7 +561,7 @@ function OverflowMenu({
         title="更多操作"
         aria-haspopup="menu"
         aria-expanded={open}
-        style={{ padding: "2px 8px", fontSize: 14, lineHeight: 1 }}
+        style={{ padding: "6px 10px", fontSize: 14, lineHeight: 1 }}
       >
         ⋯
       </button>
