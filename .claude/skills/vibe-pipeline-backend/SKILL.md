@@ -1,16 +1,17 @@
 ---
 name: vibe-pipeline-backend
-description: vibe-pipeline 後端 / 執行層規格與計畫 — Phase 1 (Project / Pipeline CRUD) + Phase 2 (QA-driven ticket 建立) + Phase 3 第一刀 (pipeline runner + worktree + notif emit) 已落地。本 SKILL 是 spec 索引與架構記憶。SQLite log、budget tracker、`vp` CLI、SKILL 蒸餾、merge ops 之前先讀。
+description: vibe-pipeline 後端 / 執行層規格與計畫 — Phase 1 (Project / Pipeline CRUD) + Phase 2 (QA-driven ticket 建立) + Phase 3 第一/二刀 (pipeline runner + worktree + notif emit + iter rounds 寫回 + ticket commit + run log API) 已落地。本 SKILL 是 spec 索引與架構記憶。SQLite log、budget tracker、`vp` CLI、SKILL 蒸餾、merge ops 之前先讀。
 ---
 
 ## 現況(2026-05-10)
 
-**Phase 1 + 2 + 3 第一刀 已落地**:
+**Phase 1 + 2 + 3 第一/二刀 已落地**:
 - Phase 1:Project 偵測 / 開啟 / git-init / reveal、Pipeline CRUD(JSON,tickets 內嵌)、`.vibe-pipeline/` 自動建立
 - Phase 2:QA-driven ticket 建立(claude CLI 對話收斂、draft store、tool 限制、Spec finalize 寫進 pipeline.tickets[])
 - Phase 3 第一刀:Pipeline runner — 主 agent (claude CLI session,Task tool 派 sub-agent)、git worktree per pipeline、Run/Pause UX、log file、crash recovery、notif emit (pipeline 級 + ticket 級透過 fs.watch)
+- Phase 3 第二刀:Runner 寫回 `ticket.iter.rounds[]`(每輪 executor summary + critic verdict/feedback + 時間戳)、ticket done 後自動 git commit(`ticket(<n>): <title>`,寫回 `ticket.commits[]`)、Run log API (`GET /pipelines/:id/runs[/:filename]`,parse log 末尾 JSON 取 cost/duration/turns/tokens)、Bash 工具白名單擴增(允許 git add / commit / diff / rev-parse,僅限 ticket commit 流程)
 
-**還沒做(P2+ / P3)**:iter 迴圈實測 (RUNNER_BEHAVIOR_PROMPT 寫了還沒驗)、transient retry 邏輯、SQLite log、merge ops、budget tracker、Q&A engine 進化版、SKILL 蒸餾、`vp` CLI。
+**還沒做(P2+ / P3)**:iter mode FAIL → 第二輪實測(目前只跑出 1 round PASS)、transient retry 邏輯實測、多 ticket 順序 + 中途 paused 介入、SQLite log、merge ops、budget tracker、Q&A engine 進化版、SKILL 蒸餾、`vp` CLI。
 
 要開工 backend 前:
 

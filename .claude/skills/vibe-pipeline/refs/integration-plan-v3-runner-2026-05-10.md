@@ -240,4 +240,43 @@ server/
 
 第一刀目標:**user 點「開始運行」→ 主 agent 跑一張 step ticket → 標 done → frontend polling 顯示完成**。Iter / 多 ticket / retry 等基本流程穩了再加。
 
+## 11. 第二刀(已落地 2026-05-10)
+
+第一刀跑出來最大空洞:**runner 跑完了,但畫面只看得到 status,看不到「過程中發生什麼」**。沒 iter 輪次明細、沒 commit、沒成本、沒 log。
+
+### 做了什麼
+
+1. **TicketDrawer**(新):點 board 上的 ticket card 開右側 600px drawer,顯示 goal / acceptance / prompt / iter 概況 / iter 輪次明細 / commits / liveLog / reason / pipeline 執行紀錄
+2. **Runner 寫回 iter 明細**:RUNNER_BEHAVIOR_PROMPT 加 `ticket.iter.rounds[]` 寫入規範:每輪 append `{ n, startedAt, endedAt, executorSummary, criticVerdict("PASS"/"FAIL"/"PARTIAL"), criticFeedback }`,同步更新 `current` / `stage("doer"/"critic"/"done")` / `verdicts`
+3. **Runner 自動 git commit**:每張 ticket done 後 → `git status` → 有改動就 `git add -A` + `git commit -m "ticket(<n>): <title>"` + `git rev-parse HEAD` → append 到 `ticket.commits[]`(`{hash, subject, ts}`)
+4. **Run log API**:`GET /pipelines/:id/runs` 回所有 run summary(parse `.runtime/logs/<pid>-<ts>.log` 末尾 JSON 拆 cost/duration/turns/tokens/result/sessionId/exitCode);`GET /pipelines/:id/runs/:filename` 回單筆完整 detail(stdout / stderr 全文)
+5. **RunHistory 元件**:drawer 內卡片式展開/收合,每張 run 顯示時間 / exit / 摘要 / duration / cost / turns / tokens
+6. **Runner 工具白名單鬆綁**:Bash 加 `git add` / `git commit` / `git diff` / `git rev-parse`(僅限 ticket commit 流程),其他寫操作仍禁
+7. **Polling 重寫**:原本 `[project, pipelines]` 雙依賴 + 條件 `pipelines.some(running)` → 切走 tab 被 `setInterval` throttle 卡舊狀態。改成只依賴 `project`、永遠跑 1.5s + visibilitychange / focus refetch。Notifs polling 同樣加 visibility/focus
+8. **UI 防禦**:
+   - `totalElapsed` 缺值 → default 0(原本 `undefined + tick = NaN`)
+   - `current=0` mid-run → 顯示 max(1, current)
+   - `stage` 不認的字面(runner 寫過 "executing")→ regex normalize 到 doer/critic/done
+   - `verdicts` 接 `(1|0|-1)[]` 與 string `("PASS"/"FAIL"/...)` 雙格式
+   - drawer IterRounds 的 verdict chip case-insensitive
+9. **i18n**:iter labels 中文化(`doer→執行` / `critic→審核` / `verdicts→結果`)
+10. **CommitRef + IterRound 型別**:加進 `src/types/pipeline.ts`,Ticket 加 optional `commits?: CommitRef[]`、IterState 加 optional `rounds?: IterRound[]`
+
+### Real-run 自檢結果
+
+reset test pipeline → 跑 → 結果:
+- exit 0、cost $1.20、duration 3m47s、11 turns
+- `ticket.iter.rounds[0]`:n=1, startedAt/endedAt, executorSummary 中文 363 字, criticVerdict="PASS"
+- `ticket.iter.verdicts: ["PASS"]`、`current=1`、`stage="done"`
+- `ticket.commits[0]`:hash `bf74aa84afb53af9346bb1ba6a7cb90da2299538`(7位 `bf74aa8`)、subject `ticket(1): Repo 健檢:tsc + ESLint 設置與修零`
+- 實 git log 看得到 commit、worktree `git status --porcelain` = 0 行
+
+### 還沒做(待第三刀)
+
+- iter mode FAIL → 第二輪實測(這次 1 round PASS,失敗 retry 路徑沒驗)
+- Transient retry 真正觸發測試
+- 主 agent 寫的 startedAt/endedAt 看起來是估的(整千 ms),已收緊 prompt 要求 `Bash "date +%s%3N"` 抓真實值,要重跑驗
+- 多 ticket 順序 + 中途 paused → 介入 → 繼續
+- Worktree 位置最終決策(global vs target 內)
+
 走完第一刀,我們有 phase 3 骨架。

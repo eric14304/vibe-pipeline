@@ -5,24 +5,35 @@ description: vibe-pipeline 前端開發規範 — shell 結構、設計 token、
 
 ## 當前 phase 提醒
 
-**Phase 1+2 已落地**(2026-05-10)。
+**Phase 1+2+3 第一/二刀 已落地**(2026-05-10)。
 
 **已串 backend 的部分**
 - TopBar:project list / select / open / reveal 全走 `/api/projects/*`
-- BoardScreen:fetch project status / pipelines、init popup、create pipeline POST
+- BoardScreen:fetch project status / pipelines、init popup、create pipeline POST、polling 1.5s + visibilitychange/focus refetch、Run/Pause endpoint、Notifs polling 3s
+- FocusColumn:RunButton(4 state:planning/running/stopping/ready)、TicketCard 點擊開 TicketDrawer、iter labels 中文化(執行/審核/結果)
+- TicketDrawer:goal/acceptance/prompt/iter 概況 + iter 輪次明細 + commits + liveLog + reason + RunHistory(展開看 cost/duration/turns/tokens/stdout)
+- RunHistory:`/api/projects/:hash/pipelines/:id/runs[/:filename]`
 - QADrawer:phase 2 完整接 `/api/.../qa/*`、real claude session、spec review form 寫進 pipeline
-- Notifications inbox:走 `aside` slot,`collapsed/expanded` toggle(資料還是 mock)
+- Notifications inbox:`/api/.../notifs/*`(list / read / dismiss / mark-all-read),走 `aside` slot
 
 **還是 mock 的(等之後接)**
-- FocusColumn 顯示的 ticket data:從 backend 拿但執行狀態(iter / liveLog)是 UI-only,等 P2 runner 接
-- `src/data/notifications.ts` NOTIFS_SEED:notification producer 還沒做,目前 frontend 顯示空 inbox
-- `src/data/pipelines.ts` PROJECTS / PIPELINES:大部分 dead,留 STATE_COLOR/LABEL/fmtElapsed 給 UI 算
+- `src/data/notifications.ts` NOTIFS_SEED:已切走,留作 prototype 對照
+- `src/data/pipelines.ts` PROJECTS / 大部分 PIPELINES seed:dead,留 STATE_COLOR/LABEL/fmtElapsed 給 UI 算
 
-加新東西的優先序(P2 開始):
-1. Doer / 審核AI runner 跑起來後,FocusColumn ticket 顯示 real iter state
-2. Notification producer 接上,inbox 有東西
-3. Multi-pipeline 平行執行 UI
+加新東西的優先序(下個 sprint):
+1. iter mode FAIL → 第二輪實測 UI 顯示(目前只跑出 1 round PASS)
+2. Multi-pipeline 平行執行 UI
+3. paused → 介入 → 繼續 流程 UI
 4. SKILL 候選 review UI(P3)
+
+## UI 防禦規則(來自 runner real-run 踩到的雷)
+
+Runner 寫進 pipeline.json 的欄位**不一定符合 type union 字面值**(主 agent 會自由發揮,即使 system prompt 寫死)。FocusColumn / TicketDrawer 渲染前要做 normalize:
+- `iter.totalElapsed` 可能 undefined → 用 `?? 0`,別直接 `+ tick`(NaN)
+- `iter.current` 可能 0(mid-run) → 顯示用 `Math.max(1, current)`
+- `iter.stage` 可能寫成 "executing" / "reviewing" 等 → regex normalize 成 doer / critic / done(在 IterStages 內)
+- `iter.verdicts` 可能 string `"PASS"/"FAIL"/"PARTIAL"` 或舊 mock 的 `1/0/-1` → Verdict type 雙格式,Verdicts 元件 case-insensitive
+- `iter.rounds[*].criticVerdict` 同上,IterRounds 取 `.toUpperCase()`
 
 ## 技術棧
 

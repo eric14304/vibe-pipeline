@@ -157,7 +157,9 @@ function TicketCard({
   const isPaused = ticket.status === "paused";
   const isDraft = ticket.status === "draft";
 
-  const elapsed = isRunning && ticket.iter ? ticket.iter.totalElapsed + tick : ticket.iter?.totalElapsed;
+  const totalElapsed = ticket.iter?.totalElapsed ?? 0;
+  const elapsed = isRunning && ticket.iter ? totalElapsed + tick : totalElapsed;
+  const iterCurrentLabel = ticket.iter ? Math.max(1, ticket.iter.current) : 0;
   const accent = STATE_COLOR[ticket.status] || "var(--draft)";
 
   return (
@@ -196,7 +198,7 @@ function TicketCard({
           <IterStages stage={ticket.iter.stage} status={ticket.status} />
           <Verdicts list={ticket.iter.verdicts} blink={isPaused} />
           <span className="iter-meta mono">
-            iter <strong>{ticket.iter.current}</strong> · {fmtElapsed(elapsed!)} elapsed
+            iter <strong>{iterCurrentLabel}</strong> · {fmtElapsed(elapsed)} elapsed
             {isRunning && <span className="live-dot pulse" />}
           </span>
         </div>
@@ -231,9 +233,28 @@ function StatusPill({ status }: { status: TicketStatus }) {
   );
 }
 
+const STAGE_LABEL: Record<IterStage, string> = {
+  doer: "執行",
+  critic: "審核",
+  "✓": "✓",
+  done: "✓",
+};
+
 function IterStages({ stage, status }: { stage: IterStage; status: TicketStatus }) {
   const stages: IterStage[] = ["doer", "critic", "✓"];
-  const idx = stages.indexOf(stage);
+  // runner 可能寫不同字面("executing" / "reviewing" / "done" 等),做同義 normalize
+  const raw = String(stage);
+  const normalized: IterStage =
+    raw === "doer" || raw === "critic" || raw === "✓"
+      ? (raw as IterStage)
+      : raw === "done" || /done|complete|pass|finish|✓/i.test(raw)
+      ? "✓"
+      : /crit|review|judge|check/i.test(raw)
+      ? "critic"
+      : /exec|run|do|work/i.test(raw)
+      ? "doer"
+      : "doer";
+  const idx = stages.indexOf(normalized === "done" ? "✓" : normalized);
   return (
     <div className="iter-stages">
       {stages.map((s, i) => (
@@ -246,7 +267,7 @@ function IterStages({ stage, status }: { stage: IterStage; status: TicketStatus 
               (status === "paused" && i === idx ? " is-paused" : "")
             }
           >
-            {s}
+            {STAGE_LABEL[s]}
             {status === "paused" && i === idx && " ⏸"}
             {status === "running" && i === idx && <span className="iter-stage-pulse pulse" />}
           </span>
@@ -257,14 +278,23 @@ function IterStages({ stage, status }: { stage: IterStage; status: TicketStatus 
   );
 }
 
-function Verdicts({ list, blink }: { list: (1 | 0 | -1)[]; blink: boolean }) {
+// 接受兩種格式:
+// - 舊 prototype mock 用 1 / 0 / -1 (PASS / WARN / FAIL)
+// - runner 寫回字串 "PASS" / "FAIL" / "PARTIAL"
+type VerdictItem = 1 | 0 | -1 | string;
+function Verdicts({ list, blink }: { list: VerdictItem[]; blink: boolean }) {
   return (
     <span className="verdicts mono">
-      <span className="verdicts-label">verdicts</span>
+      <span className="verdicts-label">結果</span>
       {list.map((v, i) => {
         const last = i === list.length - 1;
+        const k = typeof v === "string" ? v.toUpperCase() : v;
+        const isPass = k === 1 || k === "PASS";
+        const isFail = k === -1 || k === "FAIL";
         const cls =
-          "verdict-pip " + (v === 1 ? "is-pass" : v === -1 ? "is-fail" : "is-warn") + (last && blink ? " blink" : "");
+          "verdict-pip " +
+          (isPass ? "is-pass" : isFail ? "is-fail" : "is-warn") +
+          (last && blink ? " blink" : "");
         return <span key={i} className={cls} />;
       })}
     </span>

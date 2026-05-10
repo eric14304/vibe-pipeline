@@ -70,7 +70,7 @@ export function BoardScreen({
     return () => clearTimeout(t);
   }, [highlightId]);
 
-  // Fetch notifs every 3s while project is open
+  // Fetch notifs every 3s while project is open + visibility/focus refetch
   useEffect(() => {
     if (!hash) {
       setItems([]);
@@ -89,9 +89,16 @@ export function BoardScreen({
     }
     fetchNotifs();
     const id = setInterval(fetchNotifs, 3000);
+    const onVis = () => {
+      if (!document.hidden) fetchNotifs();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", fetchNotifs);
     return () => {
       cancelled = true;
       clearInterval(id);
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("focus", fetchNotifs);
     };
   }, [hash]);
 
@@ -140,13 +147,17 @@ export function BoardScreen({
     };
   }, [hash, reloadKey]);
 
+  // Pipelines fetch + polling:
+  // - 永遠跑 1.5s interval(原本 gate 在「有 running pipeline」會被 inactive tab 的 setInterval 節流卡死,
+  //   切回 tab 時看到舊的 running 直到下一次 fire)
+  // - 加 visibilitychange / focus refetch,tab 重新可見立刻 sync
   useEffect(() => {
     if (!project || !project.hasInit) {
       setPipelines([]);
       return;
     }
     let cancelled = false;
-    const fetchOnce = () =>
+    const fetchPipelines = () => {
       api
         .listPipelines(project.hash)
         .then((arr) => {
@@ -157,33 +168,22 @@ export function BoardScreen({
           setPipelines(sorted);
           if (sorted.length > 0) setActiveId((id) => id || sorted[0].id);
         })
-        .catch(() => {
-          if (cancelled) return;
-        });
-    fetchOnce();
+        .catch(() => {});
+    };
+    fetchPipelines();
+    const id = setInterval(fetchPipelines, 1500);
+    const onVis = () => {
+      if (!document.hidden) fetchPipelines();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", fetchPipelines);
     return () => {
       cancelled = true;
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("focus", fetchPipelines);
     };
   }, [project, reloadKey]);
-
-  // Polling: 任何 pipeline 處於 running / stopping → 每 1.5s refetch
-  useEffect(() => {
-    if (!project || !project.hasInit) return;
-    const needPoll = pipelines.some((p) => p.state === "running" || p.state === "stopping");
-    if (!needPoll) return;
-    const id = setInterval(() => {
-      api
-        .listPipelines(project.hash)
-        .then((arr) => {
-          const sorted = [...((arr as Pipeline[]) ?? [])].sort((a, b) =>
-            a.id < b.id ? 1 : a.id > b.id ? -1 : 0
-          );
-          setPipelines(sorted);
-        })
-        .catch(() => {});
-    }, 1500);
-    return () => clearInterval(id);
-  }, [project, pipelines]);
 
   const active = useMemo(
     () => pipelines.find((p) => p.id === activeId) || pipelines[0],
@@ -316,6 +316,8 @@ export function BoardScreen({
       ticket={liveTicket}
       pipelineName={active.name}
       pipelineBranch={active.branch}
+      pipelineId={active.id}
+      projectHash={project.hash}
       onClose={() => setOpenTicket(null)}
     />
   ) : null;

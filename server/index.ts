@@ -57,6 +57,21 @@ async function handle(req: Request): Promise<Response> {
       if (action === "pause") return projects.pausePipeline(hash, id);
     }
 
+    const pipelineRunsListMatch = rest.match(/^\/pipelines\/([a-z0-9_-]+)\/runs$/);
+    if (pipelineRunsListMatch && method === "GET") {
+      return projects.listPipelineRuns(hash, pipelineRunsListMatch[1]);
+    }
+    const pipelineRunsDetailMatch = rest.match(
+      /^\/pipelines\/([a-z0-9_-]+)\/runs\/([A-Za-z0-9._-]+)$/
+    );
+    if (pipelineRunsDetailMatch && method === "GET") {
+      return projects.getPipelineRun(
+        hash,
+        pipelineRunsDetailMatch[1],
+        pipelineRunsDetailMatch[2]
+      );
+    }
+
     if (rest === "/notifs" && method === "GET") return projects.listNotifs(hash);
     if (rest === "/notifs/mark-all-read" && method === "POST")
       return projects.markAllNotifsRead(hash);

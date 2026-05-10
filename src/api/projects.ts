@@ -97,3 +97,32 @@ export function dismissNotif(hash: string, id: string): Promise<{ ok: true }> {
 export function markAllNotifsRead(hash: string): Promise<{ ok: true }> {
   return call<{ ok: true }>(`/api/projects/${hash}/notifs/mark-all-read`, { method: "POST" });
 }
+
+export type RunSummary = {
+  filename: string;
+  startedAt: number;
+  exitCode: number | null;
+  durationMs: number | null;
+  costUsd: number | null;
+  numTurns: number | null;
+  result: string | null;
+  tokens: { input: number; output: number; cacheRead: number; cacheCreate: number } | null;
+  sessionId: string | null;
+  hasStderr: boolean;
+};
+
+export type RunDetail = RunSummary & { stdout: string; stderr: string };
+
+export function listPipelineRuns(hash: string, pipelineId: string): Promise<RunSummary[]> {
+  return call<RunSummary[]>(`/api/projects/${hash}/pipelines/${pipelineId}/runs`);
+}
+
+export function getPipelineRun(
+  hash: string,
+  pipelineId: string,
+  filename: string
+): Promise<RunDetail> {
+  return call<RunDetail>(
+    `/api/projects/${hash}/pipelines/${pipelineId}/runs/${encodeURIComponent(filename)}`
+  );
+}

@@ -4,6 +4,7 @@ import * as projectStore from "../lib/projectStore";
 import * as pipelineDir from "../lib/pipelineDir";
 import * as git from "../lib/git";
 import * as orchestrator from "../lib/runner/orchestrator";
+import * as runLog from "../lib/runner/runLog";
 import * as notifs from "../lib/notifs/store";
 import { pickFolder, revealFolder } from "../lib/dialog";
 import { projectHash } from "../lib/hash";
@@ -205,6 +206,28 @@ export async function dismissNotif(hash: string, id: string): Promise<Response> 
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);
   notifs.dismiss(project.path, id);
   return ok({ ok: true });
+}
+
+export async function listPipelineRuns(
+  hash: string,
+  pipelineId: string
+): Promise<Response> {
+  const project = await projectStore.findByHash(hash);
+  if (!project) return err("not_found", `Project not found: ${hash}`, 404);
+  const runs = await runLog.listRuns(project.path, pipelineId);
+  return ok(runs);
+}
+
+export async function getPipelineRun(
+  hash: string,
+  pipelineId: string,
+  filename: string
+): Promise<Response> {
+  const project = await projectStore.findByHash(hash);
+  if (!project) return err("not_found", `Project not found: ${hash}`, 404);
+  const run = await runLog.getRun(project.path, pipelineId, filename);
+  if (!run) return err("not_found", `Run log not found: ${filename}`, 404);
+  return ok(run);
 }
 
 export { projectHash };

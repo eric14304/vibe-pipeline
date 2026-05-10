@@ -70,6 +70,9 @@ export async function start(opts: {
     `${pipelineId}.json`
   )}\npipelineId: ${pipelineId}\nworktree (your cwd): ${wtPath}\n\n讀 pipeline JSON,按 system prompt 流程跑。`;
 
+  // 主 agent 拿全工具 — 因為 sub-agent (Task) 會繼承限制,
+  // 擋 Edit/Write 就等於 sub-agent 也不能改 code,ticket 跑不了。
+  // 改用 system prompt 約束主 agent 自己不直接改 source(只用 Edit/Write 更新 pipeline.json)
   const args = [
     "claude",
     "-p",
@@ -79,8 +82,6 @@ export async function start(opts: {
     sessionId,
     "--system-prompt",
     RUNNER_BEHAVIOR_PROMPT,
-    "--disallowedTools",
-    "Edit Write",
     initialMessage,
   ];
 

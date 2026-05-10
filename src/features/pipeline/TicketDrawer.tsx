@@ -1,9 +1,10 @@
 import { useEffect } from "react";
 import "../../styles/drawer.css";
 import "./ticketDrawer.css";
-import type { Ticket } from "../../types/pipeline";
+import type { Ticket, IterRound, CommitRef } from "../../types/pipeline";
 import { MODE_LABELS } from "../../api/qa";
 import { STATE_COLOR } from "../../data/pipelines";
+import { RunHistory } from "./RunHistory";
 
 const STATUS_LABEL: Record<string, string> = {
   draft: "草稿",
@@ -20,11 +21,15 @@ export function TicketDrawer({
   ticket,
   pipelineName,
   pipelineBranch,
+  pipelineId,
+  projectHash,
   onClose,
 }: {
   ticket: Ticket;
   pipelineName: string;
   pipelineBranch: string;
+  pipelineId: string;
+  projectHash: string;
   onClose: () => void;
 }) {
   useEffect(() => {
@@ -115,10 +120,20 @@ export function TicketDrawer({
             <pre className="tdrw-prompt">{spec.prompt || "(空)"}</pre>
           </Section>
           {ticket.iter && (
-            <Section label="執行紀錄">
+            <Section label="iter 概況">
               <div className="mono" style={{ fontSize: 12, color: "var(--fg-mute)" }}>
                 iter {ticket.iter.current} · {ticket.iter.verdicts.length} verdict
               </div>
+            </Section>
+          )}
+          {ticket.iter?.rounds && ticket.iter.rounds.length > 0 && (
+            <Section label="iter 輪次明細">
+              <IterRounds rounds={ticket.iter.rounds} />
+            </Section>
+          )}
+          {ticket.commits && ticket.commits.length > 0 && (
+            <Section label="commits">
+              <Commits commits={ticket.commits} />
             </Section>
           )}
           {ticket.liveLog && (
@@ -131,6 +146,9 @@ export function TicketDrawer({
               <ReadOnlyValue value={ticket.reason} />
             </Section>
           )}
+          <Section label="pipeline 執行紀錄">
+            <RunHistory projectHash={projectHash} pipelineId={pipelineId} />
+          </Section>
         </div>
       </div>
     </div>
@@ -149,4 +167,75 @@ function Section({ label, children }: { label: string; children: React.ReactNode
 function ReadOnlyValue({ value }: { value: string | undefined }) {
   if (!value) return <span className="tdrw-empty">(空)</span>;
   return <div className="tdrw-text">{value}</div>;
+}
+
+function IterRounds({ rounds }: { rounds: IterRound[] }) {
+  return (
+    <div className="tdrw-iter-rounds">
+      {rounds.map((r) => {
+        const v = String(r.criticVerdict ?? "").toUpperCase();
+        const cls =
+          v === "PASS"
+            ? "is-pass"
+            : v === "FAIL"
+            ? "is-fail"
+            : "is-partial";
+        const dur =
+          r.endedAt && r.startedAt
+            ? fmtDur(r.endedAt - r.startedAt)
+            : "—";
+        return (
+          <div key={r.n} className="tdrw-iter-round">
+            <div className="tdrw-iter-round-head">
+              <span className="mono tdrw-iter-round-n">#{r.n}</span>
+              <span className={"tdrw-iter-verdict " + cls}>{r.criticVerdict}</span>
+              <span className="mono tdrw-iter-round-dur">{dur}</span>
+            </div>
+            {r.executorSummary && (
+              <div className="tdrw-iter-round-block">
+                <div className="tdrw-iter-round-label">執行AI 摘要</div>
+                <div className="tdrw-text">{r.executorSummary}</div>
+              </div>
+            )}
+            {r.criticFeedback && (
+              <div className="tdrw-iter-round-block">
+                <div className="tdrw-iter-round-label">審核 feedback</div>
+                <div className="tdrw-text">{r.criticFeedback}</div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function Commits({ commits }: { commits: CommitRef[] }) {
+  return (
+    <div className="tdrw-commits">
+      {commits.map((c) => (
+        <div key={c.hash} className="tdrw-commit">
+          <span className="mono tdrw-commit-hash" title={c.hash}>
+            {c.hash.slice(0, 7)}
+          </span>
+          <span className="tdrw-commit-subject">{c.subject}</span>
+          <span className="mono tdrw-commit-ts">{fmtTimeShort(c.ts)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function fmtDur(ms: number): string {
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  return `${Math.floor(s / 60)}m ${s % 60}s`;
+}
+
+function fmtTimeShort(ms: number): string {
+  const d = new Date(ms);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(
+    d.getMinutes()
+  )}`;
 }

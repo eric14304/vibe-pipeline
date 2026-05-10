@@ -4,20 +4,23 @@
 
 ## 當前 phase(2026-05-10)
 
-**Phase 3 第一刀已落地**:Pipeline runner — 主 agent (claude CLI session) 執行 ticket、worktree per pipeline、run/pause UX、notif emit on pipeline events。
+**Phase 3 第二刀已落地**:Runner 寫回 iter 輪次 + ticket commit + Drawer feedback 完整化。Real-run 驗過(test pipeline、$1.20、commit `bf74aa8` 進 git)。
 
 **已完成**
 - Phase 1 — Project / Pipeline CRUD + .vibe-pipeline/ JSON 持久化 + git init / reveal
 - Phase 2 — QA drawer + claude CLI 整合 + Draft store + Spec checklist + Multi-select option
 - Phase 3 第一刀 — git worktree per pipeline、runner orchestrator (claude CLI session as 主 agent + Task tool 派 sub-agent)、Pipeline state machine 加 stopping、Ticket 加 failed_iter_limit / failed_transient、Run/Pause endpoints + Frontend RunButton + polling、Crash recovery on startup、Notif store (`.runtime/notifs.jsonl`) + emit on pipeline_started/ready/paused/failed + ticket_started/done/failed (透過 fs.watch 偵測 pipeline.json 變化) + frontend inbox 接 backend
+- Phase 3 第二刀 — TicketDrawer 點 ticket 看內容(goal/acceptance/prompt/iter/commits/runs)、Runner 寫回 `ticket.iter.rounds[]`(n/startedAt/endedAt/executorSummary/criticVerdict/criticFeedback)、Runner 自動 git commit 每張 done ticket(`ticket(<n>): <title>`,寫 hash 到 `ticket.commits[]`)、Run log API + 解析 cost/duration/turns/tokens/result/sessionId、Drawer「pipeline 執行紀錄」section(可展開看 stdout/stderr 全文)、Polling 改不依賴 pipelines + visibilitychange/focus refetch(修 tab 切回 board 卡舊狀態)、UI 防禦(stage 同義 normalize、verdicts string/number 雙格式、totalElapsed 缺值 default)、iter labels 中文化(執行/審核/結果)
 
-**架構決策**:Bun local server + browser(前端 Vite 5173 / 後端 Bun 3001 / `/api/*` 透過 Vite proxy)。
+**架構決策**:Bun local server + browser(前端 Vite 5173 / 後端 Bun 3001 / `/api/*` 透過 Vite proxy)。Runner 主 agent 工具白名單只准 Edit/Write 改 pipeline.json + Bash 跑 read-only 指令 + git add/commit;source code 改動 100% 透過 Task 派 sub-agent。
 
 **還沒做(下個 iteration)**
-- 實際 spawn claude 跑一張 step ticket end-to-end(需要燒 API)
-- iter 迴圈實測(主 agent 可能要再調 prompt)
+- iter mode FAIL → 下一輪實測(這次只跑出 1 round PASS,失敗 retry 路徑沒驗)
 - Transient retry 真正觸發(orchestrator hook 在,要邏輯)
+- 主 agent 寫的時間戳目前是估的,prompt 已收緊要求 `date +%s%3N` 抓真實值,要再驗
+- Pipeline 多 ticket 順序執行 + 中途 paused 介入流程
 - Budget tracker / SQLite log / SKILL 蒸餾(P2+/P3)
+- Worktree 是放 `~/.vibe-pipeline/worktrees/<projHash>/<pipelineId>/`(global)還是 target 內,還沒 final 決定
 
 **計畫 ref**
 - [phase 1 plan(已落地)](.claude/skills/vibe-pipeline/refs/integration-plan-v1-2026-05-09.md)
@@ -56,7 +59,7 @@ vibe-pipeline/
 │   │   └── PickerSelect.tsx
 │   ├── features/
 │   │   ├── notifications/     NotificationsScreen + InboxColumn + NotifBanner
-│   │   ├── pipeline/          BoardScreen + FocusColumn + EmptyProject
+│   │   ├── pipeline/          BoardScreen + FocusColumn + EmptyProject + TicketDrawer + RunHistory + ticketDrawer.css
 │   │   ├── pipelineCreate/    CreateCard + CreatePlaceholder
 │   │   ├── init/              InitScreen (全屏 prototype) + InitPopup (modal,phase 1 用)
 │   │   ├── drawer/            DrawerStage + 4 個 state 元件 (prototype 用,還沒接資料)
@@ -97,7 +100,8 @@ vibe-pipeline/
 │       ├── runner/
 │       │   ├── orchestrator.ts spawn 主 agent (claude session) + log file + recoverStale
 │       │   ├── ticketWatcher.ts fs.watch pipeline.json + diff status → emit ticket_* notif
-│       │   └── runnerPrompt.ts RUNNER_BEHAVIOR_PROMPT (主 agent 流程定義)
+│       │   ├── runnerPrompt.ts RUNNER_BEHAVIOR_PROMPT (主 agent 流程定義 + iter rounds 寫法 + ticket commit 流程)
+│       │   └── runLog.ts       parse .runtime/logs/<pid>-<ts>.log → cost/duration/turns/tokens/result/sessionId
 │       ├── notifs/
 │       │   └── store.ts       emit / list / markRead / dismiss → .runtime/notifs.jsonl
 │       └── qa/
