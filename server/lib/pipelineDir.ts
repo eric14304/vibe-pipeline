@@ -7,6 +7,7 @@ import {
   unlinkSync,
   renameSync,
 } from "node:fs";
+import { currentBranch } from "./git";
 
 const DIR = ".vibe-pipeline";
 const RUNTIME_GITIGNORE_ENTRY = `${DIR}/.runtime/`;
@@ -34,13 +35,19 @@ export const DEFAULT_MAX_PARALLEL = 2;
 export const MAX_PARALLEL_MIN = 1;
 export const MAX_PARALLEL_MAX = 8;
 
+export const MERGE_STRATEGIES = ["merge", "squash", "ff-only"] as const;
+export type MergeStrategy = (typeof MERGE_STRATEGIES)[number];
+export const DEFAULT_MERGE_STRATEGY: MergeStrategy = "merge";
+export const DEFAULT_COST_LIMIT_USD = 0;
+
 const DEFAULT_CONFIG = {
   defaults: {
     base_branch: "main",
     // merge --no-ff 保留 ticket commit 鏈,bisect / git log 看得出 pipeline 邊界
     // (squash 適合「main 極乾淨」的個人專案,要的話改本檔)
-    merge_strategy: "merge",
+    merge_strategy: DEFAULT_MERGE_STRATEGY,
     max_parallel: DEFAULT_MAX_PARALLEL,
+    cost_limit_usd: DEFAULT_COST_LIMIT_USD,
   },
   scripts: {
     setup: "",
@@ -53,9 +60,22 @@ const DEFAULT_CONFIG = {
 };
 
 export type ProjectConfig = {
-  defaults?: { base_branch?: string; merge_strategy?: string; max_parallel?: number };
+  defaults?: {
+    base_branch?: string;
+    merge_strategy?: string;
+    max_parallel?: number;
+    cost_limit_usd?: number;
+  };
   scripts?: { setup?: string; dev?: string; cleanup?: string };
   qa?: { openingMessage?: string };
+};
+
+// 已 fallback / 驗證過的完整 config defaults。GET / status 拿這個即可,不用每處再 ?? "main"。
+export type ResolvedDefaults = {
+  base_branch: string;
+  merge_strategy: MergeStrategy;
+  max_parallel: number;
+  cost_limit_usd: number;
 };
 
 export async function readConfig(projectPath: string): Promise<ProjectConfig> {
@@ -86,6 +106,41 @@ export function clampMaxParallel(raw: unknown): number {
 export async function getMaxParallel(projectPath: string): Promise<number> {
   const cfg = await readConfig(projectPath);
   return clampMaxParallel(cfg.defaults?.max_parallel);
+}
+
+export function isMergeStrategy(raw: unknown): raw is MergeStrategy {
+  return typeof raw === "string" && (MERGE_STRATEGIES as readonly string[]).includes(raw);
+}
+
+export function normalizeMergeStrategy(raw: unknown): MergeStrategy {
+  return isMergeStrategy(raw) ? raw : DEFAULT_MERGE_STRATEGY;
+}
+
+export function normalizeCostLimitUsd(raw: unknown): number {
+  if (typeof raw !== "number" || !Number.isFinite(raw) || raw < 0) return DEFAULT_COST_LIMIT_USD;
+  return raw;
+}
+
+// 拿 fallback 完整四欄。base_branch 沒設 → 嘗試 git current branch → 還沒就空字串(讓前端 placeholder)。
+export async function getResolvedDefaults(projectPath: string): Promise<ResolvedDefaults> {
+  const cfg = await readConfig(projectPath);
+  const d = cfg.defaults ?? {};
+  let base_branch =
+    typeof d.base_branch === "string" && d.base_branch.trim().length > 0 ? d.base_branch.trim() : "";
+  if (!base_branch) {
+    try {
+      const cur = await currentBranch(projectPath);
+      base_branch = cur ?? "";
+    } catch {
+      base_branch = "";
+    }
+  }
+  return {
+    base_branch,
+    merge_strategy: normalizeMergeStrategy(d.merge_strategy),
+    max_parallel: clampMaxParallel(d.max_parallel),
+    cost_limit_usd: normalizeCostLimitUsd(d.cost_limit_usd),
+  };
 }
 
 // Atomic write:先寫 .tmp,parse 驗一次,再 rename 蓋過原檔。

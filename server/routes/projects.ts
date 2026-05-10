@@ -73,17 +73,31 @@ export async function openProject(req: Request): Promise<Response> {
 export async function status(hash: string): Promise<Response> {
   const project = await projectStore.findByHash(hash);
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);
-  // 順帶夾 config 摘要(merge_strategy 等),前端要顯示動態 confirm 文字、Settings 用
+  // 順帶夾 config 摘要(merge_strategy / base_branch / cost_limit_usd),
+  // 前端 confirm 文字、SettingsPopover 顯目前值用
   let mergeStrategy: string | undefined;
+  let defaultBaseBranch: string | undefined;
+  let costLimitUsd: number | undefined;
   if (project.hasInit) {
     try {
-      const cfg = await pipelineDir.readConfig(project.path);
-      mergeStrategy = cfg.defaults?.merge_strategy as string | undefined;
+      const resolved = await pipelineDir.getResolvedDefaults(project.path);
+      mergeStrategy = resolved.merge_strategy;
+      defaultBaseBranch = resolved.base_branch;
+      costLimitUsd = resolved.cost_limit_usd;
     } catch {
       // ignore — config 讀失敗就 fallback
     }
   }
-  return ok({ ...project, mergeStrategy } satisfies Project & { mergeStrategy?: string });
+  return ok({
+    ...project,
+    mergeStrategy,
+    defaultBaseBranch,
+    costLimitUsd,
+  } satisfies Project & {
+    mergeStrategy?: string;
+    defaultBaseBranch?: string;
+    costLimitUsd?: number;
+  });
 }
 
 export async function init(hash: string): Promise<Response> {
@@ -576,24 +590,28 @@ export async function revealWorktree(hash: string, pipelineId: string): Promise<
   return ok({ ok: true, path });
 }
 
-// GET /api/projects/:hash/config — 回 project config(目前只暴露 max_parallel,其他保留)
+// GET /api/projects/:hash/config — 回完整四欄(含 fallback 預設)
 export async function getConfig(hash: string): Promise<Response> {
   const project = await projectStore.findByHash(hash);
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);
   if (!pipelineDir.hasInit(project.path))
     return err("not_initialized", `.vibe-pipeline/ not found in ${project.path}`);
-  const cfg = await pipelineDir.readConfig(project.path);
-  const max_parallel = pipelineDir.clampMaxParallel(cfg.defaults?.max_parallel);
-  return ok({
-    defaults: {
-      base_branch: cfg.defaults?.base_branch ?? "main",
-      merge_strategy: cfg.defaults?.merge_strategy ?? "squash",
-      max_parallel,
-    },
-  });
+  const resolved = await pipelineDir.getResolvedDefaults(project.path);
+  return ok({ defaults: resolved });
 }
 
-// PUT /api/projects/:hash/config — 接 partial body,只認可白名單欄位
+// 回 400 with field-level error,body 結構 { ok:false, error:{ code, message, field } }
+function fieldErr(field: string, message: string): Response {
+  return Response.json(
+    {
+      ok: false,
+      error: { code: "invalid_path" satisfies ApiErrorCode, message, field },
+    },
+    { status: 400 }
+  );
+}
+
+// PUT /api/projects/:hash/config — 接 partial body,只認可白名單欄位 + 型別驗證
 export async function updateConfig(hash: string, req: Request): Promise<Response> {
   const guardErr = requireJsonUtf8(req);
   if (guardErr) return guardErr;
@@ -603,27 +621,69 @@ export async function updateConfig(hash: string, req: Request): Promise<Response
     return err("not_initialized", `.vibe-pipeline/ not found in ${project.path}`);
   const body = await readJson(req);
   const cur = await pipelineDir.readConfig(project.path);
+  const nextDefaults: NonNullable<pipelineDir.ProjectConfig["defaults"]> = {
+    ...(cur.defaults ?? {}),
+  };
+  const incomingDefaults = (body.defaults ?? {}) as Record<string, unknown>;
+
+  // max_parallel:number,clamp [1,8](保留既有寬容行為:壞值 → DEFAULT 而不報錯)
+  if ("max_parallel" in incomingDefaults) {
+    const v = incomingDefaults.max_parallel;
+    if (typeof v !== "number" || !Number.isFinite(v)) {
+      return fieldErr("max_parallel", "max_parallel 必須為 number");
+    }
+    nextDefaults.max_parallel = pipelineDir.clampMaxParallel(v);
+  }
+
+  // default_base_branch:string,trim 後非空
+  if ("default_base_branch" in incomingDefaults) {
+    const v = incomingDefaults.default_base_branch;
+    if (typeof v !== "string") {
+      return fieldErr("default_base_branch", "default_base_branch 必須為 string");
+    }
+    const trimmed = v.trim();
+    if (trimmed.length === 0) {
+      return fieldErr("default_base_branch", "default_base_branch 不可為空字串");
+    }
+    nextDefaults.base_branch = trimmed;
+  }
+
+  // merge_strategy:enum
+  if ("merge_strategy" in incomingDefaults) {
+    const v = incomingDefaults.merge_strategy;
+    if (!pipelineDir.isMergeStrategy(v)) {
+      return fieldErr(
+        "merge_strategy",
+        `merge_strategy 必須為 ${pipelineDir.MERGE_STRATEGIES.join(" | ")}`
+      );
+    }
+    nextDefaults.merge_strategy = v;
+  }
+
+  // cost_limit_usd:number >= 0
+  if ("cost_limit_usd" in incomingDefaults) {
+    const v = incomingDefaults.cost_limit_usd;
+    if (typeof v !== "number" || !Number.isFinite(v)) {
+      return fieldErr("cost_limit_usd", "cost_limit_usd 必須為 number");
+    }
+    if (v < 0) {
+      return fieldErr("cost_limit_usd", "cost_limit_usd 必須 >= 0(0 = 無限)");
+    }
+    nextDefaults.cost_limit_usd = v;
+  }
+
   const next: pipelineDir.ProjectConfig = {
     ...cur,
-    defaults: { ...(cur.defaults ?? {}) },
+    defaults: nextDefaults,
     scripts: cur.scripts,
     qa: cur.qa,
   };
-  const incomingDefaults = (body.defaults ?? {}) as Record<string, unknown>;
-  if ("max_parallel" in incomingDefaults) {
-    next.defaults!.max_parallel = pipelineDir.clampMaxParallel(incomingDefaults.max_parallel);
-  }
-  // 其他 defaults 欄位之後再放白名單;目前只 max_parallel 可改
+
   await pipelineDir.writeConfig(project.path, next);
   // max_parallel 變大可能補位,觸發 dispatch
   await orchestrator.triggerDispatch(project.path, hash);
-  return ok({
-    defaults: {
-      base_branch: next.defaults?.base_branch ?? "main",
-      merge_strategy: next.defaults?.merge_strategy ?? "squash",
-      max_parallel: pipelineDir.clampMaxParallel(next.defaults?.max_parallel),
-    },
-  });
+  const resolved = await pipelineDir.getResolvedDefaults(project.path);
+  return ok({ defaults: resolved });
 }
 
 // GET /api/projects/:hash/runtime — 回 N/M(running 條數 / max_parallel)給 TopBar
