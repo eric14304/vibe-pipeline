@@ -1,5 +1,6 @@
 import * as projects from "./routes/projects";
 import * as qa from "./routes/qa";
+import * as userConfigRoutes from "./routes/userConfig";
 import * as test from "./routes/test";
 import * as projectStore from "./lib/projectStore";
 import * as orchestrator from "./lib/runner/orchestrator";
@@ -33,6 +34,14 @@ async function handle(req: Request): Promise<Response> {
       return test.setRunnerScript(req);
     if (pathname === "/api/__test/reset" && method === "POST") return test.reset();
     return notFound();
+  }
+
+  // User-level config(~/.vibe-pipeline/config.json,跨 project)
+  if (pathname === "/api/user/config" && method === "GET") {
+    return userConfigRoutes.getConfig();
+  }
+  if (pathname === "/api/user/config" && method === "PUT") {
+    return userConfigRoutes.updateConfig(req);
   }
 
   if (pathname === "/api/projects" && method === "GET") {

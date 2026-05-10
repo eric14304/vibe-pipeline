@@ -7,7 +7,8 @@ import * as notifs from "../notifs/store";
 import * as ticketWatcher from "./ticketWatcher";
 import * as runLog from "./runLog";
 import * as testMode from "../testMode";
-import { RUNNER_BEHAVIOR_PROMPT } from "./runnerPrompt";
+import { buildRunnerBehaviorPrompt } from "./runnerPrompt";
+import { loadUserConfig } from "../userConfig";
 
 type RunningProcess = {
   pipelineId: string;
@@ -305,6 +306,10 @@ async function spawnDirect(opts: {
   // 主 agent 拿全工具 — 因為 sub-agent (Task) 會繼承限制,
   // 擋 Edit/Write 就等於 sub-agent 也不能改 code,ticket 跑不了。
   // 改用 system prompt 約束主 agent 自己不直接改 source(只用 Edit/Write 更新 pipeline.json)
+  const userCfg = await loadUserConfig();
+  const runnerCfg = userCfg.defaults.runner;
+  const subAgentCfg = userCfg.defaults.subAgent;
+  const mergeCfg = userCfg.defaults.merge;
   const args = [
     "claude",
     "-p",
@@ -312,8 +317,12 @@ async function spawnDirect(opts: {
     "json",
     "--session-id",
     sessionId,
+    "--model",
+    runnerCfg.model,
+    "--effort",
+    runnerCfg.effort,
     "--system-prompt",
-    RUNNER_BEHAVIOR_PROMPT,
+    buildRunnerBehaviorPrompt({ subAgent: subAgentCfg, merge: mergeCfg }),
     initialMessage,
   ];
 

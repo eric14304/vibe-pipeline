@@ -21,8 +21,11 @@ export function mergeTicketPrompt(opts: {
   // pipeline 內已完成的 real ticket 歷史(merge ticket 自己不放),
   // 給 sub-agent 解衝突時判斷 branch side 改動意圖、寫 commit message 用
   history?: MergeHistoryTicket[];
+  // user 全域 config:這張 ticket 派 Task sub-agent 該用的 model / effort。
+  // model 由主 agent 在 Task tool 參數帶;effort 沒對應 Task tool 參數時走 best-effort 提示
+  modelHint?: { model: string; effort: string };
 }): string {
-  const { projectPath, branch, baseBranch, strategy, history } = opts;
+  const { projectPath, branch, baseBranch, strategy, history, modelHint } = opts;
   const strategyDesc =
     strategy === "squash"
       ? "git -C \"" + projectPath + "\" merge --squash " + branch + " (沒 commit;見「## merge commit message」自己 compose 後 commit)"
@@ -51,8 +54,13 @@ export function mergeTicketPrompt(opts: {
     }
   }
 
+  const modelHintLine = modelHint
+    ? "(建議 sub-agent 以 model=" + modelHint.model + " / effort=" + modelHint.effort + " 強度執行此任務。)"
+    : "";
+
   return [
     "AI merge 任務。把 pipeline branch '" + branch + "' 合併到 base '" + baseBranch + "'。",
+    modelHintLine,
     "",
     "**所有 git 操作都用 git -C \"" + projectPath + "\" 顯式指定 main repo,不切 cwd**。",
     "(你的 cwd 是 worktree,不能在這做 merge — 必須在 main repo 操作。)",

@@ -1,5 +1,41 @@
 // 前後端共用持久化型別。Backend 是 source of truth。
 
+// ─── User-level config(~/.vibe-pipeline/config.json,跨 project) ───
+// 跟 <target-repo>/.vibe-pipeline/config.json (per-project, max_parallel 等) 不同層。
+export type ModelName = "opus" | "sonnet" | "haiku";
+export type Effort = "low" | "medium" | "high";
+export type TaskClass = "qa" | "runner" | "subAgent" | "merge";
+
+export type TaskModelConfig = {
+  model: ModelName;
+  effort: Effort;
+};
+
+export type UserConfig = {
+  defaults: Record<TaskClass, TaskModelConfig>;
+};
+
+export const DEFAULT_USER_CONFIG: UserConfig = {
+  defaults: {
+    qa: { model: "sonnet", effort: "low" },
+    runner: { model: "opus", effort: "medium" },
+    subAgent: { model: "opus", effort: "high" },
+    merge: { model: "opus", effort: "high" },
+  },
+};
+
+export const TASK_CLASSES: TaskClass[] = ["qa", "runner", "subAgent", "merge"];
+export const MODEL_NAMES: ModelName[] = ["opus", "sonnet", "haiku"];
+export const EFFORT_LEVELS: Effort[] = ["low", "medium", "high"];
+
+export const TASK_CLASS_LABELS: Record<TaskClass, string> = {
+  qa: "QA(規格收斂)",
+  runner: "Runner 主 agent",
+  subAgent: "Sub-agent(執行AI / 審核AI)",
+  merge: "AI 合併",
+};
+
+
 export type Project = {
   path: string; // absolute
   hash: string; // sha256(path).slice(0, 8)

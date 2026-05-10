@@ -1,8 +1,80 @@
 import { useEffect, useRef, useState } from "react";
 import * as api from "../../api/projects";
+import * as userConfigApi from "../../api/userConfig";
+import {
+  EFFORT_LEVELS,
+  MODEL_NAMES,
+  TASK_CLASSES,
+  TASK_CLASS_LABELS,
+  type Effort,
+  type ModelName,
+  type TaskClass,
+  type UserConfig,
+} from "../../../shared/types";
 
 const MIN = 1;
 const MAX = 8;
+
+function TaskModelPicker({
+  label,
+  model,
+  effort,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  model: ModelName;
+  effort: Effort;
+  disabled?: boolean;
+  onChange: (patch: { model?: ModelName; effort?: Effort }) => void;
+}) {
+  const selectStyle: React.CSSProperties = {
+    padding: "3px 6px",
+    border: "1px solid var(--line)",
+    borderRadius: 4,
+    background: "var(--panel)",
+    color: "var(--fg)",
+    fontSize: 12,
+  };
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        fontSize: 12,
+      }}
+    >
+      <span style={{ flex: 1, color: "var(--fg)" }}>{label}</span>
+      <select
+        className="mono"
+        value={model}
+        disabled={disabled}
+        onChange={(e) => onChange({ model: e.target.value as ModelName })}
+        style={selectStyle}
+      >
+        {MODEL_NAMES.map((m) => (
+          <option key={m} value={m}>
+            {m}
+          </option>
+        ))}
+      </select>
+      <select
+        className="mono"
+        value={effort}
+        disabled={disabled}
+        onChange={(e) => onChange({ effort: e.target.value as Effort })}
+        style={selectStyle}
+      >
+        {EFFORT_LEVELS.map((eff) => (
+          <option key={eff} value={eff}>
+            {eff}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
 
 // Project-level Settings popover。露 max_parallel / default_base_branch / cost_limit_usd。
 // (merge_strategy 已鎖 'merge',不再露,因為 squash/ff-only 跟 auto-rebase + sync chip 不相容)
@@ -26,6 +98,10 @@ export function SettingsPopover({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+  // User-level config(跨 project)— 跟上面的 project-level 是不同層,獨立 PUT
+  const [userCfg, setUserCfg] = useState<UserConfig | null>(null);
+  const [userCfgError, setUserCfgError] = useState<string | null>(null);
+  const [userCfgBusy, setUserCfgBusy] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -48,6 +124,51 @@ export function SettingsPopover({
       cancelled = true;
     };
   }, [hash, open]);
+
+  // User-level config 載入
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setUserCfgError(null);
+    userConfigApi
+      .getUserConfig()
+      .then((c) => {
+        if (!cancelled) setUserCfg(c);
+      })
+      .catch((e: Error) => {
+        if (!cancelled) setUserCfgError(e.message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  async function updateTask(tc: TaskClass, patch: { model?: ModelName; effort?: Effort }) {
+    if (!userCfg) return;
+    const cur = userCfg.defaults[tc];
+    const next: UserConfig = {
+      ...userCfg,
+      defaults: {
+        ...userCfg.defaults,
+        [tc]: { ...cur, ...patch },
+      },
+    };
+    // 樂觀 UI:先 set,失敗 rollback
+    setUserCfg(next);
+    setUserCfgBusy(true);
+    setUserCfgError(null);
+    try {
+      const saved = await userConfigApi.updateUserConfig({
+        defaults: { [tc]: patch },
+      });
+      setUserCfg(saved);
+    } catch (e) {
+      setUserCfgError(e instanceof Error ? e.message : String(e));
+      setUserCfg(userCfg); // rollback
+    } finally {
+      setUserCfgBusy(false);
+    }
+  }
 
   // outside click + Esc 關
   useEffect(() => {
@@ -225,6 +346,48 @@ export function SettingsPopover({
         style={{ ...inputStyle, width: 120, marginBottom: 6 }}
       />
       <div style={hintStyle}>0 = 無限。超過上限會擋下新的 /run 並發 notif。</div>
+
+      <div
+        style={{
+          marginTop: 6,
+          marginBottom: 10,
+          fontSize: 12,
+          letterSpacing: "0.06em",
+          color: "var(--fg-mute)",
+          textTransform: "uppercase",
+        }}
+      >
+        AI 任務 model / effort(跨 project)
+      </div>
+      {userCfg ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 10 }}>
+          {TASK_CLASSES.map((tc) => (
+            <TaskModelPicker
+              key={tc}
+              label={TASK_CLASS_LABELS[tc]}
+              model={userCfg.defaults[tc].model}
+              effort={userCfg.defaults[tc].effort}
+              disabled={userCfgBusy}
+              onChange={(patch) => updateTask(tc, patch)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div style={hintStyle}>載入中…</div>
+      )}
+      {userCfgError && (
+        <div
+          className="mono"
+          style={{
+            fontSize: 11,
+            color: "var(--failed)",
+            marginBottom: 8,
+            wordBreak: "break-word",
+          }}
+        >
+          {userCfgError}
+        </div>
+      )}
 
       {error && (
         <div

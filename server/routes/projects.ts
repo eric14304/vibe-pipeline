@@ -9,6 +9,7 @@ import * as runLog from "../lib/runner/runLog";
 import * as notifs from "../lib/notifs/store";
 import { mergeTicketPrompt } from "../lib/runner/mergeTicketPrompt";
 import { syncTicketPrompt } from "../lib/runner/syncTicketPrompt";
+import { getTaskConfig } from "../lib/userConfig";
 import { pickFolder, revealFolder } from "../lib/dialog";
 import { projectHash } from "../lib/hash";
 import { isExistingDirectory } from "../lib/fs";
@@ -368,12 +369,14 @@ export async function mergePipeline(hash: string, pipelineId: string): Promise<R
         .filter((c) => c.hash || c.subject),
     }));
 
+  const mergeCfg = await getTaskConfig("merge");
   const prompt = mergeTicketPrompt({
     projectPath: project.path,
     branch,
     baseBranch,
     strategy,
     history,
+    modelHint: { model: mergeCfg.model, effort: mergeCfg.effort },
   });
 
   const appendRes = await pipelineDir.appendMergeTicket({
