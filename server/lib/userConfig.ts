@@ -20,9 +20,11 @@ import {
   DEFAULT_USER_CONFIG,
   EFFORT_LEVELS,
   MODEL_NAMES,
+  PROVIDERS,
   TASK_CLASSES,
   type Effort,
   type ModelName,
+  type Provider,
   type TaskClass,
   type TaskModelConfig,
   type UserConfig,
@@ -44,10 +46,15 @@ function isEffort(v: unknown): v is Effort {
   return typeof v === "string" && (EFFORT_LEVELS as string[]).includes(v);
 }
 
+function isProvider(v: unknown): v is Provider {
+  return typeof v === "string" && (PROVIDERS as string[]).includes(v);
+}
+
 function coerceTaskModel(raw: unknown, fallback: TaskModelConfig): TaskModelConfig {
   if (!raw || typeof raw !== "object") return { ...fallback };
   const o = raw as Record<string, unknown>;
   return {
+    provider: isProvider(o.provider) ? o.provider : fallback.provider,
     model: isModel(o.model) ? o.model : fallback.model,
     effort: isEffort(o.effort) ? o.effort : fallback.effort,
   };
@@ -112,8 +119,18 @@ export async function patchUserConfig(body: unknown): Promise<UserConfig> {
     }
     const o = raw as Record<string, unknown>;
     const cur_tc = cur.defaults[tc];
+    let provider: Provider = cur_tc.provider;
     let model: ModelName = cur_tc.model;
     let effort: Effort = cur_tc.effort;
+    if ("provider" in o) {
+      if (!isProvider(o.provider)) {
+        throw new UserConfigPatchError(
+          `defaults.${tc}.provider`,
+          `defaults.${tc}.provider 必須為 ${PROVIDERS.join("/")}`
+        );
+      }
+      provider = o.provider;
+    }
     if ("model" in o) {
       if (!isModel(o.model)) {
         throw new UserConfigPatchError(
@@ -132,13 +149,22 @@ export async function patchUserConfig(body: unknown): Promise<UserConfig> {
       }
       effort = o.effort;
     }
-    nextDefaults[tc] = { model, effort };
+    nextDefaults[tc] = { provider, model, effort };
   }
   return writeUserConfig({ defaults: nextDefaults });
 }
 
-// 拿單一 task class 的 model/effort(spawn 點呼叫)
+// 拿單一 task class 的 provider/model/effort(spawn 點呼叫)
 export async function getTaskConfig(tc: TaskClass): Promise<TaskModelConfig> {
   const cfg = await loadUserConfig();
   return cfg.defaults[tc];
+}
+
+// 拿 task class config + 對應 adapter instance(spawn 點便利方法,避免 caller 自己 import getAdapter)
+export async function getTaskConfigWithAdapter(
+  tc: TaskClass
+): Promise<TaskModelConfig & { adapter: import("./cli").CliAdapter }> {
+  const cfg = await getTaskConfig(tc);
+  const { getAdapter } = await import("./cli");
+  return { ...cfg, adapter: getAdapter(tc, cfg.provider) };
 }

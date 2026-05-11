@@ -4,10 +4,12 @@ import * as userConfigApi from "../../api/userConfig";
 import {
   EFFORT_LEVELS,
   MODEL_NAMES,
+  PROVIDERS,
   TASK_CLASSES,
   TASK_CLASS_LABELS,
   type Effort,
   type ModelName,
+  type Provider,
   type TaskClass,
   type UserConfig,
 } from "../../../shared/types";
@@ -17,16 +19,18 @@ const MAX = 8;
 
 function TaskModelPicker({
   label,
+  provider,
   model,
   effort,
   disabled,
   onChange,
 }: {
   label: string;
+  provider: Provider;
   model: ModelName;
   effort: Effort;
   disabled?: boolean;
-  onChange: (patch: { model?: ModelName; effort?: Effort }) => void;
+  onChange: (patch: { provider?: Provider; model?: ModelName; effort?: Effort }) => void;
 }) {
   const selectStyle: React.CSSProperties = {
     padding: "3px 6px",
@@ -41,11 +45,25 @@ function TaskModelPicker({
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 8,
+        gap: 6,
         fontSize: 12,
       }}
     >
       <span style={{ flex: 1, color: "var(--fg)" }}>{label}</span>
+      <select
+        className="mono"
+        value={provider}
+        disabled={disabled}
+        onChange={(e) => onChange({ provider: e.target.value as Provider })}
+        style={selectStyle}
+        title="AI provider(claude / codex)"
+      >
+        {PROVIDERS.map((p) => (
+          <option key={p} value={p}>
+            {p}
+          </option>
+        ))}
+      </select>
       <select
         className="mono"
         value={model}
@@ -145,7 +163,10 @@ export function SettingsPopover({
     };
   }, [open]);
 
-  async function updateTask(tc: TaskClass, patch: { model?: ModelName; effort?: Effort }) {
+  async function updateTask(
+    tc: TaskClass,
+    patch: { provider?: Provider; model?: ModelName; effort?: Effort }
+  ) {
     if (!userCfg) return;
     const cur = userCfg.defaults[tc];
     const next: UserConfig = {
@@ -393,6 +414,7 @@ export function SettingsPopover({
             <TaskModelPicker
               key={tc}
               label={TASK_CLASS_LABELS[tc]}
+              provider={userCfg.defaults[tc].provider}
               model={userCfg.defaults[tc].model}
               effort={userCfg.defaults[tc].effort}
               disabled={userCfgBusy}

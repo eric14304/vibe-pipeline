@@ -1,8 +1,11 @@
-// CLI adapter helper:依 taskClass 選擇對應 adapter。
-// 目前永遠回 ClaudeAdapter,Ticket 2 起會加 codex 分支(由 user config 決定 / per-task class 切換)。
+// CLI adapter helper:依 taskClass + provider 選對應 adapter。
+// Ticket 2:provider 由 ~/.vibe-pipeline/config.json defaults.<taskClass>.provider 決定,
+// caller 透過 userConfig.getTaskConfigWithAdapter() 一次拿 config + adapter。
 
 import type { CliAdapter, TaskClass } from "./adapter";
 import { ClaudeAdapter } from "./claudeAdapter";
+import { CodexAdapter } from "./codexAdapter";
+import type { Provider } from "../../../shared/types";
 
 export type { CliAdapter, TaskClass } from "./adapter";
 export type {
@@ -15,10 +18,13 @@ export type {
   SpawnedProcess,
 } from "./adapter";
 export { ClaudeAdapter } from "./claudeAdapter";
+export { CodexAdapter } from "./codexAdapter";
 
 const claudeAdapter = new ClaudeAdapter();
+const codexAdapter = new CodexAdapter();
 
-export function getAdapter(_taskClass: TaskClass): CliAdapter {
-  // Ticket 2 才依 taskClass 切 ClaudeAdapter / CodexAdapter。當前一律走 claude。
+// 取 adapter。provider 缺省走 claude(舊 caller / 舊 config 相容)。
+export function getAdapter(_taskClass: TaskClass, provider: Provider = "claude"): CliAdapter {
+  if (provider === "codex") return codexAdapter;
   return claudeAdapter;
 }

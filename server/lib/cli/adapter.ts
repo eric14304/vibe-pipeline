@@ -21,6 +21,10 @@ export type QASpawnOpts = {
   appendSystemPrompt?: string;    // follow-up turn 用 --append-system-prompt
   model: string;
   effort: string;
+  // 之前已完成的輪次(不含本輪 userMessage)。
+  // claude adapter:忽略(用 --resume sessionId 從 disk session 接續)。
+  // codex adapter:isFirstTurn=false 時把 history 折成 transcript 串進 prompt,補上 codex 無 session resume 的失憶問題。
+  history?: Array<{ role: "user" | "assistant"; content: string }>;
 };
 
 // Runner spawn opts:主 agent,長跑,系統 prompt 自定流程。
@@ -76,4 +80,9 @@ export interface CliAdapter {
 
   // 起一個對應 task class 的子行程
   spawn(opts: SpawnOpts): SpawnedProcess;
+
+  // 從 stdout 萃取「LLM 最終訊息文字」(callers 再丟給 parseReply / parseSplitArray)。
+  // claude:JSON.parse(stdout).result;codex:JSONL 掃 agent_message,或 fallback last line。
+  // 拋例外 = 解析失敗,caller 走 parse_failed code。
+  parseResult(kind: "qa" | "split" | "runner", stdout: string): string;
 }

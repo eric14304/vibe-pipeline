@@ -42,6 +42,13 @@ export class ClaudeAdapter implements CliAdapter {
     // 保留 placeholder 給未來其他 CLI(例如 codex)若改成獨立 spawn 模式時填。
     throw new Error("ClaudeAdapter: 'merge' task class 不獨立 spawn,呼叫端應走 orchestrator.start");
   }
+
+  parseResult(_kind: "qa" | "split" | "runner", stdout: string): string {
+    // claude --output-format json 包成 { type:"result", result:"<text>", session_id, ... }
+    const outerJson = JSON.parse(stdout) as { result?: string; text?: string; [k: string]: unknown };
+    const inner = outerJson.result ?? outerJson.text ?? outerJson;
+    return typeof inner === "string" ? inner : JSON.stringify(inner);
+  }
 }
 
 function spawnQA(opts: QASpawnOpts): SpawnedProcess {

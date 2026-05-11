@@ -8,8 +8,7 @@ import * as ticketWatcher from "./ticketWatcher";
 import * as runLog from "./runLog";
 import * as testMode from "../testMode";
 import { buildRunnerBehaviorPrompt } from "./runnerPrompt";
-import { loadUserConfig } from "../userConfig";
-import { getAdapter } from "../cli";
+import { loadUserConfig, getTaskConfigWithAdapter } from "../userConfig";
 
 type RunningProcess = {
   pipelineId: string;
@@ -308,13 +307,13 @@ async function spawnDirect(opts: {
   // 擋 Edit/Write 就等於 sub-agent 也不能改 code,ticket 跑不了。
   // 改用 system prompt 約束主 agent 自己不直接改 source(只用 Edit/Write 更新 pipeline.json)
   const userCfg = await loadUserConfig();
-  const runnerCfg = userCfg.defaults.runner;
   const subAgentCfg = userCfg.defaults.subAgent;
   const mergeCfg = userCfg.defaults.merge;
+  const runnerCfg = await getTaskConfigWithAdapter("runner");
 
   let proc: Bun.Subprocess;
   try {
-    proc = getAdapter("runner").spawn({
+    proc = runnerCfg.adapter.spawn({
       kind: "runner",
       cwd: wtPath,
       sessionId,
@@ -324,7 +323,7 @@ async function spawnDirect(opts: {
       effort: runnerCfg.effort,
     });
   } catch (e) {
-    return { ok: false, error: `spawn claude failed: ${String(e)}` };
+    return { ok: false, error: `spawn ${runnerCfg.adapter.name} failed: ${String(e)}` };
   }
 
   running.set(k, { pipelineId, proc, startedAt: Date.now() });

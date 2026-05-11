@@ -5,7 +5,7 @@
 
 import { isTestMode } from "../testMode";
 import type { TicketSpec } from "../../../shared/types";
-import { getAdapter } from "../cli";
+import { getTaskConfigWithAdapter } from "../userConfig";
 
 export class SplitError extends Error {
   constructor(public code: "not_available" | "exec_failed" | "parse_failed" | "empty_split", message: string) {
@@ -78,20 +78,21 @@ export async function splitTicketSpec(opts: {
 
   // userMessage 走 stdin,別當 positional arg(Windows 下 --system-prompt 後接 long positional 會被
   // claude CLI 當成 input 缺失,踩過)
-  // model 用 Haiku 4.5:split 是結構化輸出任務(spec → JSON 陣列),Haiku 速度 ~3-5x 快、成本 ~1/10,
-  // 品質夠用(這不需要深度推理)。User 預設 model 通常是 Opus,split 不該佔那麼多
+  // model:default haiku(便宜快;split 是結構化輸出,不需深度推理),但走 user config —
+  // user 在 SettingsPopover 可改 provider / model / effort。
+  const splitCfg = await getTaskConfigWithAdapter("split");
   let proc: ReturnType<typeof Bun.spawn>;
   try {
-    proc = getAdapter("split").spawn({
+    proc = splitCfg.adapter.spawn({
       kind: "split",
       cwd,
       userMessage,
       systemPrompt: SPLIT_BEHAVIOR_PROMPT,
-      model: "claude-haiku-4-5-20251001",
-      effort: "low",
+      model: splitCfg.model,
+      effort: splitCfg.effort,
     });
   } catch (e) {
-    throw new SplitError("not_available", `claude CLI not found: ${e}`);
+    throw new SplitError("not_available", `${splitCfg.adapter.name} CLI not found: ${e}`);
   }
   const [stdoutText, stderrText] = await Promise.all([
     new Response(proc.stdout).text(),
@@ -102,19 +103,20 @@ export async function splitTicketSpec(opts: {
   if (proc.exitCode !== 0) {
     throw new SplitError(
       "exec_failed",
-      `claude exited ${proc.exitCode}: ${stderrText.trim() || stdoutText.trim()}`
+      `${splitCfg.adapter.name} exited ${proc.exitCode}: ${stderrText.trim() || stdoutText.trim()}`
     );
   }
 
-  // --output-format json wraps result in: { type:"result", result:"<actual text>", ... }
-  let outerJson: { result?: string; text?: string; [k: string]: unknown };
+  // adapter.parseResult 統一抽取 LLM 最終訊息字串(claude=outer JSON.result;codex=JSONL agent_message)
+  let innerStr: string;
   try {
-    outerJson = JSON.parse(stdoutText);
-  } catch {
-    throw new SplitError("parse_failed", `claude output not JSON: ${stdoutText.slice(0, 200)}`);
+    innerStr = splitCfg.adapter.parseResult("split", stdoutText);
+  } catch (e) {
+    throw new SplitError(
+      "parse_failed",
+      `${splitCfg.adapter.name} output not parseable: ${String(e).slice(0, 200)}`
+    );
   }
-  const inner = outerJson.result ?? outerJson.text ?? "";
-  const innerStr = typeof inner === "string" ? inner : JSON.stringify(inner);
 
   const arr = parseSplitArray(innerStr);
   if (!Array.isArray(arr) || arr.length === 0) {
