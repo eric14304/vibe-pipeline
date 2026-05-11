@@ -215,7 +215,7 @@ export function TopBar({
           <div className="topbar-active-meta">
             {active.hasGit && (
               <span
-                className="chip mono"
+                className="chip mono topbar-current-branch"
                 title={active.currentBranch ? `當前 branch: ${active.currentBranch}` : "detached HEAD"}
               >
                 <span style={{ color: "var(--fg-mute)" }}>⎇</span>{" "}

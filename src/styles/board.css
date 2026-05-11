@@ -889,6 +889,22 @@ html.light .focus-create-empty {
   .topbar-reveal-folder {
     display: none !important;
   }
+  /* TopBar 當前 branch chip 在手機隱藏(跟 FocusColumn 已顯示的 pipeline 分支重複 / 太密) */
+  .topbar-current-branch {
+    display: none !important;
+  }
+  /* 手機 FocusColumn 縮小 padding,標題小一點,降低上方密度 */
+  .focus {
+    padding: 14px 14px 18px !important;
+  }
+  .focus-title {
+    font-size: 18px !important;
+  }
+  .focus-head { margin-bottom: 10px !important; }
+  .focus-head-top {
+    gap: 6px !important;
+    margin-bottom: 8px !important;
+  }
   /* 內容少不需要 overflow menu — 全部 inline 顯示 */
   .topbar-overflow-mobile-items {
     display: none !important;
