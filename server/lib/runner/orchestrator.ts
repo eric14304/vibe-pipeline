@@ -315,6 +315,15 @@ async function spawnDirect(opts: {
     "-p",
     "--output-format",
     "json",
+    // perf:runner 主 agent 系統 prompt 自寫完整流程,不依賴 user MCP / slash commands / 上次 session。
+    // 砍這幾項砍 cold start ~700ms + 砍 1h cache_creation ~12000 tokens / spawn(~$0.075 → ~$0.057)。
+    // 保留 --setting-sources 預設(user/project/local),因為 Task sub-agent 改 source code 時
+    // 仍可能需要 user CLAUDE.md / project lint config 等繼承,完整砍會影響 sub-agent 編碼品質。
+    "--strict-mcp-config",
+    "--mcp-config",
+    '{"mcpServers":{}}',
+    "--no-session-persistence",
+    "--disable-slash-commands",
     "--session-id",
     sessionId,
     "--model",

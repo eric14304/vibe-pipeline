@@ -67,6 +67,15 @@ export async function runTurn({
     "--effort",
     qaCfg.effort,
   ];
+  // perf:QA 是 server-controlled feature,system prompt 自己定完整契約,不該被 user 個人設定 / project hooks /
+  // MCP servers / slash commands 干擾。砍 setting-sources / mcp / slash-commands 後 cold start ~快 125ms、
+  // 1h cache_creation tokens 從 19512 降到 0(cost -89%)。量測見 refs/claude-cli-spawn-perf-2026-05-11.md。
+  //
+  // 注意:**不能加 --no-session-persistence** — QA 多輪靠 --resume 接續,
+  // 第二輪起需要前一輪 session 落地到 disk,no-persist 會讓 follow-up turn 直接 500。
+  args.push("--setting-sources", "");
+  args.push("--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}');
+  args.push("--disable-slash-commands");
   // QA 階段:鎖會改檔 / 跑 sub-agent / 上網的工具,其他(Bash / Read / Grep / Glob / MCP)放行讓 AI 收斂時可查專案。
   args.push("--disallowedTools", "Edit Write Task");
   if (isFirstTurn) {
