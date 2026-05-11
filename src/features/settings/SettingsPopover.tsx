@@ -2,11 +2,15 @@ import { useEffect, useRef, useState } from "react";
 import * as api from "../../api/projects";
 import * as userConfigApi from "../../api/userConfig";
 import {
-  EFFORT_LEVELS,
-  MODEL_NAMES,
   PROVIDERS,
   TASK_CLASSES,
   TASK_CLASS_LABELS,
+  defaultEffortForProvider,
+  defaultModelForProvider,
+  effortsForProvider,
+  isValidEffort,
+  isValidModel,
+  modelsForProvider,
   type Effort,
   type ModelName,
   type Provider,
@@ -63,7 +67,7 @@ function TaskModelRow({
         onChange={(e) => onChange({ model: e.target.value as ModelName })}
         style={TASK_SELECT_STYLE}
       >
-        {MODEL_NAMES.map((m) => (
+        {modelsForProvider(provider).map((m) => (
           <option key={m} value={m}>
             {m}
           </option>
@@ -75,7 +79,7 @@ function TaskModelRow({
         onChange={(e) => onChange({ effort: e.target.value as Effort })}
         style={TASK_SELECT_STYLE}
       >
-        {EFFORT_LEVELS.map((eff) => (
+        {effortsForProvider(provider).map((eff) => (
           <option key={eff} value={eff}>
             {eff}
           </option>
@@ -160,11 +164,24 @@ export function SettingsPopover({
   ) {
     if (!userCfg) return;
     const cur = userCfg.defaults[tc];
+    // provider 變但 patch 沒帶 model / effort → 自動 snap 到該 provider 預設,避免送出非法組合
+    const merged = { ...cur, ...patch };
+    if (patch.provider && patch.provider !== cur.provider) {
+      const np = patch.provider;
+      if (patch.model === undefined && !isValidModel(np, merged.model)) {
+        merged.model = defaultModelForProvider(np);
+        patch = { ...patch, model: merged.model };
+      }
+      if (patch.effort === undefined && !isValidEffort(np, merged.effort)) {
+        merged.effort = defaultEffortForProvider(np);
+        patch = { ...patch, effort: merged.effort };
+      }
+    }
     const next: UserConfig = {
       ...userCfg,
       defaults: {
         ...userCfg.defaults,
-        [tc]: { ...cur, ...patch },
+        [tc]: merged,
       },
     };
     // 樂觀 UI:先 set,失敗 rollback

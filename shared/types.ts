@@ -2,9 +2,12 @@
 
 // ─── User-level config(~/.vibe-pipeline/config.json,跨 project) ───
 // 跟 <target-repo>/.vibe-pipeline/config.json (per-project, max_parallel 等) 不同層。
-export type ModelName = "opus" | "sonnet" | "haiku";
-export type Effort = "low" | "medium" | "high";
-// provider 決定走 ClaudeAdapter 還是 CodexAdapter;舊 config 沒這欄預設 'claude' 維持相容
+//
+// provider 決定走 ClaudeAdapter 還是 CodexAdapter;model / effort 兩 provider 不同字典
+// (claude opus/sonnet/haiku × low/medium/high;codex gpt-5-codex/gpt-5 × minimal/low/medium/high)。
+// ModelName / Effort 用 string 寬鬆容納,各 provider 各自的 list 用 *_FOR_PROVIDER lookup。
+export type ModelName = string;
+export type Effort = string;
 export type Provider = "claude" | "codex";
 // split = QA 拆 ticket 的 one-shot call(獨立 task class,可用便宜 model)
 export type TaskClass = "qa" | "split" | "runner" | "subAgent" | "merge";
@@ -19,6 +22,40 @@ export type UserConfig = {
   defaults: Record<TaskClass, TaskModelConfig>;
 };
 
+export const TASK_CLASSES: TaskClass[] = ["qa", "split", "runner", "subAgent", "merge"];
+export const PROVIDERS: Provider[] = ["claude", "codex"];
+
+// 每 provider 各自的 model / effort 允許字典。第一個元素是該 provider 預設值。
+export const MODELS_BY_PROVIDER: Record<Provider, readonly ModelName[]> = {
+  claude: ["opus", "sonnet", "haiku"],
+  // codex CLI 接 -m 在 ChatGPT auth 下會 400,model 只作 prompt hint;選用最常見幾個
+  codex: ["gpt-5-codex", "gpt-5", "o3", "o3-mini"],
+};
+
+export const EFFORTS_BY_PROVIDER: Record<Provider, readonly Effort[]> = {
+  claude: ["low", "medium", "high"],
+  codex: ["minimal", "low", "medium", "high"],
+};
+
+export function modelsForProvider(p: Provider): readonly ModelName[] {
+  return MODELS_BY_PROVIDER[p];
+}
+export function effortsForProvider(p: Provider): readonly Effort[] {
+  return EFFORTS_BY_PROVIDER[p];
+}
+export function defaultModelForProvider(p: Provider): ModelName {
+  return MODELS_BY_PROVIDER[p][0];
+}
+export function defaultEffortForProvider(p: Provider): Effort {
+  return EFFORTS_BY_PROVIDER[p][1] ?? EFFORTS_BY_PROVIDER[p][0]; // 取 medium / 退 low
+}
+export function isValidModel(p: Provider, m: ModelName): boolean {
+  return MODELS_BY_PROVIDER[p].includes(m);
+}
+export function isValidEffort(p: Provider, e: Effort): boolean {
+  return EFFORTS_BY_PROVIDER[p].includes(e);
+}
+
 export const DEFAULT_USER_CONFIG: UserConfig = {
   defaults: {
     qa: { provider: "claude", model: "sonnet", effort: "low" },
@@ -29,10 +66,9 @@ export const DEFAULT_USER_CONFIG: UserConfig = {
   },
 };
 
-export const TASK_CLASSES: TaskClass[] = ["qa", "split", "runner", "subAgent", "merge"];
-export const MODEL_NAMES: ModelName[] = ["opus", "sonnet", "haiku"];
-export const EFFORT_LEVELS: Effort[] = ["low", "medium", "high"];
-export const PROVIDERS: Provider[] = ["claude", "codex"];
+// 舊代碼還在 import 這兩個 const 的話,保留 claude 預設值不破壞(deprecated,新代碼用 *_FOR_PROVIDER)
+export const MODEL_NAMES: readonly ModelName[] = MODELS_BY_PROVIDER.claude;
+export const EFFORT_LEVELS: readonly Effort[] = EFFORTS_BY_PROVIDER.claude;
 
 export const TASK_CLASS_LABELS: Record<TaskClass, string> = {
   qa: "QA(規格收斂)",

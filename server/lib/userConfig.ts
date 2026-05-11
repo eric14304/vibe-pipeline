@@ -18,10 +18,14 @@ import { existsSync, mkdirSync } from "node:fs";
 import { vibeHome } from "./paths";
 import {
   DEFAULT_USER_CONFIG,
-  EFFORT_LEVELS,
-  MODEL_NAMES,
   PROVIDERS,
   TASK_CLASSES,
+  defaultEffortForProvider,
+  defaultModelForProvider,
+  effortsForProvider,
+  isValidEffort,
+  isValidModel,
+  modelsForProvider,
   type Effort,
   type ModelName,
   type Provider,
@@ -38,26 +42,29 @@ function file(): string {
   return join(dir(), "config.json");
 }
 
-function isModel(v: unknown): v is ModelName {
-  return typeof v === "string" && (MODEL_NAMES as string[]).includes(v);
-}
-
-function isEffort(v: unknown): v is Effort {
-  return typeof v === "string" && (EFFORT_LEVELS as string[]).includes(v);
-}
-
 function isProvider(v: unknown): v is Provider {
   return typeof v === "string" && (PROVIDERS as string[]).includes(v);
 }
 
+// per-provider 驗 model / effort:不同 provider 字典不同(claude opus/sonnet/haiku × low/medium/high;
+// codex gpt-5-codex/gpt-5 × minimal/low/medium/high)。switch provider 後若舊值不合法 → 退到該 provider 預設
 function coerceTaskModel(raw: unknown, fallback: TaskModelConfig): TaskModelConfig {
   if (!raw || typeof raw !== "object") return { ...fallback };
   const o = raw as Record<string, unknown>;
-  return {
-    provider: isProvider(o.provider) ? o.provider : fallback.provider,
-    model: isModel(o.model) ? o.model : fallback.model,
-    effort: isEffort(o.effort) ? o.effort : fallback.effort,
-  };
+  const provider: Provider = isProvider(o.provider) ? o.provider : fallback.provider;
+  const rawModel = typeof o.model === "string" ? o.model : "";
+  const model: ModelName = isValidModel(provider, rawModel)
+    ? rawModel
+    : isValidModel(provider, fallback.model)
+    ? fallback.model
+    : defaultModelForProvider(provider);
+  const rawEffort = typeof o.effort === "string" ? o.effort : "";
+  const effort: Effort = isValidEffort(provider, rawEffort)
+    ? rawEffort
+    : isValidEffort(provider, fallback.effort)
+    ? fallback.effort
+    : defaultEffortForProvider(provider);
+  return { provider, model, effort };
 }
 
 function coerceConfig(raw: unknown): UserConfig {
@@ -132,22 +139,31 @@ export async function patchUserConfig(body: unknown): Promise<UserConfig> {
       provider = o.provider;
     }
     if ("model" in o) {
-      if (!isModel(o.model)) {
+      if (typeof o.model !== "string" || !isValidModel(provider, o.model)) {
         throw new UserConfigPatchError(
           `defaults.${tc}.model`,
-          `defaults.${tc}.model 必須為 ${MODEL_NAMES.join("/")}`
+          `defaults.${tc}.model 必須為 ${modelsForProvider(provider).join("/")}(provider=${provider})`
         );
       }
       model = o.model;
     }
     if ("effort" in o) {
-      if (!isEffort(o.effort)) {
+      if (typeof o.effort !== "string" || !isValidEffort(provider, o.effort)) {
         throw new UserConfigPatchError(
           `defaults.${tc}.effort`,
-          `defaults.${tc}.effort 必須為 ${EFFORT_LEVELS.join("/")}`
+          `defaults.${tc}.effort 必須為 ${effortsForProvider(provider).join("/")}(provider=${provider})`
         );
       }
       effort = o.effort;
+    }
+    // provider 變但 model/effort 沒同步換 → 自動 snap 到該 provider 預設
+    if ("provider" in o) {
+      if (!("model" in o) && !isValidModel(provider, model)) {
+        model = defaultModelForProvider(provider);
+      }
+      if (!("effort" in o) && !isValidEffort(provider, effort)) {
+        effort = defaultEffortForProvider(provider);
+      }
     }
     nextDefaults[tc] = { provider, model, effort };
   }
