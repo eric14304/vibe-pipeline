@@ -546,7 +546,7 @@ function OverflowMenu({
   if (!onResetAll && !onRevealWorktree && !onPruneWorktree && !onDelete) return null;
 
   return (
-    <div ref={wrapRef} style={{ position: "relative", display: "inline-block" }}>
+    <div ref={wrapRef} className="focus-overflow" style={{ position: "relative", display: "inline-block" }}>
       <button type="button"
         className="btn btn-ghost"
         onClick={() => setOpen((o) => !o)}

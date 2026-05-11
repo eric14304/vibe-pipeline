@@ -916,6 +916,10 @@ html.light .focus-create-empty {
   .focus-count {
     font-size: 11px !important;
   }
+  /* 「更多操作 ⋯」靠右(margin-left:auto 在 flex-wrap 內仍 work) */
+  .focus-overflow {
+    margin-left: auto !important;
+  }
   /* 內容少不需要 overflow menu — 全部 inline 顯示 */
   .topbar-overflow-mobile-items {
     display: none !important;
