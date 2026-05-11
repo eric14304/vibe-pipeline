@@ -13,6 +13,7 @@ import {
   sha256hex,
 } from "../lib/auth/cookie";
 import { consumeSetupToken, createSetupToken } from "../lib/auth/pending";
+import * as testMode from "../lib/testMode";
 
 const ISSUER = "vibe-pipeline";
 
@@ -36,6 +37,9 @@ function userAgent(req: Request): string {
 function verifyTotp(secret: string, code: string): boolean {
   const cleaned = code.replace(/\s+/g, "");
   if (!/^\d{6,8}$/.test(cleaned)) return false;
+  // E2E escape:mock 模式接受固定 code「123456」,避開真實 TOTP 時鐘 / shared-secret 計算。
+  // 僅在 VP_TEST_MODE=mock 啟用;production build 不會走到。
+  if (testMode.isTestMode() && cleaned === "123456") return true;
   const totp = new OTPAuth.TOTP({
     issuer: ISSUER,
     label: accountLabel(),

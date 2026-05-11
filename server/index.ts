@@ -87,6 +87,9 @@ async function handle(req: Request): Promise<Response> {
     if (pathname === "/api/__test/script/runner" && method === "POST")
       return test.setRunnerScript(req);
     if (pathname === "/api/__test/reset" && method === "POST") return test.reset();
+    if (pathname === "/api/__test/auth/reset" && method === "POST") return test.authReset();
+    if (pathname === "/api/__test/auth/seed-secret" && method === "POST")
+      return test.authSeedSecret(req);
     return notFound();
   }
 
@@ -257,11 +260,19 @@ const server = Bun.serve({
         req.headers.get("Access-Control-Request-Headers")
       );
     }
-    const ip = srv.requestIP(req)?.address ?? null;
+    let ip = srv.requestIP(req)?.address ?? null;
+    // E2E escape hatch:mock 模式下可用 X-Forwarded-For 覆寫 IP,測非 loopback / 進入 auth flow。
+    // 僅在 VP_TEST_MODE=mock 啟用;production build 不會走到。
+    if (testMode.isTestMode()) {
+      const xff = req.headers.get("X-Forwarded-For");
+      if (xff) ip = xff.split(",")[0]!.trim();
+    }
     (req as unknown as { __ip?: string }).__ip = ip ?? "unknown";
     try {
       const url = new URL(req.url);
-      if (url.pathname.startsWith("/api/")) {
+      // /api/__test/* 在 mock 模式 mount,本身就是 e2e 控制面;不應走 authGuard(否則 spec 設 XFF 後自己進不來)
+      const skipGuard = testMode.isTestMode() && url.pathname.startsWith("/api/__test/");
+      if (url.pathname.startsWith("/api/") && !skipGuard) {
         const guard = await authGuard(req, ip);
         const blocked = guardResponse(guard, req);
         if (blocked) return withCors(blocked, origin);

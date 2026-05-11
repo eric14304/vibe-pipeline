@@ -261,6 +261,30 @@ routes:
 4. 之後 ticket 開始 / 完成 / 失敗、pipeline ready / merged / failed 事件會推到手機;點通知直接跳轉對應 pipeline / ticket
 5. **離線補送**:手機離線(關螢幕 / 沒網路)時,push 由 FCM 伺服器暫存,裝置上線後自動補送(FCM 預設保留 28 天);不需 VP 端做 queue
 
+### TOTP 雙重驗證
+
+非 loopback 連線(手機透過 Tailscale 進來)會被 `authGuard` 攔截,需走 TOTP。loopback(`127.0.0.1` / `::1`)永遠 bypass,本機開發完全不受影響。
+
+**首次設定流程**
+
+1. 手機開 `http://<tailscale-ip>:5173`,首次無 secret 會被導去 `/setup`
+2. 畫面顯示 QR Code,用 Authenticator App(Google Authenticator / 1Password / Authy 等)掃描,加入帳號 `vibe-pipeline`
+3. 輸入 App 產生的 6 碼驗證碼 → 成功後 secret 寫進 `~/.vibe-pipeline/auth.json`,同時下發 session cookie(`vp_auth`,HttpOnly + SameSite=Strict,7 天)
+4. 自動跳回 `/board`
+
+**Cookie 過期後重新登入**
+
+- session cookie 預設 7 天,過期或手動 `/api/auth/logout` 後,受保護 endpoint 回 401 + `redirect=/login`
+- 手機被導去 `/login`,輸入 Authenticator App 當下 6 碼即可重新拿到 cookie(不需重新掃 QR — secret 已存在桌機)
+- 多裝置:不同手機 / 桌機各自 login 取得獨立 session,可在 SettingsPopover → 安全性 看 active sessions 並單獨踢除
+
+**Windows auth.json 權限提醒**
+
+- `~/.vibe-pipeline/auth.json` 存 TOTP secret(等同密碼)
+- 程式呼叫 `fs.chmod(0o600)` 在 POSIX(macOS / Linux)真實生效;**Windows 上 NTFS ACL 不被這 call 改動**
+- Windows 使用者請手動確認:檔案總管右鍵 `C:\Users\<你>\.vibe-pipeline\auth.json` → 內容 → 安全性 → 編輯 → 移除 Users / Everyone,只保留目前使用者讀寫
+- 若桌機是個人 PC 且唯一帳戶為自己,user profile 目錄預設 ACL 已隔離其他 user,可略過(但多帳戶 / 工作機建議手動確認)
+
 ### HTTPS 需求(實機推播)
 
 - FCM Web Push 規範要求 service worker 跑在 secure context;`localhost` 例外免 HTTPS,但 `http://100.x.x.x:5173` 不算 secure → 手機實機無法註冊 push subscription
@@ -286,4 +310,4 @@ routes:
 - service account JSON **絕對不要 commit**;`.env` / 金鑰檔放在 repo 外,或確認 `.gitignore` 有蓋到
 - service account 權限等同 Firebase 專案 admin;洩漏即可任意推播給所有 token
 - `ALLOWED_ORIGINS` 不要放 `*`,僅列實際使用的 origin
-- VP 本身沒做 auth 層,Tailscale tailnet 即是唯一邊界;不要把 5173 / 3001 暴露到 public internet
+- VP 已加 TOTP auth 層(非 loopback 連線強制),但 Tailscale tailnet 仍是最外層邊界;不要把 5173 / 3001 暴露到 public internet
