@@ -26,11 +26,12 @@ export const TASK_CLASSES: TaskClass[] = ["qa", "split", "runner", "subAgent", "
 export const PROVIDERS: Provider[] = ["claude", "codex"];
 
 // 每 provider 各自的 model / effort 允許字典。第一個元素是該 provider 預設值。
-// codex 列表是常見 GPT-5 + 推理系列;codex CLI 接 `-c model="<name>"`(不走 -m,ChatGPT auth -m 會 400)。
+// codex 列表對齊 OpenAI Codex models 官方文件(2026-05);codex CLI 接 `-c model="<name>"`
+// (不走 -m,ChatGPT auth -m 會 400)。--oss 跑 local model 不在此列。
 // effort 對應 codex 的 `model_reasoning_effort` config key,OpenAI 標準 minimal/low/medium/high
 export const MODELS_BY_PROVIDER: Record<Provider, readonly ModelName[]> = {
   claude: ["opus", "sonnet", "haiku"],
-  codex: ["gpt-5.5", "gpt-5-codex", "gpt-5", "o3", "o3-mini"],
+  codex: ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex", "gpt-5.2"],
 };
 
 export const EFFORTS_BY_PROVIDER: Record<Provider, readonly Effort[]> = {
