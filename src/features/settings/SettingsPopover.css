@@ -1,3 +1,11 @@
+/* Desktop:.task-row + .task-row-selects 用 display:contents 讓 4 個內容元素直接
+   進到 .settings-popover-task-grid 的 4 欄(label / provider / model / effort)。
+   行為跟舊版「TaskModelRow return 一段 fragment」等價。 */
+.task-row,
+.task-row-selects {
+  display: contents;
+}
+
 @media (max-width: 767px) {
   .settings-popover {
     box-sizing: border-box;
@@ -40,17 +48,37 @@
     min-width: 0;
   }
 
+  /* Mobile:不再用 grid,改 flex column;每張 task-row 變 card 卡片 */
   .settings-popover-task-grid {
-    grid-template-columns: minmax(0, 1fr) !important;
+    display: flex !important;
+    flex-direction: column;
+    gap: 10px !important;
     width: 100%;
   }
 
-  .settings-popover-task-grid > span {
+  .task-row {
+    display: flex !important;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel);
+  }
+
+  .task-row-label {
     white-space: normal !important;
   }
 
-  .settings-popover-task-grid select {
-    width: 100%;
+  .task-row-selects {
+    display: flex !important;
+    gap: 6px;
+  }
+
+  .task-row-selects select {
+    flex: 1;
+    width: auto !important;
+    min-width: 0;
   }
 
   .settings-popover-footer {

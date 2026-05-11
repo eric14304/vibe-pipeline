@@ -80,9 +80,12 @@ function TaskModelRow({
   disabled?: boolean;
   onChange: (patch: { provider?: Provider; model?: ModelName; effort?: Effort }) => void;
 }) {
+  // .task-row 用 display:contents(desktop)讓 grid 認 4 個內容子元素;
+  // mobile breakpoint 內改 display:flex column 變成 card 卡式排版。
   return (
-    <>
+    <div className="task-row">
       <span
+        className="task-row-label"
         style={{
           display: "flex",
           flexDirection: "column",
@@ -96,43 +99,45 @@ function TaskModelRow({
           <span style={{ fontSize: 10.5, color: "var(--fg-faint)", marginTop: 1 }}>{hint}</span>
         )}
       </span>
-      <select
-        value={provider}
-        disabled={disabled}
-        onChange={(e) => onChange({ provider: e.target.value as Provider })}
-        style={PROVIDER_SELECT_STYLE}
-      >
-        {PROVIDERS.map((p) => (
-          <option key={p} value={p}>
-            {p}
-          </option>
-        ))}
-      </select>
-      <select
-        value={model}
-        disabled={disabled}
-        onChange={(e) => onChange({ model: e.target.value as ModelName })}
-        style={MODEL_SELECT_STYLE}
-      >
-        {modelsForProvider(provider).map((m) => (
-          <option key={m} value={m}>
-            {m.replace(/^claude-/, "")}
-          </option>
-        ))}
-      </select>
-      <select
-        value={effort}
-        disabled={disabled}
-        onChange={(e) => onChange({ effort: e.target.value as Effort })}
-        style={EFFORT_SELECT_STYLE}
-      >
-        {effortsForProvider(provider).map((eff) => (
-          <option key={eff} value={eff}>
-            {eff}
-          </option>
-        ))}
-      </select>
-    </>
+      <div className="task-row-selects">
+        <select
+          value={provider}
+          disabled={disabled}
+          onChange={(e) => onChange({ provider: e.target.value as Provider })}
+          style={PROVIDER_SELECT_STYLE}
+        >
+          {PROVIDERS.map((p) => (
+            <option key={p} value={p}>
+              {p}
+            </option>
+          ))}
+        </select>
+        <select
+          value={model}
+          disabled={disabled}
+          onChange={(e) => onChange({ model: e.target.value as ModelName })}
+          style={MODEL_SELECT_STYLE}
+        >
+          {modelsForProvider(provider).map((m) => (
+            <option key={m} value={m}>
+              {m.replace(/^claude-/, "")}
+            </option>
+          ))}
+        </select>
+        <select
+          value={effort}
+          disabled={disabled}
+          onChange={(e) => onChange({ effort: e.target.value as Effort })}
+          style={EFFORT_SELECT_STYLE}
+        >
+          {effortsForProvider(provider).map((eff) => (
+            <option key={eff} value={eff}>
+              {eff}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
   );
 }
 
