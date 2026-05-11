@@ -863,9 +863,20 @@ html.light .focus-create-empty {
 
   .topbar-brand,
   .topbar-sep,
-  .topbar-active-meta,
   .topbar-spacer {
     display: none;
+  }
+  /* topbar-active-meta(branch chip + 開啟資料夾)mobile 仍 inline,不收進 overflow */
+  .topbar-active-meta {
+    gap: 6px;
+  }
+  .topbar-active-meta .chip {
+    padding: 3px 7px;
+    font-size: 11px;
+  }
+  /* 內容少不需要 overflow menu — 全部 inline 顯示 */
+  .topbar-overflow-mobile-items {
+    display: none !important;
   }
 
   .topbar-left {
@@ -903,47 +914,14 @@ html.light .focus-create-empty {
     width: min(320px, calc(100vw - 20px));
   }
 
+  /* 內容少不需要收合 — overflow toggle 不顯示,menu 保持 inline flex row */
   .topbar-overflow-toggle {
-    display: inline-flex;
+    display: none;
   }
 
   .topbar-overflow-menu {
-    position: absolute;
-    top: calc(100% + 8px);
-    right: 0;
-    z-index: 60;
-    display: none;
-    width: min(240px, calc(100vw - 20px));
-    align-items: stretch;
-    flex-direction: column;
+    /* 維持 desktop 的 inline flex row,單純 mobile 也直接顯示 */
     gap: 4px;
-    padding: 6px;
-    border: 1px solid var(--line-2);
-    border-radius: 9px;
-    background: var(--bg-elevated);
-    box-shadow: var(--shadow-md);
-  }
-
-  .topbar-overflow-menu.is-open {
-    display: flex;
-  }
-
-  .topbar-overflow-mobile-items {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .topbar-overflow-chip {
-    justify-content: flex-start;
-    width: 100%;
-    box-sizing: border-box;
-  }
-
-  .topbar-overflow-menu > .chip,
-  .topbar-overflow-menu .topbar-theme-toggle,
-  .topbar-overflow-menu .icon-btn {
-    align-self: flex-start;
   }
 
   .create-input,

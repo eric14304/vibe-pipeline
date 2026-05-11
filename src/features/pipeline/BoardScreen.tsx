@@ -407,7 +407,7 @@ export function BoardScreen({
         className={"board-mobile-tab" + (activeTab === "rail" ? " is-active" : "")}
         onClick={() => setActiveTab("rail")}
       >
-        Rail
+        Pipeline
       </button>
       <button
         type="button"
@@ -416,7 +416,7 @@ export function BoardScreen({
         className={"board-mobile-tab" + (activeTab === "focus" ? " is-active" : "")}
         onClick={() => setActiveTab("focus")}
       >
-        Focus
+        Ticket
       </button>
     </div>
   );
