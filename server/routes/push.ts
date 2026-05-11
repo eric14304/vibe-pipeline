@@ -32,6 +32,19 @@ export async function tokens(): Promise<Response> {
   return Response.json({ tokens: await tokenStore.listTokens() });
 }
 
+// 前端 FCM enable 流程診斷:不影響功能,只 log 到 backend stdout
+export async function diagnostic(req: Request): Promise<Response> {
+  try {
+    const body = await readJson(req);
+    const step = typeof body.step === "string" ? body.step : "?";
+    const info = JSON.stringify(body);
+    console.log(`[fcm-diag] ${step} :: ${info}`);
+  } catch {
+    console.log("[fcm-diag] (failed to parse body)");
+  }
+  return new Response(null, { status: 204 });
+}
+
 // Smoke test:對所有 registered tokens fan-out 一發測試 push,驗證鏈路
 export async function test(): Promise<Response> {
   if (!isFCMReady()) {

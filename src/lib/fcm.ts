@@ -104,17 +104,39 @@ async function registerServiceWorker(): Promise<ServiceWorkerRegistration> {
   return ready;
 }
 
+async function diag(step: string, extra?: Record<string, unknown>): Promise<void> {
+  console.log("[fcm-diag]", step, extra ?? "");
+  try {
+    await fetch(`${API_BASE_URL}/api/push/diagnostic`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+      credentials: "include",
+      body: JSON.stringify({ step, ua: navigator.userAgent.slice(0, 80), ...extra }),
+    });
+  } catch (e) {
+    console.warn("[fcm-diag] fetch failed", e);
+  }
+}
+
 export async function requestAndRegisterToken(): Promise<string> {
+  await diag("enter requestAndRegisterToken");
+  const supported = await isFcmSupported();
+  await diag("isFcmSupported", { supported });
   const m = await initFCM();
+  await diag("initFCM done", { messagingNull: !m, hasConfig: !!config });
   if (!m || !config) throw new Error("FCM 未初始化(check supported / config)");
-  // 先註冊 + 等 SW active,再要 permission + getToken,避免 race condition
   const swReg = await registerServiceWorker();
+  await diag("SW ready", { swActive: !!swReg.active });
+  const permBefore = Notification.permission;
+  await diag("before requestPermission", { permBefore });
   const permission = await Notification.requestPermission();
+  await diag("after requestPermission", { permission });
   if (permission !== "granted") throw new Error(`通知權限:${permission}`);
   const token = await getToken(m, {
     vapidKey: config.vapidKey,
     serviceWorkerRegistration: swReg,
   });
+  await diag("getToken done", { tokenLen: token?.length ?? 0 });
   if (!token) throw new Error("getToken 回空,可能 VAPID / authDomain 不對");
   try {
     const res = await authedFetch(`${API_BASE_URL}/api/push/register`, {

@@ -45,10 +45,24 @@ function StatesRoute() {
 function useFcmBootstrap() {
   useEffect(() => {
     void initFCM();
-    const off = setupForegroundHandler((payload) => {
+    const off = setupForegroundHandler(async (payload) => {
       const title =
         payload.notification?.title || payload.data?.title || "Vibe Pipeline";
       const body = payload.notification?.body || payload.data?.body || "";
+      // Android Chrome 不認 new Notification() constructor,要走 ServiceWorkerRegistration.showNotification
+      try {
+        const reg = await navigator.serviceWorker.getRegistration("/firebase-messaging-sw.js");
+        if (reg && Notification.permission === "granted") {
+          await reg.showNotification(title, {
+            body,
+            icon: "/icon-192.png",
+            badge: "/icon-192.png",
+            data: payload.data ?? {},
+          });
+          return;
+        }
+      } catch {}
+      // desktop / non-mobile fallback
       try {
         if (typeof Notification !== "undefined" && Notification.permission === "granted") {
           new Notification(title, { body });
