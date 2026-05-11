@@ -384,7 +384,7 @@ function Composer({
           ref={taRef}
           className="qadr-input qadr-input-multiline"
           value={text}
-          placeholder="或自己打一句…(Shift+Enter 換行,Enter 送出)"
+          placeholder="或自己打一句…"
           rows={1}
           onChange={(e) => {
             setText(e.target.value);
@@ -414,6 +414,9 @@ function Composer({
             <path d="M5 12h14M13 5l7 7-7 7" />
           </svg>
         </button>
+      </div>
+      <div className="qadr-composer-hint mono">
+        Enter 送出 · Shift+Enter 換行
       </div>
       <button
         className="qadr-cancel-link"
