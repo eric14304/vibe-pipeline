@@ -862,7 +862,7 @@ export function SettingsPopover({
       {/* ─── AI 任務 tab ─── */}
       {activeTab === "ai" && <>
       <div style={{ fontSize: 11, color: "var(--fg-faint)", marginBottom: 10 }}>
-        跨 project — provider / model / reasoning
+        跨 project — provider / model
       </div>
       {userCfg ? (
         <div
