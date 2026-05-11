@@ -160,7 +160,15 @@ function InboxPanel({
             <div className="inbox-empty-icon">
               <InboxEmptyIcon />
             </div>
-            <div>都看過了</div>
+            <div>
+              {items.length === 0
+                ? "目前沒有通知"
+                : filter === "unread"
+                  ? "都看過了"
+                  : filter === "blocking"
+                    ? "沒有阻斷類通知"
+                    : "目前沒有通知"}
+            </div>
           </div>
         ) : (
           filtered.map((it) => (
