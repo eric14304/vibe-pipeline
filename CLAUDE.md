@@ -235,3 +235,55 @@ routes:
 11. **Bun.serve default `idleTimeout` 10s 太短** — QA / split / claude CLI call 都 ≥ 10s,會被 Bun 砍掉連線。`server/index.ts` 設 `idleTimeout: 255`(bun 上限 ~4.25min)。
 12. **改 backend 後 backend stale 不自覺** — `bun run server` 是 no-watch default,改完要手動 kill + 重啟。watch 模式踩雷 #8,只有開發 server code 才開。
 13. **inline backtick 雷不只 systemPrompt.ts / runnerPrompt.ts** — 任何 template literal 內 `` `code` `` 都會炸。改完 grep 一下確認沒殘留 inner backtick。
+
+## 手機遠端使用方式
+
+透過 Tailscale 把桌機 VP 暴露給手機,搭配 FCM Web Push 收 ticket / pipeline 事件通知。
+
+### 前置需求
+
+- 桌機與手機都安裝並登入同一個 Tailscale 帳號(同 tailnet)
+- 取得桌機的 Tailscale IP(`100.x.x.x`,在 Tailscale 控制台或 `tailscale ip -4` 看)
+- 桌機防火牆允許 5173 / 3001 入站(僅限 tailnet 介面)
+
+### 連線步驟
+
+1. backend 預設以 `0.0.0.0` 監聽(`server/index.ts` 已設,不要改回 `127.0.0.1`,否則手機連不到)
+2. 桌機開 vite + backend(`bun run dev` / `bun run server`)
+3. 手機瀏覽器開 `http://<tailscale-ip>:5173`,即可看到 Board
+4. 若手機端 API 全部失敗(CORS 紅字),檢查桌機 `.env` 的 `ALLOWED_ORIGINS` 是否含手機端 origin(例如 `http://100.x.x.x:5173`);多個來源逗號分隔
+
+### 啟用推播通知
+
+1. 手機開 VP 後進 TopBar 的 Settings → Push Notifications
+2. 點「啟用通知」→ 瀏覽器跳系統權限對話框,選允許
+3. 狀態變「已啟用」即訂閱完成(token 寫進 backend)
+4. 之後 ticket 開始 / 完成 / 失敗、pipeline ready / merged / failed 事件會推到手機;點通知直接跳轉對應 pipeline / ticket
+5. **離線補送**:手機離線(關螢幕 / 沒網路)時,push 由 FCM 伺服器暫存,裝置上線後自動補送(FCM 預設保留 28 天);不需 VP 端做 queue
+
+### HTTPS 需求(實機推播)
+
+- FCM Web Push 規範要求 service worker 跑在 secure context;`localhost` 例外免 HTTPS,但 `http://100.x.x.x:5173` 不算 secure → 手機實機無法註冊 push subscription
+- 解法:桌機跑 `tailscale serve https / http://localhost:5173`,Tailscale 簽 Let's Encrypt 給 `<machine>.<tailnet>.ts.net`,手機改開該 HTTPS URL
+- backend(3001)也建議走 `tailscale serve` 或同網域 reverse proxy,讓前端 `/api/*` 同 origin 不用再開 CORS
+
+### 環境變數設定
+
+寫進桌機的 `.env`(已加進 `.gitignore`,別 commit)。
+
+| 變數 | 取得位置 | 用途 |
+|---|---|---|
+| `FCM_SERVICE_ACCOUNT_JSON` | Firebase console → 專案設定 → 服務帳戶 → 產生新的私密金鑰(整段 JSON inline 貼進 env) | backend 用 Admin SDK 發送 push;與下方 `_PATH` 二選一 |
+| `FCM_SERVICE_ACCOUNT_PATH` | 同上,下載 JSON 後存檔,填絕對路徑 | 同上,適合不想把 JSON inline 進 env 的情境 |
+| `FCM_API_KEY` | Firebase console → 專案設定 → 您的應用程式 → Web app → SDK setup | 前端 Firebase SDK init |
+| `FCM_MESSAGING_SENDER_ID` | 同上 | 前端 init |
+| `FCM_APP_ID` | 同上 | 前端 init |
+| `FCM_VAPID_KEY` | Firebase console → Cloud Messaging → Web 設定 → Web Push 憑證 → 產生金鑰組 | 前端 `getToken({ vapidKey })` 用 |
+| `ALLOWED_ORIGINS` | 手動列舉 | backend CORS 白名單,逗號分隔(例:`http://localhost:5173,http://100.64.0.5:5173,https://desktop.tailnet.ts.net`) |
+
+### 安全提醒
+
+- service account JSON **絕對不要 commit**;`.env` / 金鑰檔放在 repo 外,或確認 `.gitignore` 有蓋到
+- service account 權限等同 Firebase 專案 admin;洩漏即可任意推播給所有 token
+- `ALLOWED_ORIGINS` 不要放 `*`,僅列實際使用的 origin
+- VP 本身沒做 auth 層,Tailscale tailnet 即是唯一邊界;不要把 5173 / 3001 暴露到 public internet
