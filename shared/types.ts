@@ -30,20 +30,8 @@ export const PROVIDERS: Provider[] = ["claude", "codex"];
 // (不走 -m,ChatGPT auth -m 會 400)。--oss 跑 local model 不在此列。
 // effort 對應 codex 的 `model_reasoning_effort` config key,OpenAI 標準 minimal/low/medium/high
 export const MODELS_BY_PROVIDER: Record<Provider, readonly ModelName[]> = {
-  // claude:用 full ID 鎖明確版本,opusplan 是混搭 alias 保留
-  // - claude-opus-4-7 / [1m] = 當前主力(Max/Team 自動 1M;[1m] 顯式 1M)
-  // - claude-opus-4-6 = 上一代 Opus(穩定 / 便宜)
-  // - opusplan = 混搭(Opus planning + Sonnet exec)
-  // - claude-sonnet-4-6 = 當前 Sonnet
-  // - claude-haiku-4-5-20251001 = 當前 Haiku(含時間戳)
-  claude: [
-    "claude-opus-4-7",
-    "claude-opus-4-7[1m]",
-    "claude-opus-4-6",
-    "opusplan",
-    "claude-sonnet-4-6",
-    "claude-haiku-4-5-20251001",
-  ],
+  // claude:full ID 鎖明確版本(2026-05 主力組合)
+  claude: ["claude-opus-4-7", "claude-sonnet-4-6", "claude-opus-4-6"],
   codex: ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex", "gpt-5.2"],
 };
 
@@ -74,7 +62,7 @@ export function isValidEffort(p: Provider, e: Effort): boolean {
 export const DEFAULT_USER_CONFIG: UserConfig = {
   defaults: {
     qa: { provider: "claude", model: "claude-sonnet-4-6", effort: "low" },
-    split: { provider: "claude", model: "claude-haiku-4-5-20251001", effort: "low" },
+    split: { provider: "claude", model: "claude-sonnet-4-6", effort: "low" },
     runner: { provider: "claude", model: "claude-opus-4-7", effort: "medium" },
     subAgent: { provider: "claude", model: "claude-opus-4-7", effort: "high" },
     merge: { provider: "claude", model: "claude-opus-4-7", effort: "high" },
