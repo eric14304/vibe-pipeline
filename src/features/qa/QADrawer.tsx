@@ -85,7 +85,7 @@ export function QADrawer({
           <SpecChecklist spec={draft?.spec ?? null} />
         </div>
 
-        {isSpecComplete(draft?.spec ?? null) ? (
+        {draft?.complete && isSpecComplete(draft?.spec ?? null) ? (
           <div className="drawer-body qadr-body qadr-spec-body">
             <SpecReview
               spec={draft!.spec as TicketSpec}
@@ -435,7 +435,7 @@ function SpecReview({
 
   return (
     <div className="qadr-spec">
-      <div className="qadr-spec-head mono">收齊了。確認後送出。</div>
+      <div className="qadr-spec-head mono">最終預覽 — 微調後送出建立 ticket。</div>
       {hasSplit && (
         <div className="qadr-split-proposal">
           <div className="qadr-split-title mono">
