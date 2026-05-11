@@ -57,8 +57,32 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-self.addEventListener("push", () => {
-  ensureMessaging().catch((e) => console.error("[sw] push init failed", e));
+// Push event:explicit handler 自己 showNotification。不依賴 FCM SDK 自動顯示
+// (notification + data 混合 payload 在 Chrome 上 SW 不一定 auto-display)
+self.addEventListener("push", (event) => {
+  event.waitUntil(
+    (async () => {
+      let title = "Vibe Pipeline";
+      let body = "";
+      let data = {};
+      try {
+        const raw = event.data ? event.data.json() : null;
+        if (raw) {
+          title = raw.notification?.title || raw.data?.title || title;
+          body = raw.notification?.body || raw.data?.body || body;
+          data = raw.data || {};
+        }
+      } catch (e) {
+        console.error("[sw] failed to parse push payload", e);
+      }
+      await self.registration.showNotification(title, {
+        body,
+        icon: "/icon-192.png",
+        badge: "/icon-192.png",
+        data,
+      });
+    })()
+  );
 });
 
 self.addEventListener("notificationclick", (event) => {
