@@ -2,60 +2,26 @@
 
 多 AI agent(執行AI + 審核AI)的 ticket / pipeline 編排器。Web 應用為主介面,將來配 `vp` CLI。每張 ticket 由 執行AI 跑、審核AI 審,iterative 模式自動迴圈到 審核AI pass;pipeline 是 ticket 的有序組合,每條跑在獨立 git branch,完成後 merge 回 base。
 
-## 當前 phase(2026-05-11)
+## 當前狀態(2026-05-11)
 
-**Phase 4 完成** + **Phase 5 全套落地**(自動拆/同步/合併/prune + per-task model config + CLI perf flags + **RWD + Tailscale 遠端 + TOTP auth + FCM Web Push** + cross-provider sub-agent via codex-rescue + 一輪 post-merge UX 打磨)。phase3 / phase4 / refactor / perf-claude-cli / codex-cli / phase5 六條 pipeline 全 merge 進 main,**self-dogfood 自我重構成果穩定運作中**,手機透過 Tailscale HTTPS 可遠端控制 + 收 push 通知。
+**Phase 1-5 全套已落地**。六條 pipeline 已 merge 進 main(phase3 / phase4 / refactor / perf-claude-cli / codex-cli / phase5)。self-dogfood 自我重構穩定運作,**手機可透過 Tailscale HTTPS + TOTP auth + FCM Web Push 遠端控制 + 收 ticket 通知**。
 
-**Phase 3 第四刀(舊)→ 第五刀(本 phase)**:Phase 3 第四刀的機械 merge 已被 Phase 4 ticket-based AI merge 取代;`/merge` 端點現在 append synthetic merge ticket 走 runner 主流程。merge strategy 鎖死 `merge --no-ff`(squash / ff-only 跟新版 auto-rebase + sync chip 不相容,refactor pipeline 已砍掉設定)。
+| Phase | 一句話 |
+|---|---|
+| 1 | Project / Pipeline CRUD + JSON 持久化 + git init |
+| 2 | QA drawer + claude CLI 收斂 + Draft store |
+| 3 | Pipeline runner(主 agent + Task sub-agent)/ git worktree / iter rounds / multi-pipeline 平行 / merge to base |
+| 4 | E2E (Playwright mock + real) / AI merge ticket-based / UI polish(ConfirmDialog / DiffModal / 中文化) |
+| 5 | 全自動化(拆 / sync / merge / prune)+ per-task model config + CLI perf flags + RWD + Tailscale + TOTP auth + FCM + cross-provider sub-agent |
 
-**已完成**
-- Phase 1 — Project / Pipeline CRUD + .vibe-pipeline/ JSON 持久化 + git init / reveal
-- Phase 2 — QA drawer + claude CLI 整合 + Draft store + Spec checklist + Multi-select option
-- Phase 3 第一刀 — git worktree per pipeline、runner orchestrator (claude CLI session as 主 agent + Task tool 派 sub-agent)、Pipeline state machine 加 stopping、Ticket 加 failed_iter_limit / failed_transient、Run/Pause endpoints + Frontend RunButton + polling、Crash recovery on startup、Notif store (`.runtime/notifs.jsonl`) + emit on pipeline_started/ready/paused/failed + ticket_started/done/failed (透過 fs.watch 偵測 pipeline.json 變化) + frontend inbox 接 backend
-- Phase 3 第二刀 — TicketDrawer 點 ticket 看內容(goal/acceptance/prompt/iter/commits/runs)、Runner 寫回 `ticket.iter.rounds[]`(n/startedAt/endedAt/executorSummary/criticVerdict/criticFeedback)、Runner 自動 git commit 每張 done ticket(`ticket(<n>): <title>`,寫 hash 到 `ticket.commits[]`)、Run log API + 解析 cost/duration/turns/tokens/result/sessionId、Drawer「pipeline 執行紀錄」section(可展開看 stdout/stderr 全文)、Polling 改不依賴 pipelines + visibilitychange/focus refetch(修 tab 切回 board 卡舊狀態)、UI 防禦(stage 同義 normalize、verdicts string/number 雙格式、totalElapsed 缺值 default)、iter labels 中文化(執行/審核/結果)
-- Phase 3 第三刀 — Pipeline 操作補齊(delete pipeline、rename inline ✎、reset ticket、reset all done/failed、reveal worktree)、TopBar(真實 currentBranch、⌘O / Ctrl+O 鍵盤捷徑、theme toggle 走 localStorage 持久化、Settings disabled stub)、UX 系列(bell unread 數字、actionError 右下 toast、collapsed inbox 讀過 block 沉降 muted、ts 絕對定位右下、commit hash click-to-copy、empty pipeline 空狀態 CTA、EmptyProject 箭頭指向 TopBar、browser tab title 動態、FocusColumn 累計成本 chip + RunButton 上次 duration 預估、overflow menu 收 worktree/重跑全部/刪除、QADrawer tech leak 清除)、Backend 安全網(orchestrator state guard 擋 ready/running/stopping 的 /run、savePipeline shape 驗證 + race guard + PUT-as-upsert 擋、auto-cancel 空 QA draft)、Backend 新 endpoint(GET /branches、POST /pipelines/:id/worktree/reveal、DELETE /pipelines/:id、GET /pipelines/:id/runs[/:filename])、Project type 加 currentBranch、Rail 漏狀態色補齊(stopping / failed_iter_limit / failed_transient)+ 移除假 Archive chip
-- Phase 3 第二.五刀 — iter FAIL → PASS round chain 驗證(test pipeline,$1.51,verdicts ["FAIL","PASS"] + criticFeedback 全寫入 + executor 第二輪確實 incorporate feedback + 真實 ms 時間戳)、multi-ticket 順序 + pause/resume 驗證(3-step pipeline,$1.47 split 兩段,pause 後 runner 跑完 t1 才收 paused、resume 從 t2 接,3 commit 各自獨立)、atomic write(.tmp + JSON.parse round-trip + renameSync,防 partial write / serialize 炸)、inbox panel + strip 改 flat 列表(不分 sev 群組,strip 改全 8px pip)、iter-stage-pulse 改 box 內右上角 notification badge 樣式
-- Phase 3 第四刀 — Pipeline merge:`POST /pipelines/:id/merge` 用 project config `defaults.merge_strategy`(預設 squash;支援 merge/squash/ff-only),checkout base → merge → squash 模式追加 commit,衝突 / not-fast-forward / 其他 abort + 訊息;成功標 `state="merged"` + `mergedAt` + `mergeCommit{hash,subject,ts}` + emit `pipeline_merged` notif。ReadyBanner 的 View diff(改開 worktree)/ Merge 按鈕從 disabled 接通。orchestrator state guard 補擋 merged 狀態的 /run。E2E 驗過 squash → main
-- Phase 3 第五刀 — Multi-pipeline 平行執行:config `defaults.max_parallel`(預設 2,clamp 1-8)+ orchestrator in-memory slot tracker + FIFO queue per project + 滿 slot 自動 'queued' state(新增到 PipelineState union + STATE_COLOR/STATE_LABEL + tokens.css teal `--queued`)+ emit `pipeline_queued` notif + process exit 觸發 dispatcher 接棒 FIFO + recovery 把 queued 視同 stale → paused。Backend 新 endpoint:GET /api/projects/:hash/config / PUT /api/projects/:hash/config(只白名單 max_parallel)/ GET /api/projects/:hash/runtime(回 N/M)。Pause endpoint 對 queued 狀態走 `cancelQueued`(從 queue 拔 + 標 paused)。前端 TopBar N/M chip(running >= max 變 queued 色,過載紅 `!`)、RunButton 'queued' 狀態(順位顯示 + 按鈕當「取消排隊」)、Settings popover(SettingsPopover.tsx)露 max_parallel 數字欄位 1-8 + 即時 triggerDispatch 補位、FocusColumn / Title rename 把 'queued' 加進 lockedByState。savePipeline race guard 加 'queued',deletePipeline 在 queued 時走 cancelQueued 拔出再刪。**PUT body charset guard**:沒帶 charset=utf-8 / 非 application/json → 400 拒絕,防 shell caller cp950 mojibake 寫進 pipeline.json
-- Phase 4 第一/二刀 e2e — Playwright 雙模式(mock CI / real 手動)、12 mock spec / 55 test 全綠、real 套 vp-autotest scaffold + iter ticket 真跑驗過。詳見 `vibe-pipeline-e2e` SKILL
-- Phase 4 第三刀 AI merge ticket-based — `/merge` 改 append 一張 `mode="merge"` synthetic ticket 走 runner 主流程,`mergeTicketPrompt()` sub-agent 用 `git -C "<projectPath>"` 操作 main repo,主 agent 解析 PASS / FAIL / FAIL_NORETRY 三種 sub-agent 回應(致命條件不再浪費 iter);merge ticket 帶上完整 ticket 歷史(title/goal/acceptance/commits)讓 AI 解衝突 + 寫精煉 commit message。preflight working tree 髒直接 409 不 spawn agent;失敗 merge ticket 重試走「reset → re-run」不重複 append。default merge_strategy 改 `merge`(--no-ff,保留 ticket commit chain)
-- Phase 4 第四刀 UI polish — ConfirmDialog 取代 native window.confirm(Promise hook + danger 變體 + Esc/Enter 鍵);TicketCard 顯 goal sub-line + iter rounds 多 row 垂直排列 + 「執行→審核→結果」三段 stage(結果顯 PASS/FAIL/PARTIAL);RunButton spawning「啟動中…」過場;Rail item state-aware 第二行(▶ #N title / 可合併入 main / 已併入 main / 上次活動 N 分鐘前);InboxItem read/unread 改單 dot 兩種樣式(實心/空心);prompt 用 react-markdown 渲染;mode label / STATE_LABEL 全中文;DiffModal(point worktree vs base 完整 diff,React Portal 跳出 fade-up transform 牢籠)。focus-head 加可點 +N -M 統計 chip(任何狀態都看得到 worktree diff);recoverStale 補 orphan ticket 修復(running ticket pipeline 已 paused 的錯位);QA pipelineContext snapshot(QA AI 看 pipeline 內既有 ticket 避免重複)
-- Phase 4 雜項 — `.vibe-pipeline/pipelines/` 改 ignored(merge 後 redundant 於 git commit chain);`/api/projects/:hash/status` 順帶 return mergeStrategy;diff-stat polling endpoint(running 時 3s 抓 worktree +N -M)
-- **Phase 5 — Pipeline 全自動化 + 模型 / 性能調控**:
-  - **AI 拆 ticket**:QA AI 在 complete=true 最後輪可填 splitInto(N 個完整 spec),SpecReview 顯 toggle「拆 N 張 / 保 1 張」,零額外 latency 寫進 backend。獨立 `✂ AI 拆分` 按鈕也走 splitTicketSpec(老 ticket 補救用,~76s)
-  - **AI sync**:`POST /pipelines/:id/sync` append synthetic `mode="sync"` ticket,sub-agent 在 worktree 內 rebase base → branch,衝突 AI 解 + ticket.commits[].hash remap(配對 subject)。落後 chip 顯 `⇣ 落後 N`,點擊觸發。merge / sync 共用 `--no-ff` strategy 鎖
-  - **AI 自動 merge**:project / pipeline-level `auto_merge` config,ready 後 backend 自動 append merge ticket;FocusColumn / CreateCard 用 `.toggle-pill` switch UI(高度對齊 .btn);文案「自動合併」
-  - **AI merge 完 auto-rebase worktree**:orchestrator 偵測 state=merged → `git -C <wt> rebase <baseBranch>` 預期 FF;worktree HEAD 跟 main 同步,後續 sync chip 自然 0,banner 不會 false-positive 觸發 re-merge
-  - **Worktree 生命週期**:刪 pipeline 預設 prune worktree(`worktree.removeQuiet`)+ 獨立 `⊘ 清除 worktree` 按鈕;merged 後 auto-prune(節省 VSCode 開太多 worktree 卡)。未合併 prune / 刪除顯 ⚠ 警告 banner + 「強制清除/刪除」label
-  - **User-level config**:`~/.vibe-pipeline/config.json` 跨 project 共用,per-task-class (qa/runner/subAgent/merge) 可設 model / effort;SettingsPopover 露 selector;`getTaskConfig()` runtime 讀,動態套到 spawn args
-  - **CLI spawn perf flags**:三處 spawn(QA/split/runner)加 `--setting-sources ""` / `--strict-mcp-config` + 空 MCP / `--disable-slash-commands`;split / runner 多 `--no-session-persistence`(QA 多輪 resume 不能加,已避開)。QA / split 省 ~80-90% cost(cache_creation 19500/14500 → 0)+ 14-22% cold start。詳見 [refs/claude-cli-spawn-perf-2026-05-11.md](.claude/skills/vibe-pipeline/refs/claude-cli-spawn-perf-2026-05-11.md)
-  - **Ticket-level 操作**:TicketDrawer 把 reset/拆分/刪除收 head 內 toolbar(原本 body 底太遠);mode chip 可點直接 toggle step ↔ iter;iter 上限 input 1-5(coerceSpec clamp);QA system prompt 補強 `splitInto` 規則 + `iterLimit` 上限
-  - **QA 體驗**:user 送出訊息 → 立刻寫 disk(claude 跑前的中繼狀態),中途關 drawer 接續看得到剛送的話 + thinking dots(useQA poll AI 寫回);finalize 取消的 split-check / triConfirm 流程整套移除,改成 QA AI 內含 splitInto
-  - **Notif / toast 補齊**:create / pause / delete / rename / reset ticket / reset all 都有成功 toast(對齊 merge / sync / run)
-  - **ConfirmDialog 強化**:`warning?: string` 欄(紅框 + ⚠ icon);`tertiaryLabel` 三選一(`useTriConfirm()`);danger=true 時 autoFocus 取消鈕 + Enter 不觸發 confirm(避免 user 亂打 Enter 出事)
-- **Phase 5 雜項** — `Bun.serve idleTimeout: 255`(default 10s 太短,split / claude call 會被砍);`bun run server` 改 no-watch default,`server:watch` 給 dev;self-dogfood AI merge 必須關 watch(server 衝突會 reload 殺 child claude);TopBar bell 拿掉,inbox strip 改 bell + 數字 badge;merge ticket / sync ticket UI 顯「執行 → 結果」兩段(無 critic);diff stat / sync polling 等
-- **Phase 5 主 pipeline 落地內容**(pipeline/setting 13 ticket → merge commit `b4a6a13`):
-  - **#1 Settings autosave** — debounce 400ms / 移除儲存按鈕 / fade-out「已儲存 ✓」/ rollback 取 serverConfirmedValue ref
-  - **#2-5 RWD** — 12 個 `@media (max-width:767.98px)`,Board 改 bottom tab bar (Pipeline/Ticket),Drawer / Settings popover 全螢幕,TopBar 收合,SpecReview 表單垂直堆,DiffModal 橫向 scroll,hover-only 互動全補 touch 等效
-  - **#6 Tailscale 接入** — backend listen `0.0.0.0`,CORS allowlist(localhost / 127 / 100.x.x.x regex / ALLOWED_ORIGINS env),`VITE_API_BASE_URL` 環境變數,`.env.example` 樣板
-  - **#7-8 FCM web push** — `server/lib/push/tokenStore.ts` + `server/lib/fcm/` Admin SDK + `routes/push.ts`(register / unregister / config / test / diagnostic);`public/firebase-messaging-sw.js` + `manifest.json` PWA shell;`src/lib/fcm.ts` 前端 SDK + Service Worker 註冊
-  - **#10-12 TOTP auth** — `server/lib/auth/{storage,cookie,middleware,pending}.ts` + `routes/auth.ts`;**loopback bypass**(127.0.0.1 / ::1 永遠過,本機 dev 完全不受影響);非 loopback 強制 TOTP setup → 6 碼驗證 → HttpOnly cookie(7 天);`src/features/auth/{Setup,Login,Security,AddDevice}*.tsx`
-  - **#9 / #13 文件 + e2e** — CLAUDE.md 加「手機遠端使用方式」段;`tests/e2e/mock/auth.spec.ts` 125 行 happy path + cookie 過期 + loopback bypass
-- **Phase 5 後續打磨**(merge 後一波 patch,跨 ~30+ commits):
-  - **Cross-provider sub-agent**:claude main → codex sub via `codex@openai-codex` plugin 的 `codex-rescue` Task subagent_type。`runnerPrompt.ts` 按 `subAgent.provider` 分流(claude general-purpose vs codex-rescue + routing flag);任一 task class provider=codex 時 runner spawn 自動帶 `--dangerously-skip-permissions`(否則 codex-companion.mjs 的 Bash 被 permission_denials 擋,主 agent 還會幻覺成功)
-  - **AGENTS.md 跨 provider 脈絡橋樑**:純 pointer 檔(~20 行),codex sub-agent 透過讀 AGENTS.md 被引導去 Read CLAUDE.md + 對應 SKILL.md。SSoT 仍 CLAUDE.md,AGENTS.md 永不需更新(除非新增 / 重命名 / 刪除 SKILL,見「四 SKILL 對應路由」段提醒)
-  - **QA 確認輪**:5/5 收齊不立刻 `complete=true`,加一輪「以下是整理的 spec,確認建立嗎?」+ 三選一(`建立 ticket` / `我要再調整` / `從頭重來`)字面值嚴格。frontend gate 改吃 `draft.complete` 旗標。append-system-prompt reminder 補 confirm contract 每輪重念,降低 sonnet 漂移率。同時放行 Read/Grep/Glob/read-only Bash 工具(原本被 reminder 全擋,跟主 system prompt 衝突)
-  - **AI 拆分 inline 確認**:取代 ConfirmDialog popup,TicketDrawer actions 區就地展開「描述 + 取消/確認」inline 卡;確認後 spinner + 「AI 拆分中…」狀態(TicketCard 同步邊框 accent pulse + status pill 換成 "AI 拆分中" chip,關 drawer 也看得到)
-  - **runner failed_transient 改 pause**:之前主迴圈找下一張只認 draft/ready/paused,跳過 failed_transient 又標 pipeline=ready 收尾,語意矛盾。改成顯式 status 分支表:遇到 failed_transient / failed / failed_iter_limit 立刻暫停 pipeline + 結束 session(transient 立刻重試大概率同錯,要 user 介入)
-  - **ticket commit message 多段格式**:純 title 改 `git commit -F <tmpfile>` 多段(Goal / Acceptance / 最後一輪 executorSummary + verdict 鏈);Write tool 寫 worktree 外 tmp file 含真換行(避免 `-m "...\n..."` 字面 \n bug)。runner 工具限制放寬:Edit/Write 允許 worktree 外 tmp;Bash 允許 rm tmp file
-  - **Settings popover Tab UI**:四 tab(Project / AI 任務 / 通知 / 安全),取代 925 行 stacked 區塊。「已儲存 ✓」chip 升級到 tab bar 右側全域。固定寬度 480 防切 tab 抖動。AI 任務 select 固定 provider 86 / model 150 / effort 95 px。Mobile 全螢幕 + 右上 ✕ icon。task row 包 `<div class="task-row">` + 內 selects 包 `<div class="task-row-selects">`,desktop `display:contents` 落 4 欄 grid,mobile flex column + 3 select grid `1fr 2fr 1fr`(model 欄佔 2 倍)
-  - **Mobile UX 收尾**:TopBar overflow 不收合(內容少不必要)+「開啟專案資料夾」hide(沒 file explorer);bottom tab 改 Pipeline / Ticket 文案;FocusColumn padding / title 縮小;`drawer-stage` z-index 50 + `100dvh`(Android nav bar 不擋 input);`viewport-fit=cover`;CreateCard 拿掉「Tab ▶」hint
-  - **PWA + Tailscale 實機 push**:`tailscale serve --bg --https=443 http://localhost:5173` 給 phone 一個 HTTPS URL(Service Worker 必須 secure context);frontend SW push event 改自己 `event.waitUntil(showNotification(...))`(不依賴 FCM SDK auto-display);foreground 訊息走 `ServiceWorkerRegistration.showNotification`(Android Chrome 不認 `new Notification()` page constructor);icon SVG `public/icon.svg`(對齊 TopBar Logo `> >` chevron + 圓點 + accent),`scripts/gen-icons.ts` 用 ImageMagick 從 SVG 產 192/512 PNG(`bun run icons`)
-  - **UI 一致性**:drawer / CreateCard close ✕ 對齊 SettingsPopover(32×32 + svg 16 + border-radius 6 + hover bg);Unicode glyph(↺ / ✂ / 🗑 / 🤖 / ⊘ / ⌫)在 action button 全換 SVG(RefreshIcon / ScissorsIcon / TrashIcon / ProhibitIcon),保留純 semantic 符號(分支 ⎇、play ▶、sync ⇣、unit ⏱ ↺ $)
-  - **自動合併 toggle 收進 ⋯ menu**:focus-head 右側現在只剩 RunButton + ⋯,toggle 改 MenuItem(● on / ○ off,點不關 menu 連續切換)
-  - **Push notifications hide chip**:「N runs · $X.XX」累積成本 chip 全平台 hide(資訊次要)
+各 phase 詳細落地 → `git log --grep "Merge pipeline/"`(每 phase 一條 merge commit);Phase 5 後續打磨 → 看 commit history(b4a6a13 之後 ~30+ patch)。
 
-**架構決策**:Bun local server + browser(前端 Vite 5173 / 後端 Bun 3001 / `/api/*` 透過 Vite proxy)。Runner 主 agent 工具白名單只准 Edit/Write 改 pipeline.json + Bash 跑 read-only 指令 + git add/commit;source code 改動 100% 透過 Task 派 sub-agent。Theme 偏好走 localStorage(URL `?theme=` 仍 override 給分享連結用),非 backend config — 簡單 + 無 round-trip + first-paint 不閃。
+**架構決策**(現狀):
+- Bun local server + browser(前端 Vite 5173 / 後端 Bun 3001 / `/api/*` 透過 Vite proxy)
+- Runner 主 agent 工具白名單只准 Edit/Write 改 pipeline.json + worktree 外 tmp(commit message)+ Bash 跑 read-only + git add/commit;source code 改動 100% 透過 Task 派 sub-agent
+- Theme 偏好走 localStorage(URL `?theme=` 仍 override);非 backend config
+- 跨 provider sub-agent:claude main → codex sub via codex-rescue plugin(`subAgent.provider===codex` 時 orchestrator 自動加 `--dangerously-skip-permissions`)
+- Auth 設計:loopback IP 永遠 bypass,只非 loopback 連線強制 TOTP;本機 dev 完全不受影響
 
 **還沒做(下個 iteration)**
 - Transient retry 真正觸發測試(沒自然 fixture,需 fault injection;低優先,留 production 真踩到再補)
@@ -154,7 +120,7 @@ vibe-pipeline/
 │   │   ├── qa.ts              /api/.../qa/* (start / turn / finalize / cancel / drafts)
 │   │   ├── userConfig.ts      /api/user/config GET / PUT(跨 project per-task-class model 設定)
 │   │   ├── auth.ts            /api/auth/{status,setup-init,setup-verify,login,logout,sessions,reset}
-│   │   └── push.ts            /api/push/{config,register,unregister,tokens,test,diagnostic}
+│   │   └── push.ts            /api/push/{config,register,unregister,tokens,test}
 │   └── lib/                   純 IO + 邏輯,不知道 HTTP
 │       ├── projectStore.ts    ~/.vibe-pipeline/state.json 讀寫
 │       ├── pipelineDir.ts     <target-repo>/.vibe-pipeline/ 偵測 / 建立 / json 讀寫

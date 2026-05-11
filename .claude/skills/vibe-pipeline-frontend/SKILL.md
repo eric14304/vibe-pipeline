@@ -49,7 +49,7 @@ Firebase web SDK + Service Worker。
 **已串 backend 的部分**(Phase 5 後新增)
 - `/api/user/config` GET/PUT — SettingsPopover AI 任務 tab
 - `/api/auth/*` — setup / login / sessions / reset / status
-- `/api/push/*` — config / register / unregister / tokens / test / diagnostic
+- `/api/push/*` — config / register / unregister / tokens / test
 
 **還沒做**
 - iOS PWA push 實測
