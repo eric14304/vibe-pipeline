@@ -223,7 +223,7 @@ export function TopBar({
               </span>
             )}
             <button type="button"
-              className="chip"
+              className="chip topbar-reveal-folder"
               title="在檔案總管中開啟"
               onClick={() => api.reveal(active.hash).catch(() => {})}
               style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}

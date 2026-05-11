@@ -874,6 +874,10 @@ html.light .focus-create-empty {
     padding: 3px 7px;
     font-size: 11px;
   }
+  /* 「開啟專案資料夾」在手機沒有 file explorer,直接隱藏 */
+  .topbar-reveal-folder {
+    display: none !important;
+  }
   /* 內容少不需要 overflow menu — 全部 inline 顯示 */
   .topbar-overflow-mobile-items {
     display: none !important;

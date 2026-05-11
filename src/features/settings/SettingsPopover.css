@@ -1,3 +1,8 @@
+/* Desktop:右上關閉 icon 隱藏(點外面 / Esc 已夠);mobile 才顯示 */
+.settings-popover-close {
+  display: none;
+}
+
 /* Desktop:.task-row + .task-row-selects 用 display:contents 讓 4 個內容元素直接
    進到 .settings-popover-task-grid 的 4 欄(label / provider / model / effort)。
    行為跟舊版「TaskModelRow return 一段 fragment」等價。 */
@@ -48,37 +53,66 @@
     min-width: 0;
   }
 
-  /* Mobile:不再用 grid,改 flex column;每張 task-row 變 card 卡片 */
+  /* Mobile:不再用 grid,改 flex column;每張 task-row 是 1 行 label + 1 行 selects */
   .settings-popover-task-grid {
     display: flex !important;
     flex-direction: column;
-    gap: 10px !important;
+    align-items: stretch !important;
+    gap: 14px !important;
     width: 100%;
   }
 
   .task-row {
     display: flex !important;
     flex-direction: column;
-    gap: 8px;
-    padding: 10px 12px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: var(--panel);
+    align-items: stretch;
+    gap: 6px;
+    width: 100%;
   }
 
   .task-row-label {
     white-space: normal !important;
+    flex-direction: row !important;
+    align-items: baseline !important;
+    gap: 8px;
   }
 
+  /* 3 個 select 用 grid 不平均分:model 佔 2 倍寬,容下 gpt-5.4-mini / sonnet-4-6 等 */
   .task-row-selects {
-    display: flex !important;
+    display: grid !important;
+    grid-template-columns: 1fr 2fr 1fr;
     gap: 6px;
+    width: 100%;
   }
 
   .task-row-selects select {
-    flex: 1;
-    width: auto !important;
+    width: 100% !important;
     min-width: 0;
+  }
+
+  /* 右上關閉 icon — mobile 全螢幕,需要明顯的關閉入口 */
+  .settings-popover-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--fg-mute);
+    cursor: pointer;
+    z-index: 2;
+  }
+  .settings-popover-close:hover,
+  .settings-popover-close:focus-visible {
+    background: var(--hover);
+    color: var(--fg);
+    outline: none;
   }
 
   .settings-popover-footer {
