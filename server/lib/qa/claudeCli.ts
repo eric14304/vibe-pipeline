@@ -68,7 +68,7 @@ export async function runTurn({
     : QA_BEHAVIOR_PROMPT;
   const hint = isFirstTurn
     ? undefined
-    : "提醒:你只負責對話收斂 ticket 需求,不要實際執行任何工具(Bash/Read/Edit/Grep/...)。回覆永遠用單一 JSON 物件 {message, options, complete, spec, splitInto?},splitInto 只在 complete=true 且範圍跨多件獨立 ticket 時填 N 個完整 spec(見系統 prompt ## splitInto 段)。不要解釋、不要 markdown 包裝。\n\n" +
+    : "提醒:你只負責對話收斂 ticket 需求,**不要實際做事**(不要 Edit/Write 改檔、不要 Bash 跑改狀態指令、不要派 Task sub-agent)。**Read / Grep / Glob / read-only Bash**(git log/status/diff、tsc --noEmit、ls、cat 等)**可以用**,用來釐清需求 / 看現有狀態。回覆永遠用單一 JSON 物件 {message, options, complete, spec, splitInto?},splitInto 只在 complete=true 且範圍跨多件獨立 ticket 時填 N 個完整 spec(見系統 prompt ## splitInto 段)。不要解釋、不要 markdown 包裝。\n\n" +
         "**確認輪契約(每輪重念,別漂走)**:\n" +
         "1. spec 第一次達 5/5(title/goal/acceptance/prompt/mode 全填)那輪,complete **必須 false**,options **必須是這三個字面值**(嚴格,不准改寫、不准翻譯、不准加描述):\n" +
         "   - \"建立 ticket\"\n" +
