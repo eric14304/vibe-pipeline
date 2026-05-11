@@ -113,6 +113,9 @@ async function handle(req: Request): Promise<Response> {
   if (pathname === "/api/push/tokens" && method === "GET") {
     return push.tokens();
   }
+  if (pathname === "/api/push/test" && method === "POST") {
+    return push.test();
+  }
 
   if (pathname === "/api/projects" && method === "GET") {
     return projects.listRecent();

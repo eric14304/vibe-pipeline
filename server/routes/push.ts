@@ -1,5 +1,6 @@
 import { err, readJson } from "./_http";
 import * as tokenStore from "../lib/push/tokenStore";
+import { fanoutPush, isFCMReady } from "../lib/fcm";
 
 function readToken(body: Record<string, unknown>): string | null {
   const token = body.token;
@@ -27,6 +28,34 @@ export async function unregister(req: Request): Promise<Response> {
 
 export async function tokens(): Promise<Response> {
   return Response.json({ tokens: await tokenStore.listTokens() });
+}
+
+// Smoke test:對所有 registered tokens fan-out 一發測試 push,驗證鏈路
+export async function test(): Promise<Response> {
+  if (!isFCMReady()) {
+    return err("not_initialized", "FCM Admin SDK 未初始化(檢查 FCM_SERVICE_ACCOUNT_PATH)", 500);
+  }
+  const records = await tokenStore.listTokens();
+  if (records.length === 0) {
+    return err("invalid_path", "沒任何已註冊的 device token(先在 Settings → 通知 啟用)", 400);
+  }
+  const ts = new Date().toLocaleTimeString();
+  const dead = await fanoutPush(
+    records.map((r) => r.token),
+    {
+      notification: {
+        title: "vibe-pipeline 測試推播",
+        body: `從 backend 發送 · ${ts}`,
+      },
+      data: { url: "/board" },
+    }
+  );
+  if (dead.length > 0) await tokenStore.removeDeadTokens(dead);
+  return Response.json({
+    sent: records.length,
+    dead: dead.length,
+    ts,
+  });
 }
 
 export function config(): Response {
