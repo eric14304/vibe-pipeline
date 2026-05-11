@@ -81,6 +81,78 @@
   background: color-mix(in srgb, var(--failed) 12%, transparent);
   border-color: var(--failed);
 }
+.tdrw-action-primary {
+  background: var(--accent);
+  color: var(--accent-fg, white);
+  border-color: var(--accent);
+}
+.tdrw-action-primary:hover {
+  background: color-mix(in srgb, var(--accent) 88%, white);
+  border-color: var(--accent);
+}
+
+/* inline AI 拆分確認卡 — 取代彈 popup,直接展開在原 actions 位置 */
+.tdrw-split-confirm {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line-2));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 6%, var(--panel-2));
+  animation: tdrw-split-confirm-in 160ms ease-out;
+}
+@keyframes tdrw-split-confirm-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.tdrw-split-confirm-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+  margin-bottom: 6px;
+}
+.tdrw-split-confirm-desc {
+  font-size: 12px;
+  color: var(--fg-mute);
+  line-height: 1.55;
+  margin-bottom: 10px;
+}
+.tdrw-split-confirm-actions {
+  display: flex;
+  gap: 6px;
+}
+.tdrw-split-confirm-actions .tdrw-action {
+  flex: none;
+  padding: 6px 14px;
+}
+
+/* AI 拆分中 inline 狀態 */
+.tdrw-actions-running {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  padding: 10px 12px;
+  margin-top: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line-2));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 5%, var(--panel-2));
+}
+.tdrw-running-label {
+  font-size: 12.5px;
+  color: var(--fg);
+  font-weight: 500;
+}
+.tdrw-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-top-color: var(--accent);
+  animation: tdrw-spin 700ms linear infinite;
+}
+@keyframes tdrw-spin {
+  to { transform: rotate(360deg); }
+}
 
 .tdrw-num {
   font-size: 11px;

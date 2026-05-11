@@ -354,6 +354,37 @@
 .ticket.is-paused { border-color: color-mix(in srgb, var(--paused) 35%, var(--line-2)); }
 .ticket.is-draft { opacity: 0.6; }
 .ticket.is-draft:hover { opacity: 1; }
+
+/* AI 拆分中 — accent 邊框 pulse,提示「卡片正在被處理」 */
+.ticket.is-splitting {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--line-2));
+  animation: ticket-splitting-pulse 1.4s ease-in-out infinite;
+}
+@keyframes ticket-splitting-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); }
+  50%      { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+}
+.chip.ticket-splitting {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel-2));
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line-2));
+  color: var(--accent);
+  font-weight: 600;
+}
+.ticket-splitting-spinner {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-top-color: var(--accent);
+  animation: ticket-splitting-spin 700ms linear infinite;
+}
+@keyframes ticket-splitting-spin {
+  to { transform: rotate(360deg); }
+}
+
 .ticket-band {
   position: absolute; left: 0; top: 8px; bottom: 8px;
   width: 3px; border-radius: 2px;

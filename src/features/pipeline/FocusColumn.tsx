@@ -145,6 +145,7 @@ export function FocusColumn({
   onTicketClick,
   projectHash,
   queuePosition,
+  splittingTicketId,
 }: {
   pipeline: Pipeline;
   tick: number;
@@ -164,6 +165,7 @@ export function FocusColumn({
   onTicketClick?: (ticket: Ticket) => void;
   projectHash?: string;
   queuePosition?: number;
+  splittingTicketId?: string | null;
 }) {
   // Runs summary 給 head chip + RunButton 預估用。pipeline.id / state 變動就 refetch
   // (state 變表示可能新跑完一次)。失敗安靜忽略 — 純資訊性。
@@ -447,6 +449,7 @@ export function FocusColumn({
               ticket={t}
               tick={tick}
               index={i}
+              isSplitting={splittingTicketId === t.id}
               onClick={onTicketClick ? () => onTicketClick(t) : undefined}
             />
           ))
@@ -952,11 +955,13 @@ function TicketCard({
   ticket,
   tick,
   index,
+  isSplitting = false,
   onClick,
 }: {
   ticket: Ticket;
   tick: number;
   index: number;
+  isSplitting?: boolean;
   onClick?: () => void;
 }) {
   // merge / sync ticket 也跟 iter 一樣有 iter.rounds 結構,渲染走同分支
@@ -989,7 +994,7 @@ function TicketCard({
     // 改 div + role="button" + onKeyDown 已具備鍵盤可達性
     // biome-ignore lint/a11y/noStaticElementInteractions: clickable card with nested buttons
     <div
-      className={"ticket" + (isDraft ? " is-draft" : "") + (isPaused ? " is-paused" : "")}
+      className={"ticket" + (isDraft ? " is-draft" : "") + (isPaused ? " is-paused" : "") + (isSplitting ? " is-splitting" : "")}
       style={{ animationDelay: `${index * 40}ms`, cursor: onClick ? "pointer" : undefined }}
       onClick={onClick}
       role={onClick ? "button" : undefined}
@@ -1015,7 +1020,14 @@ function TicketCard({
           {MODE_LABELS[ticket.mode as "step" | "iter" | "merge" | "sync"] ?? ticket.mode}
         </span>
 
-        <StatusPill status={ticket.status} />
+        {isSplitting ? (
+          <span className="chip ticket-splitting">
+            <span className="ticket-splitting-spinner" aria-hidden />
+            AI 拆分中
+          </span>
+        ) : (
+          <StatusPill status={ticket.status} />
+        )}
 
         {ticket.meta && !isIter && <span className="ticket-meta mono">{ticket.meta}</span>}
       </div>

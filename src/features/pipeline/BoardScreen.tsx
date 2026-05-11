@@ -43,6 +43,7 @@ export function BoardScreen({
 
   const qa = useQA(hash);
   const [openTicket, setOpenTicket] = useState<Ticket | null>(null);
+  const [splittingTicketId, setSplittingTicketId] = useState<string | null>(null);
   const [branches, setBranches] = useState<string[]>([]);
   const [maxParallel, setMaxParallel] = useState<number>(0);
   const [defaultAutoMerge, setDefaultAutoMerge] = useState<boolean>(false);
@@ -510,9 +511,10 @@ export function BoardScreen({
           setActionError(`重置 ticket 失敗: ${e instanceof Error ? e.message : String(e)}`);
         }
       }}
+      isSplitting={splittingTicketId === openTicket?.id}
       onSplitTicket={async (ticketId) => {
         if (!project || !active) return;
-        setActionError("AI 拆分中…(~10-30s)");
+        setSplittingTicketId(ticketId);
         try {
           const r = await qaApi.splitTicket(project.hash, active.id, ticketId);
           if ("nothingToSplit" in r) {
@@ -524,6 +526,8 @@ export function BoardScreen({
           setReloadKey((k) => k + 1);
         } catch (e) {
           setActionError(`AI 拆分失敗: ${e instanceof Error ? e.message : String(e)}`);
+        } finally {
+          setSplittingTicketId(null);
         }
       }}
       onDeleteTicket={async (ticketId) => {
@@ -629,6 +633,7 @@ export function BoardScreen({
             tick={tick}
             projectHash={project.hash}
             queuePosition={queuePositionOf(active.id)}
+            splittingTicketId={splittingTicketId}
             onAddTicket={(pid) => qa.open(pid)}
             hasActiveDraft={!!qa.draftFor(active.id)}
             onTicketClick={(t) => setOpenTicket(t)}
