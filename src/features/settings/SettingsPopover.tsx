@@ -661,9 +661,9 @@ export function SettingsPopover({
         position: "absolute",
         top: "calc(100% + 6px)",
         right: 0,
-        width: "fit-content",
-        minWidth: 420,
-        maxWidth: "min(560px, calc(100vw - 32px))",
+        // 固定寬度,各 tab 切換時 popover 不會抖動 / shift
+        // 480px 容得下 AI Tasks grid(label auto + 86 + 150 + 95 + gaps + padding),其他 tab 共用此寬
+        width: "min(480px, calc(100vw - 32px))",
         maxHeight: "calc(100vh - 80px)",
         overflowY: "auto",
         background: "var(--bg-elevated)",
