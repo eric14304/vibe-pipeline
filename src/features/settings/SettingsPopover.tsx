@@ -415,7 +415,7 @@ export function SettingsPopover({
 
       {/* ─── AI 任務(跨 project) ─── */}
       <div style={{ ...sectionHeaderStyle, marginTop: 6 }}>
-        AI 任務 — provider / model / reasoning
+        AI 任務 — provider / model
         <span
           style={{
             marginLeft: 8,
@@ -445,7 +445,7 @@ export function SettingsPopover({
           <span style={{ fontSize: 10, color: "var(--fg-faint)", letterSpacing: "0.06em", textTransform: "uppercase", whiteSpace: "nowrap" }}>任務</span>
           <span style={{ fontSize: 10, color: "var(--fg-faint)", letterSpacing: "0.06em", textTransform: "uppercase", textAlign: "center" }}>provider</span>
           <span style={{ fontSize: 10, color: "var(--fg-faint)", letterSpacing: "0.06em", textTransform: "uppercase", textAlign: "center" }}>model</span>
-          <span style={{ fontSize: 10, color: "var(--fg-faint)", letterSpacing: "0.06em", textTransform: "uppercase", textAlign: "center" }}>reasoning</span>
+          <span aria-hidden />
           {TASK_CLASSES.map((tc) => (
             <TaskModelRow
               key={tc}
