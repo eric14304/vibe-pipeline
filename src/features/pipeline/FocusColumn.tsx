@@ -975,7 +975,17 @@ function TicketCard({
           ) / 1000
         )
       : 0);
-  const elapsed = isRunning && ticket.iter ? totalElapsed + tick : totalElapsed;
+  // 跑進行中的 round 用 Date.now() - 該 round.startedAt 算 live elapsed,
+  // 不要直接加 tick(tick 是 BoardScreen mount 後的秒數,跟 ticket 開始時間無關)。
+  // tick 在這只作 re-render 觸發訊號(void 即可,不參與計算)
+  void tick;
+  const inProgressRound = isRunning
+    ? ticket.iter?.rounds?.find((r) => !r.endedAt)
+    : null;
+  const liveRoundElapsed = inProgressRound
+    ? Math.max(0, Math.round((Date.now() - inProgressRound.startedAt) / 1000))
+    : 0;
+  const elapsed = totalElapsed + liveRoundElapsed;
   const iterCurrentLabel = ticket.iter ? Math.max(1, ticket.iter.current) : 0;
   const accent = STATE_COLOR[ticket.status] || "var(--draft)";
 
