@@ -220,6 +220,8 @@ routes:
 - 寫 / 改 / 跑 E2E(Playwright mock + real,覆蓋矩陣) → **`vibe-pipeline-e2e`**
 - 思考 scope / 決策優先順序 / 看完整功能清單 / 看外部產品對照 → **`vibe-pipeline`**(主)
 
+> ⚠️ **同步義務**:新增 / 重命名 / 刪除 SKILL 時,**必須同步更新 [`AGENTS.md`](AGENTS.md) 的 pointer 列表**。AGENTS.md 給 codex / 其他不認 claude SKILL 系統的 AI 看,用 pointer 引導他們 Read 對應 SKILL.md。Claude 自己不會自動讀 AGENTS.md,所以這條規則放這裡提醒人類 / 編輯 SKILL 的人:**改 SKILL 結構記得同步 AGENTS.md**。
+
 ## 不踩的雷
 
 1. **不開 `<StrictMode>`** — `useEffect([])` 雙觸發會讓 QA 第一輪 AI message 跑兩次等。`src/main.tsx` 已關。
