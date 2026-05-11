@@ -687,13 +687,24 @@ html.light .create-card { background: var(--bg-elevated); }
   font-size: 9.5px; font-weight: 700; letter-spacing: 0.1em;
   text-transform: uppercase; color: var(--fg-mute);
 }
+/* 對齊 SettingsPopover 的右上 ✕ 關閉按鈕樣式 */
 .create-x {
-  width: 18px; height: 18px;
+  width: 32px; height: 32px;
   display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 4px; color: var(--fg-faint);
-  transition: background 100ms, color 100ms;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg-mute);
+  cursor: pointer;
+  transition: background 120ms, color 120ms;
 }
-.create-x:hover { background: var(--hover); color: var(--fg); }
+.create-x:hover,
+.create-x:focus-visible {
+  background: var(--hover);
+  color: var(--fg);
+  outline: none;
+}
 
 .create-input {
   display: flex; align-items: center; gap: 0;

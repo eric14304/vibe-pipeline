@@ -56,7 +56,7 @@ export function CreateCard({
         <span className="create-card-eyebrow mono">新 pipeline</span>
         <span style={{ flex: 1 }} />
         <button type="button" className="create-x" onClick={onCancel} title="取消 (Esc)" aria-label="取消">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
             <path d="M6 6l12 12M18 6 6 18" />
           </svg>
         </button>
