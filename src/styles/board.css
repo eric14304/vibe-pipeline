@@ -381,6 +381,8 @@
   gap: 10px;
   margin-left: auto;
 }
+/* runs / 累積成本 chip 隱藏(資訊次要,可移到 settings 或 detail 視圖) */
+.focus-runs-chip { display: none; }
 .focus-title {
   margin: 0;
   font-size: 22px; font-weight: 600;
