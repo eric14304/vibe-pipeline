@@ -649,7 +649,8 @@ html.light .drawer {
     position: fixed;
     inset: 0;
     width: 100vw;
-    height: 100vh;
+    height: 100vh; /* fallback */
+    height: 100dvh; /* 動態 viewport,Android nav bar 顯示時自動扣除 */
     overflow: hidden;
     /* 要高於 .board-mobile-tabs (z-index:40),不然 QA / Ticket drawer 底部
        輸入框被 Pipeline / Ticket 切換條蓋住 */
@@ -662,6 +663,7 @@ html.light .drawer {
     width: 100vw;
     max-width: none;
     height: 100vh;
+    height: 100dvh;
     border-left: 0;
     box-shadow: none;
   }
