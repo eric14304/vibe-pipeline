@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { WarnIcon } from "./icons";
 import "./confirmDialog.css";
 
 export type ConfirmOptions = {
@@ -70,7 +71,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
             <div id="confirm-title" className="confirm-title">{state.title}</div>
             {state.warning && (
               <div className="confirm-warning">
-                <span className="confirm-warning-icon" aria-hidden>⚠</span>
+                <span className="confirm-warning-icon" aria-hidden><WarnIcon /></span>
                 <span className="confirm-warning-text">{state.warning}</span>
               </div>
             )}
