@@ -7,6 +7,42 @@ import * as orchestrator from "./lib/runner/orchestrator";
 import * as testMode from "./lib/testMode";
 
 const PORT = Number(process.env.PORT ?? 3001);
+const ALLOWED_ORIGINS = new Set(
+  (process.env.ALLOWED_ORIGINS ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+);
+const TAILSCALE_ORIGIN_RE = /^https?:\/\/100\.\d+\.\d+\.\d+(:\d+)?$/;
+const CORS_METHODS = "GET, POST, PUT, DELETE, OPTIONS";
+const CORS_HEADERS = "Content-Type, Authorization";
+
+function isAllowedOrigin(origin: string | null): origin is string {
+  if (!origin) return false;
+  if (ALLOWED_ORIGINS.has(origin)) return true;
+  if (TAILSCALE_ORIGIN_RE.test(origin)) return true;
+  try {
+    const { hostname } = new URL(origin);
+    return hostname === "localhost" || hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
+}
+
+function withCors(response: Response, origin: string | null, requestHeaders?: string | null): Response {
+  const headers = new Headers(response.headers);
+  if (isAllowedOrigin(origin)) {
+    headers.set("Access-Control-Allow-Origin", origin);
+    headers.set("Access-Control-Allow-Methods", CORS_METHODS);
+    headers.set("Access-Control-Allow-Headers", requestHeaders || CORS_HEADERS);
+    headers.append("Vary", "Origin");
+  }
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
 
 function notFound(): Response {
   return Response.json(
@@ -177,17 +213,28 @@ async function handle(req: Request): Promise<Response> {
 
 const server = Bun.serve({
   port: PORT,
-  hostname: "127.0.0.1",
+  hostname: "0.0.0.0",
   // 預設 10s 太短 — QA / split / merge 都會 spawn claude CLI,單次跑 10-60s 常見;
   // 拉到 5min cover 大部分 case,真超過代表 claude 卡死,讓 bun 砍掉合理
   idleTimeout: 255, // bun 上限 255s (≈4.25min)
   async fetch(req) {
+    const origin = req.headers.get("Origin");
+    if (req.method === "OPTIONS") {
+      return withCors(
+        new Response(null, { status: 204 }),
+        origin,
+        req.headers.get("Access-Control-Request-Headers")
+      );
+    }
     try {
-      return await handle(req);
+      return withCors(await handle(req), origin);
     } catch (e) {
-      return Response.json(
-        { ok: false, error: { code: "internal_error", message: String(e) } },
-        { status: 500 }
+      return withCors(
+        Response.json(
+          { ok: false, error: { code: "internal_error", message: String(e) } },
+          { status: 500 }
+        ),
+        origin
       );
     }
   },
