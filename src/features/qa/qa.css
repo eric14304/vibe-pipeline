@@ -371,3 +371,44 @@
   align-items: center;
   margin-top: 6px;
 }
+
+@media (max-width: 767px) {
+  .qadr-stage {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .qadr-drawer {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    max-width: none;
+    height: 100vh;
+    border-left: 0;
+    box-shadow: none;
+  }
+
+  .qadr-body,
+  .qadr-spec-body {
+    padding: 12px 16px calc(16px + env(safe-area-inset-bottom));
+  }
+
+  .qadr-foot {
+    padding: 10px 12px calc(12px + env(safe-area-inset-bottom));
+  }
+
+  .qadr-bubble {
+    max-width: 100%;
+  }
+
+  .qadr-spec-actions {
+    flex-wrap: wrap;
+  }
+
+  .qadr-spec-actions .btn-primary {
+    width: 100%;
+  }
+}

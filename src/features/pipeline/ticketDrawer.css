@@ -534,3 +534,43 @@
   font-size: 11px;
   color: var(--fg-faint);
 }
+
+@media (max-width: 767px) {
+  .tdrw-stage {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .tdrw-drawer {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    max-width: none;
+    height: 100vh;
+    border-left: 0;
+    box-shadow: none;
+  }
+
+  .tdrw-body {
+    padding: 12px 16px calc(16px + env(safe-area-inset-bottom));
+  }
+
+  .tdrw-split-confirm-actions {
+    flex-direction: column;
+  }
+
+  .tdrw-split-confirm-actions .tdrw-action {
+    width: 100%;
+  }
+
+  .tdrw-commit {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .tdrw-commit-ts {
+    grid-column: 1 / -1;
+  }
+}

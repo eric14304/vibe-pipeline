@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as api from "../../api/projects";
 import * as userConfigApi from "../../api/userConfig";
+import "./SettingsPopover.css";
 import {
   PROVIDERS,
   TASK_CLASSES,
@@ -508,6 +509,7 @@ export function SettingsPopover({
   return (
     <div
       ref={wrapRef}
+      className="settings-popover"
       role="dialog"
       aria-label="設定"
       style={{
@@ -698,6 +700,7 @@ export function SettingsPopover({
       </div>
       {userCfg ? (
         <div
+          className="settings-popover-task-grid"
           style={{
             display: "grid",
             // 第一欄 auto 撐到最長 label;model 欄要容 codex 較長名稱,給 max-content
@@ -752,6 +755,7 @@ export function SettingsPopover({
       )}
 
       <div
+        className="settings-popover-footer"
         style={{
           display: "flex",
           justifyContent: "flex-end",

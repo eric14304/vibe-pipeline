@@ -643,3 +643,35 @@ html.light .drawer {
   background: var(--accent-soft);
   color: var(--accent);
 }
+
+@media (max-width: 767px) {
+  .drawer-stage {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .drawer {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    max-width: none;
+    height: 100vh;
+    border-left: 0;
+    box-shadow: none;
+  }
+
+  .drawer-head {
+    padding: 12px 16px;
+  }
+
+  .drawer-body {
+    padding: 4px 16px;
+  }
+
+  .drawer-foot {
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  }
+}
