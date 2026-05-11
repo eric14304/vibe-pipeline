@@ -68,11 +68,13 @@ export function getConfig(hash: string): Promise<ProjectConfig> {
 
 export function updateConfig(
   hash: string,
-  patch: ProjectConfigPatch
+  patch: ProjectConfigPatch,
+  signal?: AbortSignal
 ): Promise<ProjectConfig> {
   return call<ProjectConfig>(`/api/projects/${hash}/config`, {
     method: "PUT",
     body: patch,
+    signal,
   });
 }
 

@@ -21,6 +21,21 @@ import {
 
 const MIN = 1;
 const MAX = 8;
+const AUTOSAVE_DELAY_MS = 400;
+const SAVED_VISIBLE_MS = 3000;
+
+type TaskModelPatch = { provider?: Provider; model?: ModelName; effort?: Effort };
+type ProjectField = "max_parallel" | "default_base_branch" | "cost_limit_usd" | "auto_merge";
+type TaskField = "provider" | "model" | "effort";
+type AutosaveKey = `project:${ProjectField}` | `task:${TaskClass}:${TaskField}`;
+type ProjectConfirmedValues = {
+  max_parallel: number;
+  default_base_branch: string;
+  cost_limit_usd: string;
+  auto_merge: boolean;
+};
+type TaskConfirmedValue = Provider | ModelName | Effort;
+type TaskConfirmedValues = Partial<Record<`task:${TaskClass}:${TaskField}`, TaskConfirmedValue>>;
 
 const TASK_SELECT_STYLE: React.CSSProperties = {
   padding: "3px 4px",
@@ -112,12 +127,14 @@ export function SettingsPopover({
   open,
   onClose,
   onSaved,
+  onActionError,
   anchorRef,
 }: {
   hash: string;
   open: boolean;
   onClose: () => void;
   onSaved?: (cfg: api.ProjectConfig) => void;
+  onActionError?: (message: string) => void;
   anchorRef: React.RefObject<HTMLElement | null>;
 }) {
   const [cfg, setCfg] = useState<api.ProjectConfig | null>(null);
@@ -125,13 +142,209 @@ export function SettingsPopover({
   const [draftBaseBranch, setDraftBaseBranch] = useState<string>("");
   const [draftCostLimit, setDraftCostLimit] = useState<string>("0");
   const [draftAutoMerge, setDraftAutoMerge] = useState<boolean>(false);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [savedVisible, setSavedVisible] = useState(false);
+  const [savedFading, setSavedFading] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const timersRef = useRef<Partial<Record<AutosaveKey, ReturnType<typeof setTimeout>>>>({});
+  const controllersRef = useRef<Partial<Record<AutosaveKey, AbortController>>>({});
+  const seqRef = useRef<Partial<Record<AutosaveKey, number>>>({});
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedProjectCfgRef = useRef<api.ProjectConfig | null>(null);
+  const savedUserCfgRef = useRef<UserConfig | null>(null);
+  const confirmedProjectValuesRef = useRef<ProjectConfirmedValues | null>(null);
+  const confirmedTaskValuesRef = useRef<TaskConfirmedValues>({});
   // User-level config(跨 project)— 跟上面的 project-level 是不同層,獨立 PUT
   const [userCfg, setUserCfg] = useState<UserConfig | null>(null);
   const [userCfgError, setUserCfgError] = useState<string | null>(null);
-  const [userCfgBusy, setUserCfgBusy] = useState(false);
+
+  function isAbortError(e: unknown): boolean {
+    return e instanceof Error && e.name === "AbortError";
+  }
+
+  function toastSaveError(e: unknown) {
+    if (isAbortError(e)) return;
+    const message = e instanceof Error && e.message ? e.message : "儲存失敗，請重試";
+    onActionError?.(message);
+  }
+
+  function showSaved() {
+    setSavedVisible(true);
+    setSavedFading(false);
+    if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+    savedTimerRef.current = setTimeout(() => setSavedFading(true), SAVED_VISIBLE_MS);
+  }
+
+  function onSavedTransitionEnd(e: React.TransitionEvent<HTMLSpanElement>) {
+    if (e.propertyName !== "opacity" || !savedFading) return;
+    setSavedVisible(false);
+    setSavedFading(false);
+  }
+
+  function setConfirmedProjectValues(c: api.ProjectConfig) {
+    confirmedProjectValuesRef.current = {
+      max_parallel: c.defaults.max_parallel,
+      default_base_branch: c.defaults.base_branch ?? "",
+      cost_limit_usd: String(c.defaults.cost_limit_usd ?? 0),
+      auto_merge: !!c.defaults.auto_merge,
+    };
+  }
+
+  function updateConfirmedProjectValue(field: ProjectField, c: api.ProjectConfig) {
+    const current =
+      confirmedProjectValuesRef.current ?? {
+        max_parallel: c.defaults.max_parallel,
+        default_base_branch: c.defaults.base_branch ?? "",
+        cost_limit_usd: String(c.defaults.cost_limit_usd ?? 0),
+        auto_merge: !!c.defaults.auto_merge,
+      };
+    confirmedProjectValuesRef.current = {
+      ...current,
+      [field]:
+        field === "max_parallel"
+          ? c.defaults.max_parallel
+          : field === "default_base_branch"
+            ? (c.defaults.base_branch ?? "")
+            : field === "cost_limit_usd"
+              ? String(c.defaults.cost_limit_usd ?? 0)
+              : !!c.defaults.auto_merge,
+    };
+  }
+
+  function setConfirmedTaskValues(c: UserConfig) {
+    const next: TaskConfirmedValues = {};
+    for (const tc of TASK_CLASSES) {
+      next[`task:${tc}:provider`] = c.defaults[tc].provider;
+      next[`task:${tc}:model`] = c.defaults[tc].model;
+      next[`task:${tc}:effort`] = c.defaults[tc].effort;
+    }
+    confirmedTaskValuesRef.current = next;
+  }
+
+  function applyConfirmedTaskValue(
+    task: UserConfig["defaults"][TaskClass],
+    field: TaskField,
+    value: TaskConfirmedValue
+  ): UserConfig["defaults"][TaskClass] {
+    if (field === "provider") return { ...task, provider: value as Provider };
+    if (field === "model") return { ...task, model: value as ModelName };
+    return { ...task, effort: value as Effort };
+  }
+
+  function scheduleAutosave(
+    key: AutosaveKey,
+    run: (signal: AbortSignal, seq: number) => Promise<void>,
+    rollback: (e: unknown) => void
+  ) {
+    const seq = (seqRef.current[key] ?? 0) + 1;
+    seqRef.current[key] = seq;
+    const existingTimer = timersRef.current[key];
+    if (existingTimer) clearTimeout(existingTimer);
+    timersRef.current[key] = setTimeout(() => {
+      controllersRef.current[key]?.abort();
+      const controller = new AbortController();
+      controllersRef.current[key] = controller;
+      run(controller.signal, seq)
+        .catch((e: unknown) => {
+          if (seqRef.current[key] !== seq || isAbortError(e)) return;
+          rollback(e);
+        })
+        .finally(() => {
+          if (controllersRef.current[key] === controller) delete controllersRef.current[key];
+        });
+    }, AUTOSAVE_DELAY_MS);
+  }
+
+  function mergeProjectSaved(field: ProjectField, next: api.ProjectConfig): api.ProjectConfig {
+    const base = savedProjectCfgRef.current ?? next;
+    const defaults = { ...base.defaults };
+    if (field === "max_parallel") defaults.max_parallel = next.defaults.max_parallel;
+    if (field === "default_base_branch") defaults.base_branch = next.defaults.base_branch;
+    if (field === "cost_limit_usd") defaults.cost_limit_usd = next.defaults.cost_limit_usd;
+    if (field === "auto_merge") defaults.auto_merge = next.defaults.auto_merge;
+    return { defaults };
+  }
+
+  function applyProjectDisplay(field: ProjectField, next: api.ProjectConfig) {
+    if (field === "max_parallel") setDraftMaxParallel(next.defaults.max_parallel);
+    if (field === "default_base_branch") setDraftBaseBranch(next.defaults.base_branch ?? "");
+    if (field === "cost_limit_usd") setDraftCostLimit(String(next.defaults.cost_limit_usd ?? 0));
+    if (field === "auto_merge") setDraftAutoMerge(!!next.defaults.auto_merge);
+  }
+
+  function scheduleProjectSave(
+    field: ProjectField,
+    patch: api.ProjectConfigPatch,
+    applyDisplay: (next: api.ProjectConfig) => void,
+    rollback: () => void
+  ) {
+    const key: AutosaveKey = `project:${field}`;
+    scheduleAutosave(
+      key,
+      async (signal, seq) => {
+        const next = await api.updateConfig(hash, patch, signal);
+        if (seqRef.current[key] !== seq) return;
+        const merged = mergeProjectSaved(field, next);
+        savedProjectCfgRef.current = merged;
+        updateConfirmedProjectValue(field, next);
+        setCfg(merged);
+        applyDisplay(next);
+        onSaved?.(merged);
+        showSaved();
+      },
+      (e) => {
+        toastSaveError(e);
+        rollback();
+      }
+    );
+  }
+
+  function scheduleTaskSave(
+    tc: TaskClass,
+    field: TaskField,
+    patch: TaskModelPatch,
+    desiredTask: UserConfig["defaults"][TaskClass],
+    rollback: () => void
+  ) {
+    const key: AutosaveKey = `task:${tc}:${field}`;
+    scheduleAutosave(
+      key,
+      async (signal, seq) => {
+        await userConfigApi.updateUserConfig({ defaults: { [tc]: patch } }, signal);
+        if (seqRef.current[key] !== seq) return;
+        const current = savedUserCfgRef.current;
+        if (current) {
+          savedUserCfgRef.current = {
+            ...current,
+            defaults: {
+              ...current.defaults,
+              [tc]: { ...current.defaults[tc], ...desiredTask },
+            },
+          };
+        }
+        for (const patchedField of Object.keys(patch) as TaskField[]) {
+          confirmedTaskValuesRef.current[`task:${tc}:${patchedField}`] = desiredTask[patchedField];
+        }
+        showSaved();
+      },
+      (e) => {
+        toastSaveError(e);
+        rollback();
+      }
+    );
+  }
+
+  useEffect(() => {
+    return () => {
+      for (const timer of Object.values(timersRef.current)) {
+        if (timer) clearTimeout(timer);
+      }
+      for (const controller of Object.values(controllersRef.current)) {
+        controller?.abort();
+      }
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -142,6 +355,8 @@ export function SettingsPopover({
       .then((c) => {
         if (cancelled) return;
         setCfg(c);
+        savedProjectCfgRef.current = c;
+        setConfirmedProjectValues(c);
         setDraftMaxParallel(c.defaults.max_parallel);
         setDraftBaseBranch(c.defaults.base_branch ?? "");
         setDraftCostLimit(String(c.defaults.cost_limit_usd ?? 0));
@@ -164,7 +379,10 @@ export function SettingsPopover({
     userConfigApi
       .getUserConfig()
       .then((c) => {
-        if (!cancelled) setUserCfg(c);
+        if (cancelled) return;
+        savedUserCfgRef.current = c;
+        setConfirmedTaskValues(c);
+        setUserCfg(c);
       })
       .catch((e: Error) => {
         if (!cancelled) setUserCfgError(e.message);
@@ -174,23 +392,22 @@ export function SettingsPopover({
     };
   }, [open]);
 
-  async function updateTask(
-    tc: TaskClass,
-    patch: { provider?: Provider; model?: ModelName; effort?: Effort }
-  ) {
+  function updateTask(tc: TaskClass, patch: TaskModelPatch) {
     if (!userCfg) return;
     const cur = userCfg.defaults[tc];
-    // provider 變但 patch 沒帶 model / effort → 自動 snap 到該 provider 預設,避免送出非法組合
+    const field: TaskField =
+      patch.provider !== undefined ? "provider" : patch.model !== undefined ? "model" : "effort";
+    let sendPatch = patch;
     const merged = { ...cur, ...patch };
     if (patch.provider && patch.provider !== cur.provider) {
       const np = patch.provider;
       if (patch.model === undefined && !isValidModel(np, merged.model)) {
         merged.model = defaultModelForProvider(np);
-        patch = { ...patch, model: merged.model };
+        sendPatch = { ...sendPatch, model: merged.model };
       }
       if (patch.effort === undefined && !isValidEffort(np, merged.effort)) {
         merged.effort = defaultEffortForProvider(np);
-        patch = { ...patch, effort: merged.effort };
+        sendPatch = { ...sendPatch, effort: merged.effort };
       }
     }
     const next: UserConfig = {
@@ -200,21 +417,28 @@ export function SettingsPopover({
         [tc]: merged,
       },
     };
-    // 樂觀 UI:先 set,失敗 rollback
     setUserCfg(next);
-    setUserCfgBusy(true);
     setUserCfgError(null);
-    try {
-      const saved = await userConfigApi.updateUserConfig({
-        defaults: { [tc]: patch },
+    scheduleTaskSave(tc, field, sendPatch, merged, () => {
+      const confirmedValues = confirmedTaskValuesRef.current;
+      setUserCfg((current) => {
+        if (!current) return current;
+        let rolledBackTask = { ...current.defaults[tc] };
+        for (const patchedField of Object.keys(sendPatch) as TaskField[]) {
+          const confirmedValue = confirmedValues[`task:${tc}:${patchedField}`];
+          if (confirmedValue !== undefined) {
+            rolledBackTask = applyConfirmedTaskValue(rolledBackTask, patchedField, confirmedValue);
+          }
+        }
+        return {
+          ...current,
+          defaults: {
+            ...current.defaults,
+            [tc]: rolledBackTask,
+          },
+        };
       });
-      setUserCfg(saved);
-    } catch (e) {
-      setUserCfgError(e instanceof Error ? e.message : String(e));
-      setUserCfg(userCfg); // rollback
-    } finally {
-      setUserCfgBusy(false);
-    }
+    });
   }
 
   // outside click + Esc 關
@@ -238,46 +462,6 @@ export function SettingsPopover({
   }, [open, onClose, anchorRef]);
 
   if (!open) return null;
-
-  const clampedMaxParallel = Math.max(MIN, Math.min(MAX, Math.floor(draftMaxParallel || MIN)));
-  const trimmedBase = draftBaseBranch.trim();
-  const parsedCost = Number(draftCostLimit);
-  const costValid = Number.isFinite(parsedCost) && parsedCost >= 0;
-  const baseValid = trimmedBase.length > 0;
-
-  const dirty = cfg
-    ? clampedMaxParallel !== cfg.defaults.max_parallel ||
-      trimmedBase !== (cfg.defaults.base_branch ?? "") ||
-      parsedCost !== cfg.defaults.cost_limit_usd ||
-      draftAutoMerge !== !!cfg.defaults.auto_merge
-    : false;
-  const canSave = dirty && baseValid && costValid;
-
-  async function save() {
-    if (!canSave) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const next = await api.updateConfig(hash, {
-        defaults: {
-          max_parallel: clampedMaxParallel,
-          default_base_branch: trimmedBase,
-          cost_limit_usd: parsedCost,
-          auto_merge: draftAutoMerge,
-        },
-      });
-      setCfg(next);
-      setDraftMaxParallel(next.defaults.max_parallel);
-      setDraftBaseBranch(next.defaults.base_branch ?? "");
-      setDraftCostLimit(String(next.defaults.cost_limit_usd ?? 0));
-      setDraftAutoMerge(!!next.defaults.auto_merge);
-      onSaved?.(next);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  }
 
   const inputStyle: React.CSSProperties = {
     padding: "4px 8px",
@@ -345,7 +529,32 @@ export function SettingsPopover({
       }}
     >
       {/* ─── Project 設定 ─── */}
-      <div style={sectionHeaderStyle}>Project 設定</div>
+      <div
+        style={{
+          ...sectionHeaderStyle,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "0.75rem",
+        }}
+      >
+        <span>Project 設定</span>
+        {savedVisible && (
+          <span
+            className="chip"
+            onTransitionEnd={onSavedTransitionEnd}
+            style={{
+              color: "var(--done)",
+              background: "var(--done-soft)",
+              borderColor: "var(--done-soft)",
+              opacity: savedFading ? 0 : 1,
+              transition: "opacity 350ms ease",
+            }}
+          >
+            已儲存 ✓
+          </span>
+        )}
+      </div>
 
       <div style={fieldRowStyle}>
         <label style={labelStyle}>平行上限</label>
@@ -356,11 +565,21 @@ export function SettingsPopover({
             max={MAX}
             step={1}
             value={draftMaxParallel}
-            onChange={(e) => setDraftMaxParallel(Number(e.target.value))}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") save();
+            onChange={(e) => {
+              const nextValue = Number(e.target.value);
+              const clamped = Math.max(MIN, Math.min(MAX, Math.floor(nextValue || MIN)));
+              setDraftMaxParallel(nextValue);
+              scheduleProjectSave(
+                "max_parallel",
+                { defaults: { max_parallel: clamped } },
+                (next) => applyProjectDisplay("max_parallel", next),
+                () => {
+                  const confirmedValue = confirmedProjectValuesRef.current?.max_parallel;
+                  if (confirmedValue !== undefined) setDraftMaxParallel(confirmedValue);
+                }
+              );
             }}
-            disabled={busy}
+            disabled={!cfg}
             className="mono"
             style={{ ...inputStyle, width: 64 }}
           />
@@ -376,11 +595,20 @@ export function SettingsPopover({
         <input
           type="text"
           value={draftBaseBranch}
-          onChange={(e) => setDraftBaseBranch(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") save();
+          onChange={(e) => {
+            const nextValue = e.target.value;
+            setDraftBaseBranch(nextValue);
+            scheduleProjectSave(
+              "default_base_branch",
+              { defaults: { default_base_branch: nextValue.trim() } },
+              (next) => applyProjectDisplay("default_base_branch", next),
+              () => {
+                const confirmedValue = confirmedProjectValuesRef.current?.default_base_branch;
+                if (confirmedValue !== undefined) setDraftBaseBranch(confirmedValue);
+              }
+            );
           }}
-          disabled={busy}
+          disabled={!cfg}
           placeholder={cfg?.defaults.base_branch || "main"}
           className="mono"
           style={{ ...inputStyle, width: "100%", boxSizing: "border-box" }}
@@ -396,11 +624,20 @@ export function SettingsPopover({
             min={0}
             step={0.01}
             value={draftCostLimit}
-            onChange={(e) => setDraftCostLimit(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") save();
+            onChange={(e) => {
+              const nextValue = e.target.value;
+              setDraftCostLimit(nextValue);
+              scheduleProjectSave(
+                "cost_limit_usd",
+                { defaults: { cost_limit_usd: Number(nextValue) } },
+                (next) => applyProjectDisplay("cost_limit_usd", next),
+                () => {
+                  const confirmedValue = confirmedProjectValuesRef.current?.cost_limit_usd;
+                  if (confirmedValue !== undefined) setDraftCostLimit(confirmedValue);
+                }
+              );
             }}
-            disabled={busy}
+            disabled={!cfg}
             placeholder="0"
             className="mono"
             style={{ ...inputStyle, width: 100 }}
@@ -420,8 +657,20 @@ export function SettingsPopover({
           <input
             type="checkbox"
             checked={draftAutoMerge}
-            onChange={(e) => setDraftAutoMerge(e.target.checked)}
-            disabled={busy}
+            onChange={(e) => {
+              const nextValue = e.target.checked;
+              setDraftAutoMerge(nextValue);
+              scheduleProjectSave(
+                "auto_merge",
+                { defaults: { auto_merge: nextValue } },
+                (next) => applyProjectDisplay("auto_merge", next),
+                () => {
+                  const confirmedValue = confirmedProjectValuesRef.current?.auto_merge;
+                  if (confirmedValue !== undefined) setDraftAutoMerge(confirmedValue);
+                }
+              );
+            }}
+            disabled={!cfg}
           />
           <span className="toggle-pill-track" aria-hidden>
             <span className="toggle-pill-thumb" />
@@ -467,7 +716,6 @@ export function SettingsPopover({
               provider={userCfg.defaults[tc].provider}
               model={userCfg.defaults[tc].model}
               effort={userCfg.defaults[tc].effort}
-              disabled={userCfgBusy}
               onChange={(patch) => updateTask(tc, patch)}
             />
           ))}
@@ -506,31 +754,13 @@ export function SettingsPopover({
       <div
         style={{
           display: "flex",
-          gap: 8,
           justifyContent: "flex-end",
           paddingTop: 10,
           borderTop: "1px solid var(--line)",
         }}
       >
-        <button type="button" className="btn" onClick={onClose} disabled={busy}>
+        <button type="button" className="btn" onClick={onClose}>
           關閉
-        </button>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={save}
-          disabled={!canSave || busy}
-          title={
-            !dirty
-              ? "尚未變更"
-              : !baseValid
-              ? "base branch 不可空白"
-              : !costValid
-              ? "cost 上限需 >= 0"
-              : "儲存"
-          }
-        >
-          {busy ? "儲存中…" : "儲存"}
         </button>
       </div>
     </div>

@@ -323,6 +323,7 @@ export function BoardScreen({
       settingsSlot={
         <SettingsButton
           hash={hash}
+          onActionError={setActionError}
           onConfigSaved={(cfg) => {
             setMaxParallel(cfg.defaults.max_parallel);
             setDefaultAutoMerge(!!cfg.defaults.auto_merge);
@@ -831,9 +832,11 @@ function fmtTs(ms: number): { ts: string; since: number } {
 function SettingsButton({
   hash,
   onConfigSaved,
+  onActionError,
 }: {
   hash: string | null;
   onConfigSaved?: (cfg: api.ProjectConfig) => void;
+  onActionError?: (message: string) => void;
 }) {
   const btnRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
@@ -859,6 +862,7 @@ function SettingsButton({
           onSaved={(cfg) => {
             onConfigSaved?.(cfg);
           }}
+          onActionError={onActionError}
           anchorRef={btnRef}
         />
       )}
