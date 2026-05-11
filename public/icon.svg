@@ -1,8 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#1c1916"/>
-  <g transform="translate(256 256)">
-    <path d="M -120 -60 L 0 120 L 120 -60 L 70 -60 L 0 60 L -70 -60 Z" fill="#d4956d"/>
-    <circle cx="0" cy="-110" r="22" fill="#d4956d"/>
-  </g>
-  <text x="256" y="430" font-family="system-ui,-apple-system,sans-serif" font-size="56" font-weight="700" text-anchor="middle" fill="#d4956d" letter-spacing="2">VP</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="512" height="512">
+  <rect width="24" height="24" rx="4.5" fill="#1c1916"/>
+  <path d="M4 7 L9 12 L4 17" stroke="#d4956d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M10 7 L15 12 L10 17" stroke="#d4956d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.55"/>
+  <circle cx="19" cy="12" r="2" fill="#d4956d"/>
 </svg>
