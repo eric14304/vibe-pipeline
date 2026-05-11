@@ -82,7 +82,7 @@ function spawnQA(opts: QASpawnOpts): SpawnedProcess {
 }
 
 function spawnRunner(opts: RunnerSpawnOpts): SpawnedProcess {
-  const { cwd, sessionId, initialMessage, systemPrompt, model, effort } = opts;
+  const { cwd, sessionId, initialMessage, systemPrompt, model, effort, needsBypassPermissions } = opts;
   const args = [
     "claude",
     "-p",
@@ -101,10 +101,15 @@ function spawnRunner(opts: RunnerSpawnOpts): SpawnedProcess {
     model,
     "--effort",
     effort,
-    "--system-prompt",
-    systemPrompt,
-    initialMessage,
   ];
+  // 跨 provider:Task(codex-rescue) sub-agent 需要 Bash 跑 codex-companion.mjs,
+  // user 設 `permissions.defaultMode: auto` 對這種 absolute path node 不一定吃,
+  // 實測會 permission_denials → 主 agent 幻覺成功。同 provider (純 claude) 不需要。
+  if (needsBypassPermissions) {
+    args.push("--dangerously-skip-permissions");
+  }
+  args.push("--system-prompt", systemPrompt);
+  args.push(initialMessage);
   return Bun.spawn(args, { cwd, stdout: "pipe", stderr: "pipe" });
 }
 

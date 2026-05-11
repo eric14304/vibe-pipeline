@@ -311,6 +311,11 @@ async function spawnDirect(opts: {
   const mergeCfg = userCfg.defaults.merge;
   const runnerCfg = await getTaskConfigWithAdapter("runner");
 
+  // 跨 provider sub-agent:任何 task class 用 codex 都需 runner spawn 帶 bypass
+  // (claude 主 agent 派 codex-rescue Task → Bash node codex-companion.mjs 需放行)
+  const needsBypassPermissions =
+    subAgentCfg.provider === "codex" || mergeCfg.provider === "codex";
+
   let proc: Bun.Subprocess;
   try {
     proc = runnerCfg.adapter.spawn({
@@ -321,6 +326,7 @@ async function spawnDirect(opts: {
       systemPrompt: buildRunnerBehaviorPrompt({ subAgent: subAgentCfg, merge: mergeCfg }),
       model: runnerCfg.model,
       effort: runnerCfg.effort,
+      needsBypassPermissions,
     });
   } catch (e) {
     return { ok: false, error: `spawn ${runnerCfg.adapter.name} failed: ${String(e)}` };

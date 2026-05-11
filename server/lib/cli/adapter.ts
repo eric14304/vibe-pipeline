@@ -36,6 +36,11 @@ export type RunnerSpawnOpts = {
   systemPrompt: string;
   model: string;
   effort: string;
+  // 跨 provider sub-agent(claude main → codex sub via codex-rescue plugin)需要
+  // 放寬 Bash 權限 — 否則 Task sub-agent 想跑 `node .../codex-companion.mjs` 被
+  // permission_denials 擋,主 agent 拿不到結果還會幻覺成功訊息(實測)。
+  // 由 orchestrator 偵測 subAgent.provider===codex || merge.provider===codex 時 true。
+  needsBypassPermissions?: boolean;
 };
 
 // Split spawn opts:one-shot,structured array output。
