@@ -55,7 +55,13 @@ const TASK_SELECT_STYLE: React.CSSProperties = {
   color: "var(--fg)",
   fontSize: 11.5,
   fontFamily: "var(--font-mono)",
+  boxSizing: "border-box",
 };
+
+// 固定寬度,避免不同 provider / model / effort 字串長度讓 column 上下抖
+const PROVIDER_SELECT_STYLE: React.CSSProperties = { ...TASK_SELECT_STYLE, width: 86 };
+const MODEL_SELECT_STYLE: React.CSSProperties = { ...TASK_SELECT_STYLE, width: 150 };
+const EFFORT_SELECT_STYLE: React.CSSProperties = { ...TASK_SELECT_STYLE, width: 95 };
 
 function TaskModelRow({
   label,
@@ -94,7 +100,7 @@ function TaskModelRow({
         value={provider}
         disabled={disabled}
         onChange={(e) => onChange({ provider: e.target.value as Provider })}
-        style={TASK_SELECT_STYLE}
+        style={PROVIDER_SELECT_STYLE}
       >
         {PROVIDERS.map((p) => (
           <option key={p} value={p}>
@@ -106,7 +112,7 @@ function TaskModelRow({
         value={model}
         disabled={disabled}
         onChange={(e) => onChange({ model: e.target.value as ModelName })}
-        style={TASK_SELECT_STYLE}
+        style={MODEL_SELECT_STYLE}
       >
         {modelsForProvider(provider).map((m) => (
           <option key={m} value={m}>
@@ -118,7 +124,7 @@ function TaskModelRow({
         value={effort}
         disabled={disabled}
         onChange={(e) => onChange({ effort: e.target.value as Effort })}
-        style={TASK_SELECT_STYLE}
+        style={EFFORT_SELECT_STYLE}
       >
         {effortsForProvider(provider).map((eff) => (
           <option key={eff} value={eff}>
