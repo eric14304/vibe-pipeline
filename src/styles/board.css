@@ -901,17 +901,6 @@ html.light .focus-create-empty {
     gap: 6px !important;
     margin-bottom: 8px !important;
   }
-  /* mobile 隱藏次要 chip / 按鈕,降低 focus-head 密度:
-     - pipeline 分支 chip(branch 名可從 pipeline 名推)
-     - runs 累積成本 chip(可去 settings 查)
-     - 自動合併 toggle(set-once,改用 CreateCard / 將來移 overflow)
-     - 「無 ticket 可執行」disabled 按鈕(state chip / banner 已有同義資訊)*/
-  .focus-branch-chip,
-  .focus-runs-chip,
-  .focus-auto-merge,
-  .run-btn-empty {
-    display: none !important;
-  }
   /* done count 字體略小,跟 state chip 同一視覺層 */
   .focus-count {
     font-size: 11px !important;
