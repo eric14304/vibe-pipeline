@@ -547,7 +547,10 @@
     inset: 0;
     width: 100vw;
     height: 100vh;
+    height: 100dvh;
     overflow: hidden;
+    /* 高於 .board-mobile-tabs(z-index:40),避免底部 actions / 內容被切換條遮 */
+    z-index: 50;
   }
 
   .tdrw-drawer {
@@ -556,6 +559,7 @@
     width: 100vw;
     max-width: none;
     height: 100vh;
+    height: 100dvh;
     border-left: 0;
     box-shadow: none;
   }
