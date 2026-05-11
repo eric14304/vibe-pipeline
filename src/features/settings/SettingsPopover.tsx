@@ -188,17 +188,6 @@ function PushNotificationsSection({
     }
   }
 
-  const sectionHeader: React.CSSProperties = {
-    fontSize: 10.5,
-    letterSpacing: "0.08em",
-    color: "var(--fg-mute)",
-    textTransform: "uppercase",
-    fontWeight: 600,
-    marginBottom: 10,
-    paddingBottom: 6,
-    borderBottom: "1px solid var(--line)",
-    marginTop: 6,
-  };
   const hint: React.CSSProperties = {
     fontSize: 11,
     color: "var(--fg-faint)",
@@ -236,7 +225,6 @@ function PushNotificationsSection({
 
   return (
     <div>
-      <div style={sectionHeader}>Push 通知</div>
       <div style={statusRow}>
         <span style={{ color: statusColor, fontFamily: "var(--font-mono)" }}>{statusIcon}</span>
         <span style={{ color: "var(--fg)" }}>{statusText}</span>

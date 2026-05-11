@@ -104,18 +104,6 @@ export function SecurityTab({
     }
   }
 
-  const sectionHeader: React.CSSProperties = {
-    fontSize: 10.5,
-    letterSpacing: "0.08em",
-    color: "var(--fg-mute)",
-    textTransform: "uppercase",
-    fontWeight: 600,
-    marginBottom: 10,
-    paddingBottom: 6,
-    borderBottom: "1px solid var(--line)",
-    marginTop: 6,
-  };
-
   const hint: React.CSSProperties = {
     fontSize: 11,
     color: "var(--fg-faint)",
@@ -134,8 +122,6 @@ export function SecurityTab({
 
   return (
     <div>
-      <div style={sectionHeader}>安全</div>
-
       <div
         style={{
           display: "flex",
