@@ -46,7 +46,14 @@ import type {
 // 解法:adapter 自己組 shell script — codex exec ... -o <tmp>; cat <tmp> 1>&2 重定向?
 // 太脆。改用 parseResult 從 codex `--json` JSONL stdout 取 agent_message 文本。
 //
-// 結論:CodexAdapter spawn 一律加 --json,parseResult 從 JSONL 掃最後一個 agent_message。
+// 結論:CodexAdapter spawn 一律加 --json,parseResult 從 JSONL 掃最後一個 item.completed/agent_message。
+//
+// Round 2 修正(codex 0.125.0):
+//  - 砍 -a/--approval-policy never(已從 codex 移除,改 sandbox 控)。runner 用
+//    --dangerously-bypass-approvals-and-sandbox 取代「never approval」語義。
+//  - 砍 -m <model>(ChatGPT auth 對 -m 回 400)。改在 prompt header 寫 "[Model preference: <m>]"。
+//  - JSONL 形狀改 {type:"item.completed", item:{type:"agent_message", text}}。
+//  - prompt 改 stdin 模式(args 最後一個是 "-"),不再 positional 傳。
 
 export class CodexAdapter implements CliAdapter {
   readonly name = "codex";
@@ -76,14 +83,28 @@ export class CodexAdapter implements CliAdapter {
   }
 
   parseResult(_kind: "qa" | "split" | "runner", stdout: string): string {
-    // codex exec --json 輸出 JSONL:每行一個 event。掃最後一個 type=agent_message 取 .message。
-    // fallback:整段當 plain text 回去(LLM 偶爾不照規矩)。
+    // codex 0.125.0 exec --json JSONL 形狀:
+    //   {"type":"item.completed","item":{"type":"agent_message","text":"..."}}
+    // 掃所有行,取最後一個 agent_message.text。
+    // fallback:最後一段非空 plain text。
     const lines = stdout.split(/\r?\n/).filter((l) => l.trim().length > 0);
     let lastMsg: string | null = null;
     for (const line of lines) {
       try {
-        const ev = JSON.parse(line) as { type?: string; msg?: { type?: string; message?: string }; message?: string };
-        // codex JSONL 形狀可能是 { msg: { type: 'agent_message', message } } 或扁平 { type, message }
+        const ev = JSON.parse(line) as {
+          type?: string;
+          item?: { type?: string; text?: string; message?: string };
+          msg?: { type?: string; message?: string };
+          message?: string;
+        };
+        if (ev?.type === "item.completed" && ev.item?.type === "agent_message") {
+          const t = ev.item.text ?? ev.item.message;
+          if (typeof t === "string") {
+            lastMsg = t;
+            continue;
+          }
+        }
+        // 舊形狀 fallback(某些 codex 版本仍可能輸出)
         const inner = ev.msg ?? ev;
         if (inner && typeof inner === "object") {
           const t = (inner as { type?: string }).type;
@@ -101,6 +122,21 @@ export class CodexAdapter implements CliAdapter {
     const tail = lines.slice(-1)[0] ?? "";
     return tail;
   }
+}
+
+// 用 stdin 模式 spawn codex,把 prompt 寫進 stdin。args 最後一個必為 "-"。
+function spawnCodexWithStdinPrompt(args: string[], cwd: string, prompt: string): SpawnedProcess {
+  const proc = Bun.spawn(args, { cwd, stdin: "pipe", stdout: "pipe", stderr: "pipe" });
+  // Bun.spawn stdin 是 FileSink,write + end。
+  proc.stdin.write(prompt);
+  proc.stdin.end();
+  return proc;
+}
+
+// 在 prompt 前綴註明 model preference(因 ChatGPT auth 不接 -m,只能 hint)。
+function modelHint(model: string, effort?: string): string {
+  const eff = effort ? `, effort: ${effort}` : "";
+  return `[Model preference: ${model}${eff}]\n\n`;
 }
 
 // ─── 共用 args ──────────────────────────────────────────────────────
@@ -136,10 +172,10 @@ function wrapPrompt(systemPrompt: string, userMessage: string): string {
 // caller 看 capability flag 決定降級(其實 caller 用 getTaskConfig 拿 provider 後可走另一條 path,
 // 但 ticket 範圍不重寫 caller,僅在 spawn 內回報能力限制)。
 function spawnQA(opts: QASpawnOpts): SpawnedProcess {
-  const { cwd, userMessage, isFirstTurn, systemPrompt, appendSystemPrompt, model, history } = opts;
+  const { cwd, userMessage, isFirstTurn, systemPrompt, appendSystemPrompt, model, effort, history } = opts;
+  const hint = modelHint(model, effort);
+  let prompt: string;
   if (!isFirstTurn) {
-    // 沒 session resume → 把 caller 提供的 history(之前已完成的輪次,不含本輪 userMessage)
-    // 折成 transcript 串進 prompt;不然 codex 跨輪會失憶。
     const combined = appendSystemPrompt
       ? systemPrompt + "\n\n" + appendSystemPrompt
       : systemPrompt;
@@ -148,7 +184,7 @@ function spawnQA(opts: QASpawnOpts): SpawnedProcess {
           .map((t) => (t.role === "user" ? "[User] " : "[Assistant] ") + t.content)
           .join("\n\n")
       : "";
-    const prompt = transcript
+    prompt = hint + (transcript
       ? [
           "[System instructions]",
           combined,
@@ -159,21 +195,9 @@ function spawnQA(opts: QASpawnOpts): SpawnedProcess {
           "[User message]",
           userMessage,
         ].join("\n")
-      : wrapPrompt(combined, userMessage);
-    const args = [
-      ...commonExecArgs(),
-      "-C",
-      cwd,
-      "-s",
-      "read-only",
-      "-a",
-      "never",
-      "--ephemeral",
-      "-m",
-      model,
-      prompt,
-    ];
-    return Bun.spawn(args, { cwd, stdout: "pipe", stderr: "pipe" });
+      : wrapPrompt(combined, userMessage));
+  } else {
+    prompt = hint + wrapPrompt(systemPrompt, userMessage);
   }
   const args = [
     ...commonExecArgs(),
@@ -181,53 +205,43 @@ function spawnQA(opts: QASpawnOpts): SpawnedProcess {
     cwd,
     "-s",
     "read-only",
-    "-a",
-    "never",
     "--ephemeral",
-    "-m",
-    model,
-    wrapPrompt(systemPrompt, userMessage),
+    "-",
   ];
-  return Bun.spawn(args, { cwd, stdout: "pipe", stderr: "pipe" });
+  return spawnCodexWithStdinPrompt(args, cwd, prompt);
 }
 
 function spawnRunner(opts: RunnerSpawnOpts): SpawnedProcess {
-  const { cwd, initialMessage, systemPrompt, model } = opts;
-  // runner 要改 source code:workspace-write sandbox + bypass approvals
-  // (本機 vibe-pipeline 已是受控環境,sandbox + 'never' approval 等價 claude runner 的工具白名單放寬)
+  const { cwd, initialMessage, systemPrompt, model, effort } = opts;
+  // runner 要改 source code:workspace-write sandbox + bypass approvals。
   // 不加 --ephemeral:跟 QA / split 不對稱是刻意 — runner 長任務跨 round / 多次 spawn,
-  // 寫 rollout history 對後續除錯 / resume / 觀測有用,值得保留 disk session。
+  // 寫 rollout history 對後續除錯 / resume / 觀測有用。
+  const prompt = modelHint(model, effort) + wrapPrompt(systemPrompt, initialMessage);
   const args = [
     ...commonExecArgs(),
     "-C",
     cwd,
     "-s",
     "workspace-write",
-    "-a",
-    "never",
-    "-m",
-    model,
-    wrapPrompt(systemPrompt, initialMessage),
+    "--dangerously-bypass-approvals-and-sandbox",
+    "-",
   ];
-  return Bun.spawn(args, { cwd, stdout: "pipe", stderr: "pipe" });
+  return spawnCodexWithStdinPrompt(args, cwd, prompt);
 }
 
 function spawnSplit(opts: SplitSpawnOpts): SpawnedProcess {
-  const { cwd, systemPrompt, model, userMessage } = opts;
+  const { cwd, systemPrompt, model, effort, userMessage } = opts;
+  const prompt = modelHint(model, effort) + wrapPrompt(systemPrompt, userMessage);
   const args = [
     ...commonExecArgs(),
     "-C",
     cwd,
     "-s",
     "read-only",
-    "-a",
-    "never",
     "--ephemeral",
-    "-m",
-    model,
-    wrapPrompt(systemPrompt, userMessage),
+    "-",
   ];
-  return Bun.spawn(args, { cwd, stdout: "pipe", stderr: "pipe" });
+  return spawnCodexWithStdinPrompt(args, cwd, prompt);
 }
 
 // last-message tmp file helper(留作 future 用,當前用 JSONL parseResult 不需要)。
