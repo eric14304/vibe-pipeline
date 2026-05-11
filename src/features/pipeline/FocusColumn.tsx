@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { CheckCircleIcon, FolderIcon, MergeIcon, PlusIcon } from "../../ui/icons";
+import { CheckCircleIcon, FolderIcon, MergeIcon, PlusIcon, ProhibitIcon, RefreshIcon, TrashIcon } from "../../ui/icons";
 import { STATE_COLOR, STATE_LABEL, fmtElapsed, fmtDuration, normalizeVerdict } from "../../data/pipelines";
 import { MODE_LABELS } from "../../api/qa";
 import { useConfirm } from "../../ui/ConfirmDialog";
@@ -589,7 +589,7 @@ function OverflowMenu({
           )}
           {onPruneWorktree && (
             <MenuItem
-              icon={<span>⊘</span>}
+              icon={<ProhibitIcon />}
               label="清除 worktree"
               hint={lockedByState ? "running 中" : "git worktree remove + 刪 dir"}
               disabled={lockedByState}
@@ -616,7 +616,7 @@ function OverflowMenu({
           )}
           {onResetAll && hasResettable && (
             <MenuItem
-              icon={<span>↺</span>}
+              icon={<RefreshIcon />}
               label="重跑全部"
               hint={lockedByState ? "running 中" : "重置 done/failed → draft"}
               disabled={lockedByState}
@@ -645,7 +645,7 @@ function OverflowMenu({
           )}
           {onDelete && (
             <MenuItem
-              icon={<span>⌫</span>}
+              icon={<TrashIcon />}
               label="刪除 pipeline"
               hint={lockedByState ? "running 中" : "順手 prune worktree"}
               disabled={lockedByState}

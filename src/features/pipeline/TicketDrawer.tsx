@@ -6,6 +6,7 @@ import type { Ticket, IterRound, CommitRef } from "../../types/pipeline";
 import { MODE_LABELS } from "../../api/qa";
 import { STATE_COLOR, fmtDuration, normalizeVerdict } from "../../data/pipelines";
 import { useConfirm } from "../../ui/ConfirmDialog";
+import { RefreshIcon, ScissorsIcon, TrashIcon } from "../../ui/icons";
 import { RunHistory } from "./RunHistory";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -162,7 +163,7 @@ export function TicketDrawer({
               isSplitting ? (
                 <div className="tdrw-actions tdrw-actions-running">
                   <span className="tdrw-spinner" aria-hidden />
-                  <span className="tdrw-running-label">🤖 AI 拆分中…(~10-30s)</span>
+                  <span className="tdrw-running-label">AI 拆分中…(~10-30s)</span>
                 </div>
               ) : splitPending && onSplitTicket && isSplittable(ticket) ? (
                 <div className="tdrw-split-confirm">
@@ -183,7 +184,7 @@ export function TicketDrawer({
                         onSplitTicket(ticket.id);
                       }}
                     >
-                      ✂ 確認 AI 拆分
+                      <ScissorsIcon /> 確認 AI 拆分
                     </button>
                   </div>
                 </div>
@@ -204,7 +205,7 @@ export function TicketDrawer({
                         if (ok) onResetTicket(ticket.id);
                       }}
                     >
-                      ↺ 重置
+                      <RefreshIcon /> 重置
                     </button>
                   )}
                   {onSplitTicket && isSplittable(ticket) && (
@@ -212,7 +213,7 @@ export function TicketDrawer({
                       className="tdrw-action"
                       onClick={() => setSplitPending(true)}
                     >
-                      ✂ AI 拆分
+                      <ScissorsIcon /> AI 拆分
                     </button>
                   )}
                   {onDeleteTicket && isDeletable(ticket) && (
@@ -230,7 +231,7 @@ export function TicketDrawer({
                         if (ok) onDeleteTicket(ticket.id);
                       }}
                     >
-                      🗑 刪除
+                      <TrashIcon /> 刪除
                     </button>
                   )}
                 </div>
