@@ -4,9 +4,9 @@
 
 ## 當前 phase(2026-05-11)
 
-**Phase 4 進行中**:e2e 套(mock + real)+ AI merge 改成 ticket-based 架構 + UI polish 一輪。pipeline/phase3 branch 的「multi-pipeline 平行 + PUT charset guard」兩張 ticket 已手動 merge 進 main。
+**Phase 4 完成**(e2e + AI merge ticket-based + UI polish)+ **Phase 5 落地**(自動拆 ticket / 自動 sync / 自動 merge / 自動 prune / per-task model config / CLI perf flags)。phase3 / phase4 / refactor / perf-claude-cli 四條 pipeline 全 merge 進 main,**self-dogfood 自我重構成果穩定運作中**。
 
-**Phase 3 第四刀(舊)→ 第五刀(本 phase)**:Phase 3 第四刀的機械 merge 已被 Phase 4 ticket-based AI merge 取代;`/merge` 端點現在 append synthetic merge ticket 走 runner 主流程。
+**Phase 3 第四刀(舊)→ 第五刀(本 phase)**:Phase 3 第四刀的機械 merge 已被 Phase 4 ticket-based AI merge 取代;`/merge` 端點現在 append synthetic merge ticket 走 runner 主流程。merge strategy 鎖死 `merge --no-ff`(squash / ff-only 跟新版 auto-rebase + sync chip 不相容,refactor pipeline 已砍掉設定)。
 
 **已完成**
 - Phase 1 — Project / Pipeline CRUD + .vibe-pipeline/ JSON 持久化 + git init / reveal
@@ -21,17 +21,28 @@
 - Phase 4 第三刀 AI merge ticket-based — `/merge` 改 append 一張 `mode="merge"` synthetic ticket 走 runner 主流程,`mergeTicketPrompt()` sub-agent 用 `git -C "<projectPath>"` 操作 main repo,主 agent 解析 PASS / FAIL / FAIL_NORETRY 三種 sub-agent 回應(致命條件不再浪費 iter);merge ticket 帶上完整 ticket 歷史(title/goal/acceptance/commits)讓 AI 解衝突 + 寫精煉 commit message。preflight working tree 髒直接 409 不 spawn agent;失敗 merge ticket 重試走「reset → re-run」不重複 append。default merge_strategy 改 `merge`(--no-ff,保留 ticket commit chain)
 - Phase 4 第四刀 UI polish — ConfirmDialog 取代 native window.confirm(Promise hook + danger 變體 + Esc/Enter 鍵);TicketCard 顯 goal sub-line + iter rounds 多 row 垂直排列 + 「執行→審核→結果」三段 stage(結果顯 PASS/FAIL/PARTIAL);RunButton spawning「啟動中…」過場;Rail item state-aware 第二行(▶ #N title / 可合併入 main / 已併入 main / 上次活動 N 分鐘前);InboxItem read/unread 改單 dot 兩種樣式(實心/空心);prompt 用 react-markdown 渲染;mode label / STATE_LABEL 全中文;DiffModal(point worktree vs base 完整 diff,React Portal 跳出 fade-up transform 牢籠)。focus-head 加可點 +N -M 統計 chip(任何狀態都看得到 worktree diff);recoverStale 補 orphan ticket 修復(running ticket pipeline 已 paused 的錯位);QA pipelineContext snapshot(QA AI 看 pipeline 內既有 ticket 避免重複)
 - Phase 4 雜項 — `.vibe-pipeline/pipelines/` 改 ignored(merge 後 redundant 於 git commit chain);`/api/projects/:hash/status` 順帶 return mergeStrategy;diff-stat polling endpoint(running 時 3s 抓 worktree +N -M)
+- **Phase 5 — Pipeline 全自動化 + 模型 / 性能調控**:
+  - **AI 拆 ticket**:QA AI 在 complete=true 最後輪可填 splitInto(N 個完整 spec),SpecReview 顯 toggle「拆 N 張 / 保 1 張」,零額外 latency 寫進 backend。獨立 `✂ AI 拆分` 按鈕也走 splitTicketSpec(老 ticket 補救用,~76s)
+  - **AI sync**:`POST /pipelines/:id/sync` append synthetic `mode="sync"` ticket,sub-agent 在 worktree 內 rebase base → branch,衝突 AI 解 + ticket.commits[].hash remap(配對 subject)。落後 chip 顯 `⇣ 落後 N`,點擊觸發。merge / sync 共用 `--no-ff` strategy 鎖
+  - **AI 自動 merge**:project / pipeline-level `auto_merge` config,ready 後 backend 自動 append merge ticket;FocusColumn / CreateCard 用 `.toggle-pill` switch UI(高度對齊 .btn);文案「自動合併」
+  - **AI merge 完 auto-rebase worktree**:orchestrator 偵測 state=merged → `git -C <wt> rebase <baseBranch>` 預期 FF;worktree HEAD 跟 main 同步,後續 sync chip 自然 0,banner 不會 false-positive 觸發 re-merge
+  - **Worktree 生命週期**:刪 pipeline 預設 prune worktree(`worktree.removeQuiet`)+ 獨立 `⊘ 清除 worktree` 按鈕;merged 後 auto-prune(節省 VSCode 開太多 worktree 卡)。未合併 prune / 刪除顯 ⚠ 警告 banner + 「強制清除/刪除」label
+  - **User-level config**:`~/.vibe-pipeline/config.json` 跨 project 共用,per-task-class (qa/runner/subAgent/merge) 可設 model / effort;SettingsPopover 露 selector;`getTaskConfig()` runtime 讀,動態套到 spawn args
+  - **CLI spawn perf flags**:三處 spawn(QA/split/runner)加 `--setting-sources ""` / `--strict-mcp-config` + 空 MCP / `--disable-slash-commands`;split / runner 多 `--no-session-persistence`(QA 多輪 resume 不能加,已避開)。QA / split 省 ~80-90% cost(cache_creation 19500/14500 → 0)+ 14-22% cold start。詳見 [refs/claude-cli-spawn-perf-2026-05-11.md](.claude/skills/vibe-pipeline/refs/claude-cli-spawn-perf-2026-05-11.md)
+  - **Ticket-level 操作**:TicketDrawer 把 reset/拆分/刪除收 head 內 toolbar(原本 body 底太遠);mode chip 可點直接 toggle step ↔ iter;iter 上限 input 1-5(coerceSpec clamp);QA system prompt 補強 `splitInto` 規則 + `iterLimit` 上限
+  - **QA 體驗**:user 送出訊息 → 立刻寫 disk(claude 跑前的中繼狀態),中途關 drawer 接續看得到剛送的話 + thinking dots(useQA poll AI 寫回);finalize 取消的 split-check / triConfirm 流程整套移除,改成 QA AI 內含 splitInto
+  - **Notif / toast 補齊**:create / pause / delete / rename / reset ticket / reset all 都有成功 toast(對齊 merge / sync / run)
+  - **ConfirmDialog 強化**:`warning?: string` 欄(紅框 + ⚠ icon);`tertiaryLabel` 三選一(`useTriConfirm()`);danger=true 時 autoFocus 取消鈕 + Enter 不觸發 confirm(避免 user 亂打 Enter 出事)
+- **Phase 5 雜項** — `Bun.serve idleTimeout: 255`(default 10s 太短,split / claude call 會被砍);`bun run server` 改 no-watch default,`server:watch` 給 dev;self-dogfood AI merge 必須關 watch(server 衝突會 reload 殺 child claude);TopBar bell 拿掉,inbox strip 改 bell + 數字 badge;merge ticket / sync ticket UI 顯「執行 → 結果」兩段(無 critic);diff stat / sync polling 等
 
 **架構決策**:Bun local server + browser(前端 Vite 5173 / 後端 Bun 3001 / `/api/*` 透過 Vite proxy)。Runner 主 agent 工具白名單只准 Edit/Write 改 pipeline.json + Bash 跑 read-only 指令 + git add/commit;source code 改動 100% 透過 Task 派 sub-agent。Theme 偏好走 localStorage(URL `?theme=` 仍 override 給分享連結用),非 backend config — 簡單 + 無 round-trip + first-paint 不閃。
 
 **還沒做(下個 iteration)**
 - Transient retry 真正觸發測試(沒自然 fixture,需 fault injection;低優先,留 production 真踩到再補)
-- Budget tracker(P2+;不需 SQLite,直接 sum log JSON)
-- Settings 畫面其餘欄位(default base branch / merge_strategy / cost 上限等;phase 3-5 已露 max_parallel,SettingsPopover 雛形已落地,其他保留)
-- AI 跑 merge / runner 時的 model / effort 控制(目前都用 user 預設;QA 適合 sonnet 省、merge sub-agent 適合 opus,可加 ticket spec 欄位 + 全域 default config)
-- log/notif GC 已落地(per-pipeline 留 10 / 全 project 留 500)
-- Phase 3-5 e2e 留給 user 手動(orchestrator 不會 spawn 巢狀 claude session 跑覆蓋)
+- Budget tracker UI(backend cost_limit_usd 已落地會擋 /run + 發 budget notif,UI 顯示「目前累積」之類的 dashboard 缺)
+- Phase 5 e2e mock 覆蓋(autoMerge / splitInto / sync / prune worktree / userConfig 等新功能)
 - self-dogfood 不靠手動 merge 的方案 → merge worktree isolation,規模 ~150 行,看 [refs/merge-isolation-2026-05-11.md](.claude/skills/vibe-pipeline/refs/merge-isolation-2026-05-11.md);99% user 不踩,當前不投入
+- runner spawn 的 `--setting-sources` 還沒砍(留給 Task sub-agent 讀 user/project CLAUDE.md);若日後把 sub-agent context 全 push 進 prompt,可拿 ~13% 額外 cache 改善
 
 **已 final 決定**(不再討論)
 - Theme 偏好 → localStorage(URL `?theme=` 仍 override)
@@ -218,3 +229,8 @@ routes:
 6. **server prompt template literal 內禁用 inline backtick** — `` `code` `` 在 backtick template literal 內會關閉外層字串。改寫純文字。踩過兩次。
 7. **改 `server/lib/qa/systemPrompt.ts` 或 `runnerPrompt.ts` 後 grep `\``** 確認沒殘留 inner backtick。Bun --watch reload 噴 syntax error 後 server 不會自己復活。
 8. **self-dogfood(vibe-pipeline 改 vibe-pipeline 自己)跑 AI merge 前要關 `--watch`** — AI 在 main repo 跑 `git merge` 會寫 conflict markers;若衝突落在 `server/` 檔,bun `--watch` reload backend 會連帶殺掉 spawn 出去的 claude child session,merge 中斷。`src/` 衝突只 vite 紅 overlay 但 child 不死(可忽略 overlay,F5 等做完)。解法:平常 `bun run server`(no watch)就好;只有改 server code 想熱 reload 才用 `bun run server:watch`,且 watch 模式下不要按 AI merge。end user 跑 VP 對別 project 不會有這問題(他不改 VP 自己 server code)。研究紀錄見 [`merge-isolation-2026-05-11.md`](.claude/skills/vibe-pipeline/refs/merge-isolation-2026-05-11.md);徹底解只能上 merge worktree 隔離(~150 行,當前不投入)。
+9. **server 重啟會殺 spawn 的 claude child(running pipeline → recoverStale 標 paused)** — 改 server code 前先看有沒有 pipeline 在跑,否則 user 看到 pipeline 莫名暫停。recovery 自動標 paused 但 worktree 進度保留,user 按「繼續」會從 critic 階段接續(若 doer 已交,executor 不重派,省 token)。
+10. **vite 內部模組 map cache 卡 stale `.js` 副檔名** — 如果以前 src/ 有過 stale `.js`(已刪),vite 仍會把 import 解到 `.js` URL → 撞 SPA fallback HTML → board 空白。解:`rm -rf node_modules/.vite` + 重啟 vite。`tsconfig.json` 已加 `noEmit: true` 防再生 `.js`,但 vite cache 需手清。
+11. **Bun.serve default `idleTimeout` 10s 太短** — QA / split / claude CLI call 都 ≥ 10s,會被 Bun 砍掉連線。`server/index.ts` 設 `idleTimeout: 255`(bun 上限 ~4.25min)。
+12. **改 backend 後 backend stale 不自覺** — `bun run server` 是 no-watch default,改完要手動 kill + 重啟。watch 模式踩雷 #8,只有開發 server code 才開。
+13. **inline backtick 雷不只 systemPrompt.ts / runnerPrompt.ts** — 任何 template literal 內 `` `code` `` 都會炸。改完 grep 一下確認沒殘留 inner backtick。
