@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { mkdirSync } from "node:fs";
 import * as pipelineDir from "../pipelineDir";
+import * as projectStore from "../projectStore";
 import * as worktree from "../git/worktree";
 import * as notifs from "../notifs/store";
 import * as ticketWatcher from "./ticketWatcher";
@@ -17,6 +18,91 @@ type RunningProcess = {
 };
 
 const running = new Map<string, RunningProcess>(); // key: <projectHash>:<pipelineId>
+
+// === Liveness watchdog ===
+// Bun.Subprocess.exited 通常會在 child 結束時 fire,但 Windows 偶發
+// process tree 異常(orphan / handle leak)可能造成 exit promise 卡住,running map
+// entry 留下「pipeline.json 寫 running 但實際沒 process」的 stale 狀態。
+// 每 60s 掃一遍,對每個 entry 驗 OS PID 是否還活,死了就走跟正常 exit 同樣的
+// cleanup(標 paused + notif + 釋 slot + dispatcher 接棒)。
+// 純加邏輯,既有 exit handler 不動;watchdog 抓到的話 exit handler 失效這 entry
+// 不會收到 proc.exited resolve,但 running.delete 已執行,handler 後續寫操作對
+// 已刪除 entry 是 no-op,安全。
+const WATCHDOG_INTERVAL_MS = 60_000;
+let watchdogTimer: ReturnType<typeof setInterval> | null = null;
+
+function isPidAlive(pid: number | undefined): boolean {
+  if (!pid) return false;
+  try {
+    process.kill(pid, 0); // signal 0 不殺只查
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function watchdogTick(): Promise<void> {
+  for (const [k, entry] of running.entries()) {
+    if (!entry.proc) continue; // mock 模式
+    // exitCode 非 null 表示 Bun 知道 process 已退;exit handler 應該會處理。
+    // 但若 exit handler 卡住(extremely rare),這邊也視為已死,fallback recover
+    const codeKnown = entry.proc.exitCode !== null;
+    const pidAlive = isPidAlive(entry.proc.pid);
+    if (codeKnown || !pidAlive) {
+      const reason = codeKnown
+        ? `exit code=${entry.proc.exitCode} but stuck in running map`
+        : `PID ${entry.proc.pid} no longer alive`;
+      console.warn(`[watchdog ${entry.pipelineId}] ${reason} — recovering`);
+      const [hashPart] = k.split(":");
+      const projectHash = hashPart ?? "";
+      const project = await projectStore.findByHash(projectHash);
+      if (!project) {
+        running.delete(k);
+        continue;
+      }
+      try {
+        const p = (await pipelineDir.readPipeline(project.path, entry.pipelineId)) as {
+          state?: string;
+          name?: string;
+          [k: string]: unknown;
+        } | null;
+        if (p && p.state === "running") {
+          // 用 recoverStale 等效語意:running → paused,保留 worktree 進度
+          await pipelineDir.writePipeline(project.path, entry.pipelineId, {
+            ...p,
+            state: "paused",
+          });
+          notifs.emit(project.path, {
+            type: "runner_crash",
+            title: `${p.name || entry.pipelineId} runner 異常結束`,
+            sub: reason,
+            pipelineId: entry.pipelineId,
+          });
+        }
+      } catch (e) {
+        console.error(`[watchdog ${entry.pipelineId}] cleanup failed:`, e);
+      }
+      running.delete(k);
+      ticketWatcher.stop({ projectHash, pipelineId: entry.pipelineId });
+      // 釋 slot,dispatcher 接棒
+      dispatch(project.path, projectHash).catch((e) =>
+        console.error(`[watchdog ${entry.pipelineId}] dispatch failed:`, e)
+      );
+    }
+  }
+}
+
+export function startWatchdog(): void {
+  if (watchdogTimer) return;
+  watchdogTimer = setInterval(() => {
+    void watchdogTick();
+  }, WATCHDOG_INTERVAL_MS);
+}
+
+export function stopWatchdog(): void {
+  if (watchdogTimer) clearInterval(watchdogTimer);
+  watchdogTimer = null;
+}
 
 // FIFO queue per project:enqueue 順序 = 排隊順位。dispatcher 從隊頭撈、轉 spawn。
 // 不存 process,只存「下一次 spawn 該帶的 opts」。

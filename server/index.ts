@@ -315,3 +315,8 @@ void initFCM();
     console.error("[recover] scan failed:", e);
   }
 })();
+
+// Liveness watchdog:server 跑期間每 60s 掃 running map,抓 process 死了但
+// exit handler 沒收到通知的 stale entry(Windows 偶發 socket / handle leak 場景)。
+// recoverStale 只在啟動跑一次,watchdog 補 runtime 期間的偵測。
+orchestrator.startWatchdog();
