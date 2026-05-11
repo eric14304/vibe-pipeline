@@ -528,16 +528,16 @@ function OverflowMenu({
   const wrapRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
-    function onClick(e: MouseEvent) {
+    function onPointerDown(e: PointerEvent) {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
     }
-    document.addEventListener("mousedown", onClick);
+    document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKey);
     return () => {
-      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKey);
     };
   }, [open]);
@@ -696,6 +696,7 @@ function MenuItem({
   return (
     <button type="button"
       role="menuitem"
+      className="pipeline-overflow-menu-item"
       onClick={onClick}
       disabled={disabled}
       style={{
@@ -704,7 +705,6 @@ function MenuItem({
         gap: 8,
         alignItems: "center",
         padding: "6px 10px",
-        background: "transparent",
         border: 0,
         borderRadius: 4,
         textAlign: "left",
@@ -712,12 +712,6 @@ function MenuItem({
         cursor: disabled ? "not-allowed" : "pointer",
         font: "inherit",
         fontSize: 12.5,
-      }}
-      onMouseEnter={(e) => {
-        if (!disabled) e.currentTarget.style.background = "var(--panel-2)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = "transparent";
       }}
     >
       <span style={{ display: "inline-flex", justifyContent: "center" }}>

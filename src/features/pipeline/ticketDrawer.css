@@ -524,6 +524,12 @@
   background: color-mix(in srgb, var(--accent, var(--running)) 14%, transparent);
   border-color: var(--line);
 }
+.tdrw-commit-hash-btn:focus-visible {
+  background: color-mix(in srgb, var(--accent, var(--running)) 14%, transparent);
+  border-color: var(--line);
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
 .tdrw-commit-subject {
   color: var(--fg);
   overflow: hidden;
@@ -572,5 +578,12 @@
 
   .tdrw-commit-ts {
     grid-column: 1 / -1;
+  }
+}
+
+@media (hover: none) {
+  .tdrw-commit-hash-btn {
+    background: color-mix(in srgb, var(--accent, var(--running)) 10%, transparent);
+    border-color: var(--line);
   }
 }

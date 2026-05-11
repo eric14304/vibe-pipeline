@@ -445,7 +445,7 @@ export function SettingsPopover({
   // outside click + Esc 關
   useEffect(() => {
     if (!open) return;
-    function onClick(e: MouseEvent) {
+    function onPointerDown(e: PointerEvent) {
       const target = e.target as Node;
       if (wrapRef.current?.contains(target)) return;
       if (anchorRef.current?.contains(target)) return;
@@ -454,10 +454,10 @@ export function SettingsPopover({
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
     }
-    document.addEventListener("mousedown", onClick);
+    document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKey);
     return () => {
-      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKey);
     };
   }, [open, onClose, anchorRef]);

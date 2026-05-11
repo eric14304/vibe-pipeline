@@ -56,32 +56,32 @@ export function TopBar({
 
   useEffect(() => {
     if (!open) return;
-    function onClick(e: MouseEvent) {
+    function onPointerDown(e: PointerEvent) {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
     }
-    document.addEventListener("mousedown", onClick);
+    document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKey);
     return () => {
-      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKey);
     };
   }, [open]);
 
   useEffect(() => {
     if (!overflowOpen) return;
-    function onClick(e: MouseEvent) {
+    function onPointerDown(e: PointerEvent) {
       if (overflowRef.current && !overflowRef.current.contains(e.target as Node)) setOverflowOpen(false);
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOverflowOpen(false);
     }
-    document.addEventListener("mousedown", onClick);
+    document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKey);
     return () => {
-      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKey);
     };
   }, [overflowOpen]);
