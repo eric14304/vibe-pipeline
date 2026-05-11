@@ -387,45 +387,45 @@ export function FocusColumn({
             <PlusIcon /> {hasActiveDraft ? "接續 QA" : "ticket"}
           </button>
 
-          <span style={{ flex: 1 }} />
+          <div className="focus-actions">
+            {onToggleAutoMerge && (
+              <label
+                className={"toggle-pill mono focus-auto-merge" + (pipeline.autoMerge ? " is-on" : "")}
+                title="全 ticket done → backend 自動 append merge ticket 走 runner 流程"
+              >
+                <input
+                  type="checkbox"
+                  checked={!!pipeline.autoMerge}
+                  onChange={(e) => onToggleAutoMerge(pipeline.id, e.target.checked)}
+                />
+                <span className="toggle-pill-track" aria-hidden>
+                  <span className="toggle-pill-thumb" />
+                </span>
+                自動合併
+              </label>
+            )}
 
-          {onToggleAutoMerge && (
-            <label
-              className={"toggle-pill mono focus-auto-merge" + (pipeline.autoMerge ? " is-on" : "")}
-              title="全 ticket done → backend 自動 append merge ticket 走 runner 流程"
-            >
-              <input
-                type="checkbox"
-                checked={!!pipeline.autoMerge}
-                onChange={(e) => onToggleAutoMerge(pipeline.id, e.target.checked)}
-              />
-              <span className="toggle-pill-track" aria-hidden>
-                <span className="toggle-pill-thumb" />
-              </span>
-              自動合併
-            </label>
-          )}
-
-          <RunButton
-            pipeline={pipeline}
-            onRun={(pid) => {
-              setSpawning(true);
-              onRun?.(pid);
-            }}
-            onPause={onPause}
-            lastRun={lastRun}
-            spawning={spawning}
-            queuePosition={queuePosition}
-          />
-          <OverflowMenu
-            pipeline={pipeline}
-            hasResettable={hasResettable}
-            lockedByState={lockedByState}
-            onResetAll={onResetAll}
-            onRevealWorktree={onRevealWorktree}
-            onPruneWorktree={onPruneWorktree}
-            onDelete={onDelete}
-          />
+            <RunButton
+              pipeline={pipeline}
+              onRun={(pid) => {
+                setSpawning(true);
+                onRun?.(pid);
+              }}
+              onPause={onPause}
+              lastRun={lastRun}
+              spawning={spawning}
+              queuePosition={queuePosition}
+            />
+            <OverflowMenu
+              pipeline={pipeline}
+              hasResettable={hasResettable}
+              lockedByState={lockedByState}
+              onResetAll={onResetAll}
+              onRevealWorktree={onRevealWorktree}
+              onPruneWorktree={onPruneWorktree}
+              onDelete={onDelete}
+            />
+          </div>
         </div>
 
         {showMergeBanner && (

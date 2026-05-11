@@ -372,6 +372,15 @@
   flex-wrap: wrap;
   margin-bottom: 12px;
 }
+/* 動作群組(自動合併 toggle + RunButton + ⋯)整批靠右,desktop / mobile 都有效。
+   + ticket button 留在 left meta 區尾端,因為它是「對當前 pipeline 加 ticket」
+   的上下文動作,跟右側的 pipeline-level 控制(run / merge / 重置)不同層。 */
+.focus-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
 .focus-title {
   margin: 0;
   font-size: 22px; font-weight: 600;
@@ -904,11 +913,6 @@ html.light .focus-create-empty {
   /* done count 字體略小,跟 state chip 同一視覺層 */
   .focus-count {
     font-size: 11px !important;
-  }
-  /* 動作群組(+ ticket / 自動合併 / RunButton / ⋯)整批靠右 — margin-left:auto
-     放在第一個動作 + ticket 上,後續 inline 元素自然黏在右側 */
-  .focus-add-ticket {
-    margin-left: auto !important;
   }
   /* 內容少不需要 overflow menu — 全部 inline 顯示 */
   .topbar-overflow-mobile-items {
