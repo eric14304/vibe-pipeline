@@ -73,11 +73,20 @@ export const MODEL_NAMES: readonly ModelName[] = MODELS_BY_PROVIDER.claude;
 export const EFFORT_LEVELS: readonly Effort[] = EFFORTS_BY_PROVIDER.claude;
 
 export const TASK_CLASS_LABELS: Record<TaskClass, string> = {
-  qa: "QA(規格收斂)",
-  split: "Split(拆 ticket)",
-  runner: "Runner 主 agent",
-  subAgent: "Sub-agent(執行AI / 審核AI)",
-  merge: "AI 合併",
+  qa: "QA Spec",
+  split: "Ticket Split",
+  runner: "Main Agent",
+  subAgent: "Sub Agent",
+  merge: "Merge Agent",
+};
+
+// 第二行說明文字 — 弱化 hint,在 UI 主 label 下方小字顯
+export const TASK_CLASS_HINTS: Record<TaskClass, string> = {
+  qa: "規格收斂",
+  split: "拆 ticket",
+  runner: "任務執行主 Agent",
+  subAgent: "執行AI / 審核AI",
+  merge: "合併衝突解決",
 };
 
 

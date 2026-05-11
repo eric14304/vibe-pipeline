@@ -4,6 +4,7 @@ import * as userConfigApi from "../../api/userConfig";
 import {
   PROVIDERS,
   TASK_CLASSES,
+  TASK_CLASS_HINTS,
   TASK_CLASS_LABELS,
   defaultEffortForProvider,
   defaultModelForProvider,
@@ -33,6 +34,7 @@ const TASK_SELECT_STYLE: React.CSSProperties = {
 
 function TaskModelRow({
   label,
+  hint,
   provider,
   model,
   effort,
@@ -40,6 +42,7 @@ function TaskModelRow({
   onChange,
 }: {
   label: string;
+  hint?: string;
   provider: Provider;
   model: ModelName;
   effort: Effort;
@@ -48,7 +51,20 @@ function TaskModelRow({
 }) {
   return (
     <>
-      <span style={{ fontSize: 12, color: "var(--fg)", alignSelf: "center", whiteSpace: "nowrap" }}>{label}</span>
+      <span
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignSelf: "center",
+          whiteSpace: "nowrap",
+          lineHeight: 1.25,
+        }}
+      >
+        <span style={{ fontSize: 12, color: "var(--fg)" }}>{label}</span>
+        {hint && (
+          <span style={{ fontSize: 10.5, color: "var(--fg-faint)", marginTop: 1 }}>{hint}</span>
+        )}
+      </span>
       <select
         value={provider}
         disabled={disabled}
@@ -450,6 +466,7 @@ export function SettingsPopover({
             <TaskModelRow
               key={tc}
               label={TASK_CLASS_LABELS[tc]}
+              hint={TASK_CLASS_HINTS[tc]}
               provider={userCfg.defaults[tc].provider}
               model={userCfg.defaults[tc].model}
               effort={userCfg.defaults[tc].effort}
