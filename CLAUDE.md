@@ -32,6 +32,7 @@
 - **CLI(`vbpl` 暫定名)**:命名已 brainstorm 過,實作未啟動。長遠目標是讓 user 不開 browser 也能管 pipeline / ticket
 - **iOS PWA push 實測**:iOS 16.4+ 已支援 Web Push 但需先「加入主畫面」,目前只在 Android 驗過
 - **背景 push 待人工觸發測試**:測過 `/api/push/test` 鎖屏可收;runner 真實 pipeline 完成事件 → push 還沒實機跑過(ticketWatcher 路徑已寫好,缺最後一哩驗證)
+- **runner 主 agent 鎖 claude**:SettingsPopover 雖然 runner 欄位讓 user 可選 codex,實際上 `runnerPrompt.ts` 全是 claude-isms(Task tool / subagent_type / Edit/Write 規則),codex 主 runner 跑起來會忽略 sub-agent 派發指令,iter 紀律破功。要支援 codex 主 runner 需 rewrite prompt provider-agnostic(Task tool 換成 Bash 派下一層 CLI 統一寫法)或寫 codex-flavored 變體,~200-300 行 prompt 重設計。目前最務實做法是 UI 禁掉 runner=codex 選項 / backend `getTaskConfig("runner")` 強制 fallback claude,但暫不擋(待真正實作前看是否有 user 誤選)
 
 **已 final 決定**(不再討論)
 - Theme 偏好 → localStorage(URL `?theme=` 仍 override)
