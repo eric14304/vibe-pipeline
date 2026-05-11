@@ -8,7 +8,7 @@ export type TempProject = {
   hash: string;
 };
 
-const API = "http://127.0.0.1:3001/api";
+const API = "http://127.0.0.1:3003/api";
 
 // Run git deterministically:設 user.name/email + -b baseBranch,避免吃 user 全域 git config 出 surprise。
 export function gitIn(cwd: string, args: string[]): { ok: boolean; out: string; err: string } {

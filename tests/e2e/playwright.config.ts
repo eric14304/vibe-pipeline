@@ -15,10 +15,19 @@ import { join } from "node:path";
 const TEST_HOME = join(tmpdir(), `vp-e2e-home-${Date.now()}`);
 mkdirSync(TEST_HOME, { recursive: true });
 
+// e2e backend 跑 3003 不撞 dev backend 的 3001
+// (避免 playwright 中斷時 child bun 留下 zombie 鎖死 dev port)
+const E2E_PORT = "3003";
+
 const TEST_ENV: Record<string, string> = {
   VP_TEST_MODE: "mock",
   VP_HOME_OVERRIDE: TEST_HOME,
+  PORT: E2E_PORT,
   // Windows 上 Bun 的 process.env 也讀 USERPROFILE,但 vibeHome() 走 VP_HOME_OVERRIDE 優先,所以只設它就夠
+};
+
+const VITE_ENV: Record<string, string> = {
+  VITE_API_BASE_URL: `http://127.0.0.1:${E2E_PORT}`,
 };
 
 export default defineConfig({
@@ -41,15 +50,16 @@ export default defineConfig({
       command: "bun run dev",
       url: "http://127.0.0.1:5173/",
       timeout: 30_000,
-      // vite 不在意 testMode,reuse 沒副作用
       reuseExistingServer: !process.env.CI,
+      // vite 讀 VITE_API_BASE_URL → frontend fetch 直連 e2e backend(繞過 vite /api proxy)
+      env: VITE_ENV,
     },
     {
       command: "bun run server",
-      url: "http://127.0.0.1:3001/api/health",
+      url: `http://127.0.0.1:${E2E_PORT}/api/health`,
       timeout: 30_000,
       // 本地開發 reuse 之前 playwright 起的 mock server(env 會延續);CI 永遠重啟。
-      // 注意:user 不該手動跑 bun run server 跟 e2e 撞,撞到先 taskkill。
+      // e2e backend 跑 PORT=3003 不撞 dev 用的 3001
       reuseExistingServer: !process.env.CI,
       env: TEST_ENV,
     },

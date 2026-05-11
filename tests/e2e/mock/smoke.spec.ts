@@ -4,7 +4,7 @@ import { test, expect } from "@playwright/test";
 // 沒寫 backend mock 注入,純 boot test。Phase 2 才做 fixture project + mock script。
 
 test("backend health 回應 ok", async ({ request }) => {
-  const res = await request.get("http://127.0.0.1:3001/api/health");
+  const res = await request.get("http://127.0.0.1:3003/api/health");
   expect(res.ok()).toBe(true);
   const body = await res.json();
   expect(body.ok).toBe(true);

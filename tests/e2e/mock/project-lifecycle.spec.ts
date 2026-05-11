@@ -42,7 +42,7 @@ test("hasGit=false 時 board 仍 render(fixture project 都有 git;這裡用無 
     JSON.stringify({ defaults: {} })
   );
 
-  const res = await request.post("http://127.0.0.1:3001/api/__test/register-project", {
+  const res = await request.post("http://127.0.0.1:3003/api/__test/register-project", {
     data: { path: dir, ensureInit: true },
   });
   const body = await res.json();

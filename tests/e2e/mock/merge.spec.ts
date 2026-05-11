@@ -51,7 +51,7 @@ test("squash merge:全 ticket done + ready → POST /merge → state=merged + me
   });
   preBuildBranch(proj.path, "pipeline/merge-pipe", "feature.ts");
 
-  const res = await request.post(`http://127.0.0.1:3001/api/projects/${proj.hash}/pipelines/p-merge/merge`);
+  const res = await request.post(`http://127.0.0.1:3003/api/projects/${proj.hash}/pipelines/p-merge/merge`);
   const body = await res.json();
   if (!res.ok()) {
     throw new Error(`merge failed: status=${res.status()} body=${JSON.stringify(body)}`);
@@ -59,7 +59,7 @@ test("squash merge:全 ticket done + ready → POST /merge → state=merged + me
   expect(body.data.commitHash).toMatch(/^[a-f0-9]{40}$/);
 
   // 後端應該已經把 pipeline state 寫成 merged
-  const pipeRes = await request.get(`http://127.0.0.1:3001/api/projects/${proj.hash}/pipelines/p-merge`);
+  const pipeRes = await request.get(`http://127.0.0.1:3003/api/projects/${proj.hash}/pipelines/p-merge`);
   const pipeBody = await pipeRes.json();
   expect(pipeBody.data.state).toBe("merged");
   expect(pipeBody.data.mergeCommit.hash).toBe(body.data.commitHash);
@@ -92,7 +92,7 @@ test("merge 完 base 真的有那個 commit", async ({ request }) => {
   });
   preBuildBranch(proj.path, "pipeline/merge-pipe-2", "thing.ts");
 
-  await request.post(`http://127.0.0.1:3001/api/projects/${proj.hash}/pipelines/p-merge2/merge`);
+  await request.post(`http://127.0.0.1:3003/api/projects/${proj.hash}/pipelines/p-merge2/merge`);
 
   // squash 後 main 應該多一個 commit(原本只有 init);ls-tree 看到 thing.ts
   const lsTree = gitIn(proj.path, ["ls-tree", "main", "thing.ts"]);
@@ -113,7 +113,7 @@ test("merge 不可在 state != ready 跑", async ({ request }) => {
       },
     ],
   });
-  const res = await request.post(`http://127.0.0.1:3001/api/projects/${proj.hash}/pipelines/p-merge3/merge`);
+  const res = await request.post(`http://127.0.0.1:3003/api/projects/${proj.hash}/pipelines/p-merge3/merge`);
   expect(res.ok()).toBe(false);
 });
 
@@ -130,6 +130,6 @@ test("已 merge 的 pipeline 再 merge → 擋", async ({ request }) => {
       },
     ],
   });
-  const res = await request.post(`http://127.0.0.1:3001/api/projects/${proj.hash}/pipelines/p-merge4/merge`);
+  const res = await request.post(`http://127.0.0.1:3003/api/projects/${proj.hash}/pipelines/p-merge4/merge`);
   expect(res.ok()).toBe(false);
 });

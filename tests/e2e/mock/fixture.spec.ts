@@ -28,7 +28,7 @@ test.afterEach(async () => {
 });
 
 test("temp project 註冊後 health 報 testMode=true", async ({ request }) => {
-  const res = await request.get("http://127.0.0.1:3001/api/health");
+  const res = await request.get("http://127.0.0.1:3003/api/health");
   const body = await res.json();
   expect(body.data.testMode).toBe(true);
 });

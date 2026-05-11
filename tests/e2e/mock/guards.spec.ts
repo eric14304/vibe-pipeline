@@ -24,7 +24,7 @@ test.afterEach(() => {
 });
 
 test("PUT non-existent pipeline → 404", async ({ request }) => {
-  const res = await request.put(`http://127.0.0.1:3001/api/projects/${proj.hash}/pipelines/never-existed`, {
+  const res = await request.put(`http://127.0.0.1:3003/api/projects/${proj.hash}/pipelines/never-existed`, {
     data: {
       id: "never-existed",
       name: "x",
@@ -42,7 +42,7 @@ test("PUT non-existent pipeline → 404", async ({ request }) => {
 test("savePipeline 缺必備欄位 → 4xx + UI 不變", async ({ request }) => {
   // 缺 branch
   const res = await request.put(
-    `http://127.0.0.1:3001/api/projects/${proj.hash}/pipelines/p-guard`,
+    `http://127.0.0.1:3003/api/projects/${proj.hash}/pipelines/p-guard`,
     {
       data: { id: "p-guard", name: "guard-pipe", baseBranch: "main", state: "planning" },
     }
@@ -54,7 +54,7 @@ test("savePipeline 缺必備欄位 → 4xx + UI 不變", async ({ request }) => 
 
 test("PUT 沒帶 tickets 陣列 → 4xx", async ({ request }) => {
   const res = await request.put(
-    `http://127.0.0.1:3001/api/projects/${proj.hash}/pipelines/p-guard`,
+    `http://127.0.0.1:3003/api/projects/${proj.hash}/pipelines/p-guard`,
     {
       data: {
         id: "p-guard",
@@ -71,11 +71,11 @@ test("PUT 沒帶 tickets 陣列 → 4xx", async ({ request }) => {
 
 test("/api/__test/* 在 mock 模式 mount;real 模式不存在", async ({ request }) => {
   // 我們在 mock 模式,reset 應該 200
-  const res = await request.post("http://127.0.0.1:3001/api/__test/reset");
+  const res = await request.post("http://127.0.0.1:3003/api/__test/reset");
   expect(res.ok()).toBe(true);
 });
 
 test("不存在的 project hash → 404", async ({ request }) => {
-  const res = await request.get(`http://127.0.0.1:3001/api/projects/deadbeef/pipelines`);
+  const res = await request.get(`http://127.0.0.1:3003/api/projects/deadbeef/pipelines`);
   expect(res.status()).toBe(404);
 });

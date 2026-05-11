@@ -5,7 +5,7 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 let proj: TempProject;
-const API = "http://127.0.0.1:3001/api";
+const API = "http://127.0.0.1:3003/api";
 
 test.beforeEach(async () => {
   await resetMocks();

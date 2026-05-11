@@ -10,7 +10,7 @@ import { resetMocks } from "../helpers/mock-control";
 //
 // 三個都用 NODE_ENV/VP_TEST_MODE gate,production build 永遠走真路徑。
 
-const API = "http://127.0.0.1:3001";
+const API = "http://127.0.0.1:3003";
 const REMOTE_IP = "100.64.0.1"; // 模擬 Tailscale 端,非 loopback,會被 authGuard 攔
 const LOOPBACK_IP = "127.0.0.1";
 

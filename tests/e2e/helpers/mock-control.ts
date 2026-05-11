@@ -1,6 +1,6 @@
 // Wraps /api/__test/* 控制端點。Mock 模式專用。
 
-const API = "http://127.0.0.1:3001/api/__test";
+const API = "http://127.0.0.1:3003/api/__test";
 
 // QA reply 結構跟 shared/types.ts 一致;mock 腳本 spec 欄位放寬到 Record(允許 partial spec test)。
 import type { QAReply as SharedQAReply } from "../../../shared/types";

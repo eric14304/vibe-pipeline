@@ -5,7 +5,7 @@ import { createTempProject, cleanupTempProject, gitIn, type TempProject } from "
 import { resetMocks, setRunnerScript, type RunnerScript } from "../helpers/mock-control";
 
 let proj: TempProject;
-const API = "http://127.0.0.1:3001/api";
+const API = "http://127.0.0.1:3003/api";
 
 test.beforeEach(async () => {
   await resetMocks();
