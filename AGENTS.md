@@ -13,7 +13,7 @@ claude CLI 自動載 CLAUDE.md + 對應 SKILL,codex 不會,所以本檔導你過
    - 寫 / 改 / 跑 E2E(Playwright mock + real) → `.claude/skills/vibe-pipeline-e2e/SKILL.md`
    - scope / 決策 / 完整功能清單 / 外部產品對照 → `.claude/skills/vibe-pipeline/SKILL.md`(主 SKILL)
 
-CLAUDE.md 的「不踩的雷」段(目前 #1-13)是最容易踩的坑,**先讀完再動手**,避免重蹈覆轍。
+CLAUDE.md 的「不踩的雷」段(目前 #1-19)是最容易踩的坑,**先讀完再動手**,避免重蹈覆轍。
 
 ## 維護
 
