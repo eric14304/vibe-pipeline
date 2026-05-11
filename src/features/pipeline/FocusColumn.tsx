@@ -964,28 +964,28 @@ function TicketCard({
   const isPaused = ticket.status === "paused";
   const isDraft = ticket.status === "draft";
 
-  // runner 不一定寫 totalElapsed,從 rounds[] 推:sum(endedAt - startedAt) / 1000
-  const totalElapsed =
-    ticket.iter?.totalElapsed ??
-    (ticket.iter?.rounds
-      ? Math.round(
-          ticket.iter.rounds.reduce(
-            (sum, r) => sum + Math.max(0, (r.endedAt ?? r.startedAt) - r.startedAt),
-            0
-          ) / 1000
-        )
-      : 0);
-  // 跑進行中的 round 用 Date.now() - 該 round.startedAt 算 live elapsed,
-  // 不要直接加 tick(tick 是 BoardScreen mount 後的秒數,跟 ticket 開始時間無關)。
-  // tick 在這只作 re-render 觸發訊號(void 即可,不參與計算)
+  // Wall clock 計時:ticket.startedAt → Date.now()(running)/ ticket.endedAt(已結束)。
+  // 含暫停期間,但與 user 心智模型一致(「這 ticket 跑多久了」)。
+  // 沒有 ticket.startedAt(舊資料 / draft)時 fallback 用 rounds 總和。
+  // tick 只當 re-render 訊號,不參與計算
   void tick;
-  const inProgressRound = isRunning
-    ? ticket.iter?.rounds?.find((r) => !r.endedAt)
-    : null;
-  const liveRoundElapsed = inProgressRound
-    ? Math.max(0, Math.round((Date.now() - inProgressRound.startedAt) / 1000))
-    : 0;
-  const elapsed = totalElapsed + liveRoundElapsed;
+  let elapsed: number;
+  const ts = (ticket as { startedAt?: number; endedAt?: number }).startedAt;
+  const te = (ticket as { startedAt?: number; endedAt?: number }).endedAt;
+  if (typeof ts === "number") {
+    const end = isRunning ? Date.now() : (te ?? Date.now());
+    elapsed = Math.max(0, Math.round((end - ts) / 1000));
+  } else {
+    elapsed = ticket.iter?.totalElapsed
+      ?? (ticket.iter?.rounds
+        ? Math.round(
+            ticket.iter.rounds.reduce(
+              (sum, r) => sum + Math.max(0, (r.endedAt ?? r.startedAt) - r.startedAt),
+              0
+            ) / 1000
+          )
+        : 0);
+  }
   const iterCurrentLabel = ticket.iter ? Math.max(1, ticket.iter.current) : 0;
   const accent = STATE_COLOR[ticket.status] || "var(--draft)";
 
