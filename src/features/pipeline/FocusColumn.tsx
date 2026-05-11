@@ -388,23 +388,6 @@ export function FocusColumn({
           </button>
 
           <div className="focus-actions">
-            {onToggleAutoMerge && (
-              <label
-                className={"toggle-pill mono focus-auto-merge" + (pipeline.autoMerge ? " is-on" : "")}
-                title="全 ticket done → backend 自動 append merge ticket 走 runner 流程"
-              >
-                <input
-                  type="checkbox"
-                  checked={!!pipeline.autoMerge}
-                  onChange={(e) => onToggleAutoMerge(pipeline.id, e.target.checked)}
-                />
-                <span className="toggle-pill-track" aria-hidden>
-                  <span className="toggle-pill-thumb" />
-                </span>
-                自動合併
-              </label>
-            )}
-
             <RunButton
               pipeline={pipeline}
               onRun={(pid) => {
@@ -424,6 +407,7 @@ export function FocusColumn({
               onRevealWorktree={onRevealWorktree}
               onPruneWorktree={onPruneWorktree}
               onDelete={onDelete}
+              onToggleAutoMerge={onToggleAutoMerge}
             />
           </div>
         </div>
@@ -514,6 +498,7 @@ function OverflowMenu({
   onRevealWorktree,
   onPruneWorktree,
   onDelete,
+  onToggleAutoMerge,
 }: {
   pipeline: Pipeline;
   hasResettable: boolean;
@@ -522,6 +507,7 @@ function OverflowMenu({
   onRevealWorktree?: (id: string) => void;
   onPruneWorktree?: (id: string) => void;
   onDelete?: (id: string) => void;
+  onToggleAutoMerge?: (id: string, next: boolean) => void;
 }) {
   const confirm = useConfirm();
   const [open, setOpen] = useState(false);
@@ -543,7 +529,7 @@ function OverflowMenu({
   }, [open]);
 
   // 沒任何 action 可做就不顯示
-  if (!onResetAll && !onRevealWorktree && !onPruneWorktree && !onDelete) return null;
+  if (!onResetAll && !onRevealWorktree && !onPruneWorktree && !onDelete && !onToggleAutoMerge) return null;
 
   return (
     <div ref={wrapRef} className="focus-overflow" style={{ position: "relative", display: "inline-block" }}>
@@ -576,6 +562,16 @@ function OverflowMenu({
             gap: 2,
           }}
         >
+          {onToggleAutoMerge && (
+            <MenuItem
+              icon={<span style={{ color: pipeline.autoMerge ? "var(--done)" : "var(--fg-faint)" }}>{pipeline.autoMerge ? "●" : "○"}</span>}
+              label="自動合併"
+              hint={pipeline.autoMerge ? "on" : "off"}
+              onClick={() => {
+                onToggleAutoMerge(pipeline.id, !pipeline.autoMerge);
+              }}
+            />
+          )}
           {onRevealWorktree && (
             <MenuItem
               icon={<FolderIcon />}
