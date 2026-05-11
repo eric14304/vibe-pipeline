@@ -10,6 +10,7 @@ export function AppShell({
   main,
   aside,
   overlay,
+  mobileTabBar,
 }: {
   rootClassName?: string;
   density?: "compact" | "medium";
@@ -19,6 +20,7 @@ export function AppShell({
   main: ReactNode;
   aside?: ReactNode;
   overlay?: ReactNode;
+  mobileTabBar?: ReactNode;
 }) {
   return (
     <div className={"board-root " + rootClassName} data-density={density}>
@@ -29,6 +31,7 @@ export function AppShell({
         {main}
         {aside}
       </div>
+      {mobileTabBar}
       {overlay}
     </div>
   );
