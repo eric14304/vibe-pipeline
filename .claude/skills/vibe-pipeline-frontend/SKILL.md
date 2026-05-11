@@ -5,32 +5,56 @@ description: vibe-pipeline 前端開發規範 — shell 結構、設計 token、
 
 ## 當前 phase 提醒
 
-**Phase 1+2+3 第一/二/三/四刀 已落地**(2026-05-10)。
+> 完整 phase 落地 / 後續打磨清單 → [`CLAUDE.md`](../../../CLAUDE.md)。本段只列「**改前端時要意識到的新東西**」。
 
-第三刀(UX 完整化)新增:Pipeline 操作補齊(delete / rename inline ✎ / reset ticket / reset all / reveal worktree)、TopBar(真實 currentBranch / ⌘O Mac / Ctrl+O Win 鍵盤捷徑 / theme toggle 走 localStorage 持久化 + sun/moon icon / Settings disabled stub)、UX 系列(bell unread 數字 / actionError 改右下 toast 不再用 NotifBanner / collapsed inbox 讀過 block 沉 muted / inbox-item ts 絕對定位右下 / commit hash click-to-copy / empty pipeline CTA / EmptyProject 箭頭指 TopBar / browser tab title 動態 / FocusColumn 累計成本 chip + RunButton 上次 duration 預估 / ⋯ overflow menu / QADrawer tech leak 清)、Rail 漏色補(stopping / failed_iter_limit / failed_transient)+ 移除假 Archive chip。
+**Phase 1-5 全套已落地**(2026-05-11 為止 6 條 pipeline merge 進 main)。Phase 5 後 frontend 多了三大區塊:
 
-第二.五刀:inbox panel + strip 改 flat 列表(不分 sev 群組)、iter-stage-pulse 改 box 內右上角 notification badge 樣式、刪 elapsed 後面 redundant live-dot。
+### auth 模組(`src/features/auth/`)
+TOTP 雙重驗證 — 非 loopback 連線需先 setup → bind → cookie session。
+- `SetupScreen.tsx` 全屏 — 顯示 QR Code + 6 碼驗證(`/setup` route)
+- `LoginScreen.tsx` 全屏 — cookie 過期後重新輸 6 碼(`/login` route)
+- `SecurityTab.tsx` — SettingsPopover 內「安全」tab,顯示 active sessions + 撤銷 + 重置 TOTP + 擴增裝置
+- `AddDeviceDialog.tsx` — 擴增裝置時顯 QR 給新裝置掃
+- `useAuthStatus` hook — 全域 auth state(bound / sessions)
+- `authedFetch` wrapper — 401 自動 redirect `/login`(避免在 setup/login 頁無限循環)
+- App.tsx router 加 `/setup` `/login` routes
 
-第四刀(merge):ReadyBanner 的 View diff(改開 worktree)+ Merge 按鈕從 disabled 接通,呼叫 `POST /pipelines/:id/merge`。BoardScreen handler 成功後 reload + actionError channel 借用顯示「✓ Merged → <hash> <subject>」(無專門 success toast)。
+### Settings popover Tab UI(`src/features/settings/`)
+925 行 stacked 區塊改 4-tab(Project / AI 任務 / 通知 / 安全)。
+- 固定寬度 480px,切 tab 不抖
+- 「已儲存 ✓」chip 升級到 tab bar 右側全域(原本在 Project section header)
+- mobile 全螢幕 + 右上 ✕ icon
+- AI 任務 task row 用 `display:contents` desktop pass-through grid / mobile flex column + select grid `1fr 2fr 1fr`(model 欄佔 2 倍)
+- 「安全」tab 僅在 `authStatus.bound === true` 時顯示
 
-**已串 backend 的部分**
-- TopBar:project list / select / open / reveal 全走 `/api/projects/*`
-- BoardScreen:fetch project status / pipelines、init popup、create pipeline POST、polling 1.5s + visibilitychange/focus refetch、Run/Pause endpoint、Notifs polling 3s
-- FocusColumn:RunButton(4 state:planning/running/stopping/ready)、TicketCard 點擊開 TicketDrawer、iter labels 中文化(執行/審核/結果)
-- TicketDrawer:goal/acceptance/prompt/iter 概況 + iter 輪次明細 + commits + liveLog + reason + RunHistory(展開看 cost/duration/turns/tokens/stdout)
-- RunHistory:`/api/projects/:hash/pipelines/:id/runs[/:filename]`
-- QADrawer:phase 2 完整接 `/api/.../qa/*`、real claude session、spec review form 寫進 pipeline
-- Notifications inbox:`/api/.../notifs/*`(list / read / dismiss / mark-all-read),走 `aside` slot
+### FCM Web Push(`src/lib/fcm.ts` + App.tsx + Settings 通知 tab)
+Firebase web SDK + Service Worker。
+- `initFCM` / `requestAndRegisterToken` / `setupForegroundHandler` / `unregisterToken`
+- 前景訊息走 `ServiceWorkerRegistration.showNotification()`(Android Chrome 不認 `new Notification()`)
+- Service Worker 在 `public/firebase-messaging-sw.js`,push event 自己 `event.waitUntil(showNotification(...))`(不依賴 FCM SDK auto-display)
+- PWA manifest `public/manifest.json` + icon SVG/PNG(`scripts/gen-icons.ts` ImageMagick 產)
 
-**還是 mock 的(等之後接)**
-- `src/data/notifications.ts` 只剩 `SEV_COLOR`(NOTIFS_SEED 已隨 prototype variant 砍掉)
-- `src/data/pipelines.ts` PROJECTS / 大部分 PIPELINES seed:dead,留 STATE_COLOR/LABEL/fmtElapsed 給 UI 算
+### Mobile RWD(全套 12 個 `@media (max-width:767.98px)`)
+- BoardScreen bottom tab bar:Pipeline / Ticket 切換(取代 Rail + FocusColumn 並排)
+- Drawer / Settings popover / DiffModal 改全螢幕(`position: fixed inset: 0 height: 100dvh`)
+- TopBar 收合:project switcher / theme / settings 仍 inline,「開啟資料夾」hide
+- 自動合併 toggle 從 focus-head 移到 ⋯ menu(MenuItem ● / ○ 點切換不關 menu)
+- hover-only 互動全補 touch 等效(overflow menu / chip click-to-copy / focus-visible / @media (hover:none) fallback)
 
-加新東西的優先序(下個 sprint):
-1. iter mode FAIL → 第二輪實測 UI 顯示(目前只跑出 1 round PASS)
-2. Multi-pipeline 平行執行 UI
-3. paused → 介入 → 繼續 流程 UI
-4. SKILL 候選 review UI(P3)
+### Icon 統一
+- Action button 內 Unicode glyph(↺ ✂ 🗑 🤖 ⊘ ⌫)全換 SVG(RefreshIcon / ScissorsIcon / TrashIcon / ProhibitIcon)
+- close ✕ 對齊 SettingsPopover 風格(32×32 + svg 16 + border-radius 6 + hover bg)
+- 保留純 semantic 符號(分支 ⎇、play ▶、sync ⇣、unit ⏱ ↺ $)
+
+**已串 backend 的部分**(Phase 5 後新增)
+- `/api/user/config` GET/PUT — SettingsPopover AI 任務 tab
+- `/api/auth/*` — setup / login / sessions / reset / status
+- `/api/push/*` — config / register / unregister / tokens / test / diagnostic
+
+**還沒做**
+- iOS PWA push 實測
+- 真實 pipeline 完成事件 → push 端對端驗
+- FCM / RWD 對應 e2e mock spec
 
 ## UI 防禦規則(來自 runner real-run 踩到的雷)
 

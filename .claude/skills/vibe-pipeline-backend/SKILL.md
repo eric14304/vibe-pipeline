@@ -1,20 +1,49 @@
 ---
 name: vibe-pipeline-backend
-description: vibe-pipeline 後端 / 執行層規格與計畫 — Phase 1 (Project / Pipeline CRUD) + Phase 2 (QA-driven ticket 建立) + Phase 3 第一/二/三/四刀 (pipeline runner + worktree + notif emit + iter rounds 寫回 + ticket commit + run log API + multi-ticket pause/resume + merge to base branch) 已落地。本 SKILL 是 spec 索引與架構記憶。SQLite log、budget tracker、`vp` CLI、SKILL 蒸餾 之前先讀。
+description: vibe-pipeline 後端 / 執行層規格與計畫 — Phase 1-5 全套(Project/Pipeline CRUD + QA + Runner + Worktree + Merge/Sync + Auto + Tailscale + TOTP auth + FCM + cross-provider sub-agent) 已落地。本 SKILL 是 spec 索引與架構記憶。SQLite log、budget tracker、`vbpl` CLI、SKILL 蒸餾 之前先讀。
 ---
 
-## 現況(2026-05-10)
+## 現況(2026-05-11,Phase 1-5 已落地)
 
-**Phase 1 + 2 + 3 第一/二/三刀 已落地**:
-- Phase 1:Project 偵測 / 開啟 / git-init / reveal、Pipeline CRUD(JSON,tickets 內嵌)、`.vibe-pipeline/` 自動建立
-- Phase 2:QA-driven ticket 建立(claude CLI 對話收斂、draft store、tool 限制、Spec finalize 寫進 pipeline.tickets[])
-- Phase 3 第一刀:Pipeline runner — 主 agent (claude CLI session,Task tool 派 sub-agent)、git worktree per pipeline、Run/Pause UX、log file、crash recovery、notif emit (pipeline 級 + ticket 級透過 fs.watch)
-- Phase 3 第二刀:Runner 寫回 `ticket.iter.rounds[]`(每輪 executor summary + critic verdict/feedback + 時間戳)、ticket done 後自動 git commit(`ticket(<n>): <title>`,寫回 `ticket.commits[]`)、Run log API (`GET /pipelines/:id/runs[/:filename]`,parse log 末尾 JSON 取 cost/duration/turns/tokens)、Bash 工具白名單擴增(允許 git add / commit / diff / rev-parse,僅限 ticket commit 流程)
-- Phase 3 第三刀:Backend 操作補齊 + 安全網 — Project type 加 `currentBranch`、新 endpoint(`GET /branches`、`POST /pipelines/:id/worktree/reveal`、`DELETE /pipelines/:id`)、orchestrator state guard(running/stopping/ready 拒 /run,不 spawn 燒錢)、savePipeline shape 驗證(name/branch/tickets 必備)+ race guard(running/stopping 不准 PUT)+ PUT-as-upsert 擋(non-existent → 404,要 POST 建立)、QA `close` 自動 cancel 空 draft
-- Phase 3 第二.五刀:iter FAIL → PASS round chain 驗證 + multi-ticket pause/resume 驗證 + atomic write(`writeJson` .tmp + JSON.parse round-trip + renameSync,防 partial write / serialize 炸)
-- Phase 3 第四刀:Pipeline merge — `git.ts:merge(projectPath, branch, base, strategy)` 函式(支援 merge / squash / ff-only,strategy 從 project config `defaults.merge_strategy` 讀,預設 squash);conflict / not-fast-forward 自動 abort 不留半 merge;`POST /pipelines/:id/merge` route(isRunning + state==merged + 全 ticket done guard);成功標 state=merged + mergedAt + mergeCommit + emit `pipeline_merged` notif;orchestrator state guard 補 merged 也擋 /run
+> 完整 phase 落地清單 / 後續打磨細節 → [`CLAUDE.md`](../../../CLAUDE.md)。本段只列「**改 backend 時要意識到的新模組**」。
 
-**還沒做(P2+ / P3)**:transient retry 真實作測試、多 pipeline 平行、SQLite log / runs.db、budget tracker、Q&A engine 進化版、SKILL 蒸餾、`vp` CLI、log/notif GC、charset guard for PUT body。
+### Phase 5 後 backend 多了五大模組
+
+**`server/lib/auth/`** — TOTP 雙重驗證
+- `storage.ts` 讀寫 `~/.vibe-pipeline/auth.json`(totp_secret_hash + sessions[])
+- `middleware.ts` `authGuard()` — loopback bypass(127.0.0.1 / ::1 永遠過)+ bypass paths(setup/login/status)+ cookie validate → redirect /setup or /login
+- `cookie.ts` `parseCookie` / `findSession` / `vp_auth`(HttpOnly + SameSite=Strict + 7d)
+- `pending.ts` in-memory setup_token map(setup-init → setup-verify 5min 過期)
+- `routes/auth.ts` `/api/auth/{status,setup-init,setup-verify,login,logout,sessions,reset}`
+
+**`server/lib/push/` + `server/lib/fcm/`** — FCM Web Push
+- `tokenStore.ts` 讀寫 `~/.vibe-pipeline/push-tokens.json`(register / list / removeDead)
+- `fcm/index.ts` firebase-admin init + `fanoutPush(tokens, payload)` + 死 token 偵測
+- `routes/push.ts` `/api/push/{config,register,unregister,tokens,test,diagnostic}`
+- `ticketWatcher.ts` 在 ticket 狀態變化時 fanout 給所有 device tokens
+
+**`server/lib/cli/`** — Provider 抽象(claude / codex)
+- `adapter.ts` `CliAdapter` 介面 + `QASpawnOpts` / `RunnerSpawnOpts`(`needsBypassPermissions` 開關)/ `SplitSpawnOpts`
+- `claudeAdapter.ts` spawn claude CLI(perf flags + 跨 provider 時加 `--dangerously-skip-permissions`)
+- `codexAdapter.ts` spawn codex CLI(`-c model="..."` config override / sandbox 模式 / JSONL parse)
+- `index.ts` `getAdapter(taskClass, provider)` factory
+- 跨 provider sub-agent:`subAgent.provider===codex || merge.provider===codex` 時 orchestrator 自動帶 bypass(否則 codex-rescue plugin 的 Bash 被 permission_denials 擋)
+
+**`server/lib/userConfig.ts` + `routes/userConfig.ts`** — 跨 project user config
+- `~/.vibe-pipeline/config.json`(per-task-class qa/runner/subAgent/merge/split → provider/model/effort)
+- `getTaskConfig(tc)` 給 spawn 點用,動態套到 adapter args
+- `patchUserConfig()` PUT 白名單 + provider/model/effort 三欄獨立驗
+
+**`server/lib/runner/runnerPrompt.ts`** — RUNNER prompt 多項升級
+- 主迴圈第 3 步:**顯式 status 分支表**(failed_transient / failed / failed_iter_limit → 立刻暫停 pipeline + 結束 session,不再跳過)
+- ticket commit:**`git commit -F <tmpfile>` 多段 message**(Goal / Acceptance / executor summary + verdict 鏈),不再 `-m "...\n..."` 字面 \n
+- provider-aware Task 派發:claude → general-purpose;codex → codex-rescue + routing flag 寫進 prompt 開頭
+
+**`server/lib/qa/{claudeCli,systemPrompt}.ts`** — QA 確認輪契約
+- 5/5 收齊不立刻 complete=true,加一輪「以下是整理的 spec,確認建立嗎?」+ 三選一(`建立 ticket` / `我要再調整` / `從頭重來`)字面值嚴格
+- append-system-prompt reminder 每輪重念契約(降低 sonnet 漂移)+ 放行 Read/Grep/Glob/read-only Bash
+
+**Phase 1-5 還沒做**:transient retry 真實作測試、SQLite log / runs.db、budget tracker UI、`vbpl` CLI、log/notif GC、Phase 5 e2e mock(FCM / RWD / autoMerge / splitInto / sync / prune / userConfig)、diag endpoint 清理。
 
 要開工 backend 前:
 
