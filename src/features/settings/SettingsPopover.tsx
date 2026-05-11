@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import * as api from "../../api/projects";
 import * as userConfigApi from "../../api/userConfig";
+import { SecurityTab } from "../auth/SecurityTab";
+import { useAuthStatus } from "../auth/useAuthStatus";
 import {
   getPermission,
   getStoredToken,
@@ -302,6 +304,7 @@ export function SettingsPopover({
   // User-level config(跨 project)— 跟上面的 project-level 是不同層,獨立 PUT
   const [userCfg, setUserCfg] = useState<UserConfig | null>(null);
   const [userCfgError, setUserCfgError] = useState<string | null>(null);
+  const { status: authStatus } = useAuthStatus();
 
   function isAbortError(e: unknown): boolean {
     return e instanceof Error && e.name === "AbortError";
@@ -899,6 +902,10 @@ export function SettingsPopover({
       )}
 
       <PushNotificationsSection onActionError={onActionError} />
+
+      {authStatus?.bound === true && (
+        <SecurityTab status={authStatus} onActionError={onActionError} />
+      )}
 
       <div
         className="settings-popover-footer"
