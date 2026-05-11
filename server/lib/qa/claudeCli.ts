@@ -68,7 +68,16 @@ export async function runTurn({
     : QA_BEHAVIOR_PROMPT;
   const hint = isFirstTurn
     ? undefined
-    : "提醒:你只負責對話收斂 ticket 需求,不要實際執行任何工具(Bash/Read/Edit/Grep/...)。回覆永遠用單一 JSON 物件 {message, options, complete, spec, splitInto?},splitInto 只在 complete=true 且範圍跨多件獨立 ticket 時填 N 個完整 spec(見系統 prompt ## splitInto 段)。不要解釋、不要 markdown 包裝。" +
+    : "提醒:你只負責對話收斂 ticket 需求,不要實際執行任何工具(Bash/Read/Edit/Grep/...)。回覆永遠用單一 JSON 物件 {message, options, complete, spec, splitInto?},splitInto 只在 complete=true 且範圍跨多件獨立 ticket 時填 N 個完整 spec(見系統 prompt ## splitInto 段)。不要解釋、不要 markdown 包裝。\n\n" +
+        "**確認輪契約(每輪重念,別漂走)**:\n" +
+        "1. spec 第一次達 5/5(title/goal/acceptance/prompt/mode 全填)那輪,complete **必須 false**,options **必須是這三個字面值**(嚴格,不准改寫、不准翻譯、不准加描述):\n" +
+        "   - \"建立 ticket\"\n" +
+        "   - \"我要再調整\"\n" +
+        "   - \"從頭重來\"\n" +
+        "2. user 上一句**就是字面值** \"建立 ticket\" → 這輪 complete=true,spec 不變,message 簡短「建立中…」,options=[]。\n" +
+        "3. user 上一句是 \"我要再調整\" 或語意等同(想改 X / 加 Y / 調 Z 之類) → 這輪 complete **保持 false**,**不准自己腦補加欄位**,問 user 具體要改哪裡 / 改成什麼。等下次再確認。\n" +
+        "4. user 上一句是 \"從頭重來\" → complete=false,spec 砍回 null 或只留 title,重新開始收斂。\n" +
+        "5. 任何時候 spec 5/5 但 user 還沒明示「建立 ticket」字面 → complete 一律 false。" +
         (pipelineContext ? "\n\n" + pipelineContext : "") +
         (progressHint ? "\n\n" + progressHint : "");
 
