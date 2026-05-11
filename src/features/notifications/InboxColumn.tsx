@@ -14,6 +14,7 @@ type Common = {
   onMarkRead: (id: string) => void;
   onDismiss: (id: string) => void;
   onMarkAllRead: () => void;
+  onDismissAll: () => void;
   onItemClick: (id: string, pipelineId?: string) => void;
 };
 
@@ -111,6 +112,7 @@ function InboxPanel({
   onMarkRead,
   onDismiss,
   onMarkAllRead,
+  onDismissAll,
   onItemClick,
 }: Common & { onCollapse: () => void }) {
   const filtered = items.filter((it) => {
@@ -186,6 +188,18 @@ function InboxPanel({
             }}
           >
             全部標已讀
+          </button>
+        )}
+        {items.length > 0 && (
+          <button type="button"
+            className="inbox-foot-link"
+            title="清除所有通知"
+            onClick={(e) => {
+              e.preventDefault();
+              onDismissAll();
+            }}
+          >
+            全部清除
           </button>
         )}
       </div>

@@ -207,6 +207,8 @@ async function handle(req: Request): Promise<Response> {
     if (rest === "/notifs" && method === "GET") return projects.listNotifs(hash);
     if (rest === "/notifs/mark-all-read" && method === "POST")
       return projects.markAllNotifsRead(hash);
+    if (rest === "/notifs/dismiss-all" && method === "POST")
+      return projects.dismissAllNotifs(hash);
     const notifMatch = rest.match(/^\/notifs\/([a-z0-9]+)\/(read|dismiss)$/);
     if (notifMatch && method === "POST") {
       const nid = notifMatch[1];

@@ -67,6 +67,10 @@ export function BoardScreen({
     setItems((arr) => arr.map((it) => ({ ...it, unread: false })));
     if (hash) api.markAllNotifsRead(hash).catch(() => {});
   }
+  function dismissAllNotifs() {
+    setItems([]);
+    if (hash) api.dismissAllNotifs(hash).catch(() => {});
+  }
   function focusNotif(id: string, pipelineId?: string) {
     setInboxState("expanded");
     if (pipelineId) {
@@ -393,6 +397,7 @@ export function BoardScreen({
       onMarkRead={markRead}
       onDismiss={dismissNotif}
       onMarkAllRead={markAllRead}
+      onDismissAll={dismissAllNotifs}
       onItemClick={focusNotif}
     />
   );

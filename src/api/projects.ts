@@ -175,6 +175,10 @@ export function markAllNotifsRead(hash: string): Promise<{ ok: true }> {
   return call<{ ok: true }>(`/api/projects/${hash}/notifs/mark-all-read`, { method: "POST" });
 }
 
+export function dismissAllNotifs(hash: string): Promise<{ ok: true }> {
+  return call<{ ok: true }>(`/api/projects/${hash}/notifs/dismiss-all`, { method: "POST" });
+}
+
 export function listPipelineRuns(hash: string, pipelineId: string): Promise<RunSummary[]> {
   return call<RunSummary[]>(`/api/projects/${hash}/pipelines/${pipelineId}/runs`);
 }

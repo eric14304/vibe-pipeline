@@ -77,6 +77,18 @@ export function dismiss(projectPath: string, id: string): void {
   rewrite(projectPath, (r) => (r.id === id ? null : r));
 }
 
+// 砍光 notifs.jsonl(user 主動「全部清除」用)。
+// 跟 pruneOldRecords 不同:這個無條件清空,不保留任何紀錄
+export function dismissAll(projectPath: string): void {
+  const f = file(projectPath);
+  if (!existsSync(f)) return;
+  try {
+    writeFileSync(f, "");
+  } catch {
+    // 失敗安靜忽略
+  }
+}
+
 // 全 project notifs 保留最新 keep 筆(unread / read 不分,純按時序)。
 // JSONL 是 append-only,GC 等於一次性 rewrite。
 // 失敗 (檔不存在 / parse 壞) 安靜忽略。

@@ -473,6 +473,13 @@ export async function dismissNotif(hash: string, id: string): Promise<Response> 
   return ok({ ok: true });
 }
 
+export async function dismissAllNotifs(hash: string): Promise<Response> {
+  const project = await projectStore.findByHash(hash);
+  if (!project) return err("not_found", `Project not found: ${hash}`, 404);
+  notifs.dismissAll(project.path);
+  return ok({ ok: true });
+}
+
 export async function listPipelineRuns(
   hash: string,
   pipelineId: string
