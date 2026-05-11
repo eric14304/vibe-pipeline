@@ -9,13 +9,43 @@ export function buildRunnerBehaviorPrompt(opts: {
 }): string {
   const { subAgent, merge } = opts;
   const subAgentDirective =
-    '\n## Task tool 派 sub-agent 用的 model / effort\n\n' +
-    '派 Task sub-agent 時,**永遠**在 Task tool 參數帶上:\n' +
-    '- 一般 ticket (mode=step / iter,以及 ticket commit / 驗證):model="' + subAgent.model + '",effort="' + subAgent.effort + '"\n' +
-    '- merge / sync ticket(mode=merge / sync):model="' + merge.model + '",effort="' + merge.effort + '"\n' +
-    '\nTask tool 的 model 參數吃 alias(opus / sonnet / haiku)。' +
-    'effort 若 Task tool 不支援該參數,就用「請以 ' + subAgent.effort + ' / ' + merge.effort + ' 強度執行」寫在 sub-agent prompt 開頭,best-effort 提示。\n';
+    '\n## Task tool 派 sub-agent 用的 provider / model / effort\n\n' +
+    '本次 run 的 sub-agent 配置:\n' +
+    '- 一般 ticket(mode=step / iter):provider=' + subAgent.provider + ',model=' + subAgent.model + ',effort=' + subAgent.effort + '\n' +
+    '- merge / sync ticket(mode=merge / sync):provider=' + merge.provider + ',model=' + merge.model + ',effort=' + merge.effort + '\n\n' +
+    dispatchInstructions("一般 ticket", subAgent, /* allowWrite */ true) +
+    dispatchInstructions("merge / sync ticket", merge, /* allowWrite */ true) +
+    '\n**注意**:iter mode 的「審核 AI」(critic)派 sub-agent 時,prompt 內明確寫「只驗收、不改 code」;codex provider 派審核 AI 時,改用 `--read-only` 取代 `--write`(避免審核步驟誤改檔)。\n';
   return RUNNER_BEHAVIOR_PROMPT_HEAD + subAgentDirective + RUNNER_BEHAVIOR_PROMPT_TAIL;
+}
+
+// 派 sub-agent 的具體 Task tool 呼叫格式,因 provider 而異。
+function dispatchInstructions(label: string, cfg: TaskModelConfig, allowWrite: boolean): string {
+  if (cfg.provider === "claude") {
+    return (
+      '\n### ' + label + '(provider=claude)派法\n' +
+      '用 Task tool,參數:\n' +
+      '- subagent_type: "general-purpose"\n' +
+      '- model: "' + cfg.model + '"(full ID,Task tool 也吃 alias opus/sonnet/haiku,但本 pipeline 統一傳 full ID)\n' +
+      '- description / prompt: 照常\n' +
+      '- effort:Task tool 不接 effort 參數,改在 prompt 開頭加一行「[Reasoning effort: ' + cfg.effort + ']」做 hint\n'
+    );
+  }
+  // codex:走 codex@openai-codex plugin 提供的 codex-rescue subagent_type
+  return (
+    '\n### ' + label + '(provider=codex)派法\n' +
+    '本 ticket 改派 **codex** 而非 claude sub-agent。用 Task tool,參數:\n' +
+    '- subagent_type: "codex-rescue"  ← **必須**,這是 codex@openai-codex plugin 提供的 forwarding agent\n' +
+    '- description: 5-10 字概述\n' +
+    '- prompt: **開頭一行**寫 routing flags,然後空行,然後完整任務指令。格式:\n' +
+    '\n' +
+    '  --model ' + cfg.model + ' --effort ' + cfg.effort + (allowWrite ? ' --write' : ' --read-only') + '\n' +
+    '  \n' +
+    '  <ticket.prompt + acceptance + 上輪 feedback,如有>\n' +
+    '\n' +
+    '  codex-rescue 會把這些 flag 抽出來 forward 給 codex-companion runtime,不會混進實際任務文本。\n' +
+    '- model:**不要傳** Task tool 的 model 參數(它只認 claude alias,給了會錯)。model 透過 prompt 內 `--model` flag 指定\n'
+  );
 }
 
 const RUNNER_BEHAVIOR_PROMPT_HEAD = `你是 vibe-pipeline 的 pipeline runner orchestrator。
@@ -208,8 +238,7 @@ const RUNNER_BEHAVIOR_PROMPT_TAIL = `## sub-agent (Task) 使用
 派 Task 時:
 - description: 5-10 字概述 (例 "修 tsc errors")
 - prompt: 完整指令 (ticket.prompt + acceptance + 上輪 feedback,如有)
-- subagent_type: 預設 "general-purpose" (有完整工具)
-- model: 依「上方 Task tool 派 sub-agent 用的 model / effort」段指定
+- subagent_type / model / effort:**完全依「上方 Task tool 派 sub-agent 用的 provider / model / effort」段** — claude provider 用 "general-purpose",codex provider 用 "codex-rescue" 且 routing flag 寫進 prompt 開頭
 
 sub-agent 會自己用 Edit/Write/Bash 改 code,跑完回報結果。你拿到結果後:
 - 自己用 Read / Bash 驗收(對照 acceptance)
