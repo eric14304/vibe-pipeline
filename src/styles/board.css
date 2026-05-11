@@ -889,10 +889,6 @@ html.light .focus-create-empty {
   .topbar-reveal-folder {
     display: none !important;
   }
-  /* TopBar 當前 branch chip 在手機隱藏(跟 FocusColumn 已顯示的 pipeline 分支重複 / 太密) */
-  .topbar-current-branch {
-    display: none !important;
-  }
   /* 手機 FocusColumn 縮小 padding,標題小一點,降低上方密度 */
   .focus {
     padding: 14px 14px 18px !important;
@@ -904,6 +900,15 @@ html.light .focus-create-empty {
   .focus-head-top {
     gap: 6px !important;
     margin-bottom: 8px !important;
+  }
+  /* mobile 隱藏 pipeline 分支 chip(空間擠,branch 名通常從 pipeline 名能推)+ runs 累積成本 chip(次要資訊) */
+  .focus-branch-chip,
+  .focus-runs-chip {
+    display: none !important;
+  }
+  /* done count 字體略小,跟 state chip 同一視覺層 */
+  .focus-count {
+    font-size: 11px !important;
   }
   /* 內容少不需要 overflow menu — 全部 inline 顯示 */
   .topbar-overflow-mobile-items {

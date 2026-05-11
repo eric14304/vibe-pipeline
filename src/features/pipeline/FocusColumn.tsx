@@ -307,7 +307,7 @@ export function FocusColumn({
             onRename={onRename}
             existingNames={existingNames}
           />
-          <span className="chip mono">
+          <span className="chip mono focus-branch-chip">
             <span style={{ color: "var(--fg-mute)" }}>⎇</span> {pipeline.branch}
           </span>
           <span
@@ -331,7 +331,7 @@ export function FocusColumn({
           </span>
           {runs.length > 0 && (
             <span
-              className="chip mono"
+              className="chip mono focus-runs-chip"
               title={`累計 ${runs.length} 次執行,共 $${totalCost.toFixed(2)}`}
               style={{ fontSize: 11, color: "var(--fg-mute)" }}
             >
