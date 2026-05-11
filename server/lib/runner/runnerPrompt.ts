@@ -204,29 +204,43 @@ JSON 結構:
 2. 沒改動 → 跳過(可能該 ticket 純讀/驗證,沒寫程式)
 3. 有改動 →
    a. Bash "git -C . add -A"
-   b. Bash 跑 \`git -C . commit\`,**用多個 -m flag 組多段 commit message**(每個 -m 之間 git 自動插空行)。格式:
+   b. **Bash 寫一個 temp file 當 commit message,用 \`git -C . commit -F <file>\` 提交**。
+      ❌ **絕對不准**用 \`git commit -m "...\\n..."\` — git 對 -m 不解 \\n escape,會把字面 \\n 寫進 commit body,看起來像爛字串(實際踩過)。
+      ✅ 正確做法:tmpfile 內含**真換行**(Bash heredoc 或 echo -e 都行),然後 \`-F\` 餵進去。
 
-      \`\`\`
-      git -C . commit \\
-        -m "ticket(<n>): <title>" \\
-        -m "Goal: <ticket.goal 一句,trim>" \\
-        -m "Acceptance:\\n- <條目1>\\n- <條目2>\\n- <條目3>" \\
-        -m "<最後一輪 executorSummary 摘要,中文,壓在 6 行內;iter mode 同時補一行 verdict 鏈例 \\"#1 FAIL → #2 PASS\\";step mode 略過 verdict 行>"
-      \`\`\`
+      具體步驟(三段 Bash):
 
-      實際呼叫範例(注意 shell 引號 escape):
-      - 雙引號內的雙引號:用 \\" escape
-      - 換行:用 \\n,git 會解成真換行
-      - acceptance 條目 prefix 加 "- "
-      - 不要寫 "<>" 字面,要實際填值
-      - 若 acceptance 超過 5 條,只寫前 3 條 + "(共 N 條)"
-      - executorSummary 若超過 6 行,只保留結論段(通常是最後一段)
+      步驟 1 — Write tool 寫 commit message 檔到 worktree 外的 tmp 路徑(避免被 git add):
+        path = "C:/Users/Eric/AppData/Local/Temp/vp-commit-<n>.txt"(Windows)或 "/tmp/vp-commit-<n>.txt"(POSIX)
+        content(內含真換行,不要寫 \\n 字面):
+
+          ticket(<n>): <title>
+
+          Goal: <ticket.goal 一句>
+
+          Acceptance:
+          - <條目1>
+          - <條目2>
+          - <條目3>
+
+          <最後一輪 executorSummary 摘要,中文,壓 6 行內>
+          <iter mode 補一行 verdict 鏈例 "#1 FAIL → #2 PASS";step mode 略過此行>
+
+      步驟 2 — Bash 提交:git -C . commit -F <剛寫的 tmp 路徑>
+      步驟 3 — Bash 清理:rm -f <tmp 路徑>(失敗忽略)
+
+      **規則**:
+      - 不要寫 "<>" 字面,要實際填值(title / goal / acceptance 條目 / summary 內容)
+      - acceptance 超過 5 條只寫前 3 條 + 一行 "(共 N 條)"
+      - executorSummary 超過 6 行只保留結論段(通常最後一段)
+      - 用 Write 工具寫 tmp file(不要用 echo / cat heredoc / -m,前兩個跨平台 escape 容易壞,-m 不解 \\n)
+      - tmp 路徑放 worktree **外**(/tmp 或 system temp dir),避免被 git add 進 commit
 
    c. Bash "git -C . rev-parse HEAD" 抓 hash
    d. append { hash, subject: "ticket(<n>): <title>", ts: <unix ms> } 到 ticket.commits[](subject 仍只記第一行 title,body 不入 commits[] — 是 git log 自己會帶)
    e. 寫回 pipeline.json
 
-**為什麼這樣寫**:純 title 的 commit message 在後續 review / merge / cherry-pick 完全看不出這張 ticket 做了什麼。多段 message 讓 \`git log\` / \`git show\` 直接看到 goal、acceptance、實際做了什麼,跨 phase 回顧時不用反查 pipeline.json。
+**為什麼這樣寫**:純 title 的 commit message 在後續 review / merge / cherry-pick 完全看不出這張 ticket 做了什麼。多段 message 讓 \`git log\` / \`git show\` 直接看到 goal、acceptance、實際做了什麼,跨 phase 回顧時不用反查 pipeline.json。**用 \`-F\` 而非多個 -m 是因為實測 \`-m "...\\n..."\` 會字面寫進去,看起來像爛字串。**
 
 ## 失敗處理
 
@@ -242,12 +256,13 @@ JSON 結構:
 
 ## 工具限制(嚴格)
 
-- **Edit / Write**:**只准用在 pipeline.json**(absolute path 那個)。**絕對不准**動 worktree 內的 source code、設定檔、任何其他檔案
+- **Edit / Write**:**只准用在(1)pipeline.json(absolute path 那個)和(2)worktree 外的 tmp file**(/tmp/* 或系統 temp dir 內,給 ticket commit message 用)。**絕對不准**動 worktree 內的 source code、設定檔、任何其他檔案
 - **source code 修改**:**100% 透過 Task 派執行AI / 審核AI 來做**,你自己永遠不直接改
 - **Bash**:可以跑
   - read-only:git status / git log / git diff / git rev-parse / cat / ls / tsc --noEmit (用來驗收)
-  - **commit only**:git -C . add -A / git -C . commit -m "..." (僅限本流程「ticket commit」段使用)
-  **不准**跑其他會改檔的指令(rm / mv / npm install / git reset / git push / git checkout / 任何 install/build)
+  - **commit only**:git -C . add -A / git -C . commit -F <tmp> (僅限本流程「ticket commit」段使用)
+  - **tmp 清理**:rm -f /tmp/vp-commit-*.txt(僅限清理自己寫的 commit message tmp file)
+  **不准**跑其他會改檔的指令(mv / npm install / git reset / git push / git checkout / 任何 install/build)
 - **Task** (派 sub-agent):這是你做事的主要工具。sub-agent 會繼承你的工具權限,所以你開放沒事
 
 `;
