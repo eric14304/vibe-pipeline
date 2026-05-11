@@ -91,21 +91,31 @@ export async function initFCM(): Promise<Messaging | null> {
 
 async function registerServiceWorker(): Promise<ServiceWorkerRegistration> {
   const existing = await navigator.serviceWorker.getRegistration("/firebase-messaging-sw.js");
-  if (existing) return existing;
-  return navigator.serviceWorker.register("/firebase-messaging-sw.js", { scope: "/" });
+  if (existing) {
+    // 等 SW 變 active(getRegistration 拿到的可能還在 installing / waiting)
+    await navigator.serviceWorker.ready;
+    return existing;
+  }
+  await navigator.serviceWorker.register("/firebase-messaging-sw.js", { scope: "/" });
+  // **必須**等到 SW 進入 active 狀態 — Firebase getToken 內部呼叫 PushManager.subscribe,
+  // 沒 active SW 會直接 "Subscription failed - no active Service Worker" silent fail。
+  // 參考 firebase-js-sdk#7693 race condition fix。
+  const ready = await navigator.serviceWorker.ready;
+  return ready;
 }
 
 export async function requestAndRegisterToken(): Promise<string> {
   const m = await initFCM();
-  if (!m || !config) throw new Error("FCM 未初始化");
-  const permission = await Notification.requestPermission();
-  if (permission !== "granted") throw new Error("通知權限未允許");
+  if (!m || !config) throw new Error("FCM 未初始化(check supported / config)");
+  // 先註冊 + 等 SW active,再要 permission + getToken,避免 race condition
   const swReg = await registerServiceWorker();
+  const permission = await Notification.requestPermission();
+  if (permission !== "granted") throw new Error(`通知權限:${permission}`);
   const token = await getToken(m, {
     vapidKey: config.vapidKey,
     serviceWorkerRegistration: swReg,
   });
-  if (!token) throw new Error("取得 FCM token 失敗");
+  if (!token) throw new Error("getToken 回空,可能 VAPID / authDomain 不對");
   try {
     const res = await authedFetch(`${API_BASE_URL}/api/push/register`, {
       method: "POST",

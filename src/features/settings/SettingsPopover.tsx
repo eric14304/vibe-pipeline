@@ -150,6 +150,7 @@ function PushNotificationsSection({
   const [permission, setPermission] = useState<NotificationPermission>(getPermission());
   const [token, setToken] = useState<string | null>(getStoredToken());
   const [loading, setLoading] = useState(false);
+  const [lastError, setLastError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -168,11 +169,13 @@ function PushNotificationsSection({
 
   async function enable() {
     setLoading(true);
+    setLastError(null);
     try {
       await requestAndRegisterToken();
       refreshPermission();
     } catch (e) {
       const message = e instanceof Error && e.message ? e.message : "啟用通知失敗";
+      setLastError(message);
       onActionError?.(message);
       refreshPermission();
     } finally {
@@ -182,11 +185,13 @@ function PushNotificationsSection({
 
   async function disable() {
     setLoading(true);
+    setLastError(null);
     try {
       await unregisterFcm();
       refreshPermission();
     } catch (e) {
       const message = e instanceof Error && e.message ? e.message : "停用通知失敗";
+      setLastError(message);
       onActionError?.(message);
     } finally {
       setLoading(false);
@@ -262,6 +267,31 @@ function PushNotificationsSection({
         </div>
       )}
       <div style={hint}>啟用後 pipeline 完成 / 失敗會推到此裝置(背景或前景皆可)。</div>
+
+      {/* 診斷區:把 FCM 內部狀態露出來,診斷手機端為何 register 沒打進 backend */}
+      <div
+        className="mono"
+        style={{
+          fontSize: 10.5,
+          color: "var(--fg-faint)",
+          marginTop: 10,
+          padding: 8,
+          background: "var(--panel)",
+          border: "1px solid var(--line)",
+          borderRadius: 4,
+          lineHeight: 1.6,
+          wordBreak: "break-all",
+        }}
+      >
+        <div>supported: {supported === null ? "checking…" : String(supported)}</div>
+        <div>permission: {permission}</div>
+        <div>token(local): {token ? token.slice(0, 24) + "…" : "(none)"}</div>
+        {lastError && (
+          <div style={{ color: "var(--failed)", marginTop: 4 }}>
+            last error: {lastError}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

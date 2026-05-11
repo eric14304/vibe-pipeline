@@ -12,9 +12,11 @@ function readToken(body: Record<string, unknown>): string | null {
 export async function register(req: Request): Promise<Response> {
   const body = await readJson(req);
   const token = readToken(body);
+  console.log(`[push/register] body keys: ${Object.keys(body).join(",")}, token len: ${token?.length ?? 0}`);
   if (!token) return err("invalid_path", "token 必須為非空字串", 400);
   const platform = typeof body.platform === "string" ? body.platform : "unknown";
   const record = await tokenStore.registerToken(token, platform);
+  console.log(`[push/register] OK platform=${platform}, total tokens=${(await tokenStore.listTokens()).length}`);
   return Response.json({ token: record }, { status: 201 });
 }
 
