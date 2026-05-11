@@ -8,6 +8,7 @@ import {
   type Messaging,
   type MessagePayload,
 } from "firebase/messaging";
+import { authedFetch } from "../features/auth/authApi";
 
 type FcmConfig = {
   apiKey: string;
@@ -28,7 +29,7 @@ let config: FcmConfig | null = null;
 let initPromise: Promise<Messaging | null> | null = null;
 
 async function fetchConfig(): Promise<FcmConfig> {
-  const res = await fetch(`${API_BASE_URL}/api/push/config`);
+  const res = await authedFetch(`${API_BASE_URL}/api/push/config`);
   if (!res.ok) throw new Error("無法取得 push config");
   return (await res.json()) as FcmConfig;
 }
@@ -106,7 +107,7 @@ export async function requestAndRegisterToken(): Promise<string> {
   });
   if (!token) throw new Error("取得 FCM token 失敗");
   try {
-    const res = await fetch(`${API_BASE_URL}/api/push/register`, {
+    const res = await authedFetch(`${API_BASE_URL}/api/push/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json; charset=utf-8" },
       body: JSON.stringify({ token, platform: "web" }),
@@ -135,7 +136,7 @@ export async function unregisterToken(): Promise<void> {
   }
   if (token) {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/push/unregister`, {
+      const res = await authedFetch(`${API_BASE_URL}/api/push/unregister`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json; charset=utf-8" },
         body: JSON.stringify({ token }),

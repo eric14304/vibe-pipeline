@@ -2,6 +2,8 @@ import { useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useSearchParams } from "react-router-dom";
 import { BoardScreen } from "./features/pipeline/BoardScreen";
 import { StatesGallery } from "./features/dev/StatesGallery";
+import { SetupScreen } from "./features/auth/SetupScreen";
+import { LoginScreen } from "./features/auth/LoginScreen";
 import { ConfirmProvider } from "./ui/ConfirmDialog";
 import { initFCM, setupForegroundHandler } from "./lib/fcm";
 
@@ -66,6 +68,8 @@ export default function App() {
           <Route path="/" element={<Navigate to="/board" replace />} />
           <Route path="/board" element={<BoardRoute />} />
           <Route path="/dev/states" element={<StatesRoute />} />
+          <Route path="/setup" element={<SetupScreen />} />
+          <Route path="/login" element={<LoginScreen />} />
         </Routes>
       </ConfirmProvider>
     </BrowserRouter>

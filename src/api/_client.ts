@@ -1,4 +1,5 @@
 import type { ApiResponse, ApiErrorCode } from "../../shared/types";
+import { authedFetch } from "../features/auth/authApi";
 
 export class ApiError extends Error {
   constructor(public code: ApiErrorCode | string, message: string) {
@@ -23,7 +24,7 @@ export async function call<T>(path: string, init?: CallInit): Promise<T> {
     opts.body = typeof init.body === "string" ? init.body : JSON.stringify(init.body);
     opts.headers = { "Content-Type": "application/json; charset=utf-8", ...(init.headers || {}) };
   }
-  const res = await fetch(`${API_BASE_URL}${path}`, opts);
+  const res = await authedFetch(`${API_BASE_URL}${path}`, opts);
   const json = (await res.json()) as ApiResponse<T> & { data?: T; message?: string };
   if (!json.ok) {
     const message = typeof json.message === "string" ? json.message : json.error.message;
