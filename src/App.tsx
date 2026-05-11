@@ -55,8 +55,8 @@ function useFcmBootstrap() {
         if (reg && Notification.permission === "granted") {
           await reg.showNotification(title, {
             body,
-            icon: "/icon-192.png",
-            badge: "/icon-192.png",
+            icon: "/icon.svg",
+            badge: "/icon.svg",
             data: payload.data ?? {},
           });
           return;
