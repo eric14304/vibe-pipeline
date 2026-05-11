@@ -80,15 +80,20 @@ JSON 結構:
 2. 看 pipeline.state:
    - "stopping" → 標 pipeline.state = "paused",寫回,結束
    - 其他 → 繼續
-3. 從 tickets[] 找第一張 status = "draft" / "ready" / "paused" 的
-   - **paused = pause 後接續**,**不要歸零 iter.rounds 或 iter.current**;整段 iter 進度延續上次。
-   - paused iter ticket 接續行為(看 iter.stage):
-     - stage="doer" → 從 iter 步驟 1 開始(派 executor 走當前 round)
-     - stage="critic" → executor 上次已跑完(worktree 有改動),**直接從 iter 步驟 3 派 critic**(不再花 token 重派 executor)。executorSummary 寫 "(resumed from pause; prior executor 工作保留在 worktree)" 即可,critic 仍照 acceptance 驗 worktree 現狀
-     - stage="✓" 或 "done" → 此 round 已 PASS 但 ticket 沒收尾(罕見 race),直接視為 ticket done
-   - paused step ticket → 重派 executor;worktree 上次的改動還在,executor 會接著做。
-4. 沒找到 → 標 pipeline.state = "ready",寫回,結束 (全部跑完)
-5. 找到 ticket → 標 ticket.status = "running",寫回 JSON
+3. **依 ticket.n 順序**掃 tickets[],對每張依 status 分支:
+   - status="done" → 跳過,看下一張
+   - status="draft" / "ready" / "paused" → 這張是「下一張要跑」,跳出掃描,進步驟 5(下方)。
+     - **paused = pause 後接續**,**不要歸零 iter.rounds 或 iter.current**;整段 iter 進度延續上次。
+     - paused iter ticket 接續行為(看 iter.stage):
+       - stage="doer" → 從 iter 步驟 1 開始(派 executor 走當前 round)
+       - stage="critic" → executor 上次已跑完(worktree 有改動),**直接從 iter 步驟 3 派 critic**(不再花 token 重派 executor)。executorSummary 寫 "(resumed from pause; prior executor 工作保留在 worktree)" 即可,critic 仍照 acceptance 驗 worktree 現狀
+       - stage="✓" 或 "done" → 此 round 已 PASS 但 ticket 沒收尾(罕見 race),直接視為 ticket done
+     - paused step ticket → 重派 executor;worktree 上次的改動還在,executor 會接著做。
+   - status="failed_transient" → **立刻暫停 pipeline 結束 session**:標 pipeline.state = "paused",寫回 JSON,結束。**絕對不准跳過繼續跑下一張** — transient 意味暫時錯誤(rate limit / 配額 / 網路),立刻重試大概率同錯,user 要介入(等配額重置 / 切 provider / 改 config),由 user 點繼續(resume)再 retry。
+   - status="failed" / "failed_iter_limit" → 同上,立刻暫停 pipeline + 結束 session(這是被 critic 判死 / 達 iter 上限的 ticket,user 要決定要不要 reset + 改 spec 重跑)。
+   - status="running" → race condition(可能 crash 殘留),視同 paused 處理(走 paused 接續邏輯)。
+4. 掃完整個 tickets[] **沒遇到任何 draft/ready/paused 且也沒任何 failed_***、所有 ticket 都 done → 標 pipeline.state = "ready",寫回,結束(全部跑完,可以 merge)。
+5. 找到下一張 ticket → 標 ticket.status = "running",寫回 JSON
 6. 跑該 ticket (見下「跑 ticket」)
 7. 跑完 → 標 ticket.status = "done" 或 "failed_*"; **若 done,執行「ticket commit」步驟**(見下);寫回 JSON
 8. 回步驟 1
