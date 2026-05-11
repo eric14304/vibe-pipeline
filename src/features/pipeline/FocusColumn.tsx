@@ -1059,21 +1059,30 @@ function TicketCard({
                 </span>
               </div>
             ))}
-            {inProgress && (
-              <div className="ticket-iter ticket-iter-row">
-                <span className="iter-round-num mono">
-                  #{(ticket.iter.current ?? 0) + 1}
-                </span>
-                <IterStages
-                  stage={ticket.iter.stage}
-                  status={ticket.status}
-                  stages={stageList}
-                />
-                <span className="iter-meta mono">
-                  {fmtElapsed(tick)}
-                </span>
-              </div>
-            )}
+            {inProgress && (() => {
+              // in-progress round 沒 startedAt(runner 完成才 append rounds[]),
+              // 估算:用最後一筆 completed round 的 endedAt;否則用 ticket.startedAt
+              const lastEnded = rounds[rounds.length - 1]?.endedAt;
+              const roundStart = lastEnded ?? (ticket as { startedAt?: number }).startedAt;
+              const live = typeof roundStart === "number"
+                ? Math.max(0, Math.round((Date.now() - roundStart) / 1000))
+                : 0;
+              return (
+                <div className="ticket-iter ticket-iter-row">
+                  <span className="iter-round-num mono">
+                    #{(ticket.iter?.current ?? 0) + 1}
+                  </span>
+                  <IterStages
+                    stage={ticket.iter!.stage}
+                    status={ticket.status}
+                    stages={stageList}
+                  />
+                  <span className="iter-meta mono">
+                    {fmtElapsed(live)}
+                  </span>
+                </div>
+              );
+            })()}
             {rounds.length === 0 && !inProgress && (
               // 還沒跑(ready 但 mode=iter/merge/sync 也屬此情形)
               <div className="ticket-iter ticket-iter-row">
