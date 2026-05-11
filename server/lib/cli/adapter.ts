@@ -1,0 +1,79 @@
+// CliAdapter:統一 claude / 將來 codex 等不同 AI CLI 的 spawn 介面。
+// 4 處原本散落的 spawn(QA / runner / split / merge dispatch)走這層介面,
+// adapter 內負責對應 CLI 的 args / parseReply 行為差異。
+//
+// 重要:每個 adapter 內 spawn 行為必須與既有實作 bit-exact 等價(包含 args 順序、
+// stdin / stdout / stderr piping、cwd 行為)。本介面不做「優化」/「補強」,純抽象搬家。
+
+import type { TicketSpec } from "../../../shared/types";
+import type { QAReply } from "../qa/schema";
+
+export type TaskClass = "qa" | "runner" | "split" | "merge";
+
+// QA spawn opts:多輪對話、--resume / --session-id 視 isFirstTurn 切。
+export type QASpawnOpts = {
+  kind: "qa";
+  cwd: string;
+  sessionId: string;
+  userMessage: string;
+  isFirstTurn: boolean;
+  systemPrompt: string;           // first turn 帶 system prompt
+  appendSystemPrompt?: string;    // follow-up turn 用 --append-system-prompt
+  model: string;
+  effort: string;
+};
+
+// Runner spawn opts:主 agent,長跑,系統 prompt 自定流程。
+export type RunnerSpawnOpts = {
+  kind: "runner";
+  cwd: string;
+  sessionId: string;
+  initialMessage: string;
+  systemPrompt: string;
+  model: string;
+  effort: string;
+};
+
+// Split spawn opts:one-shot,structured array output。
+export type SplitSpawnOpts = {
+  kind: "split";
+  cwd: string;
+  userMessage: string;            // 透過 stdin 餵入
+  systemPrompt: string;
+  model: string;                  // 通常 hard-coded haiku
+  effort: string;
+};
+
+// Merge dispatch opts:目前 merge 是把 synthetic ticket append 進 pipeline,
+// 由 runner 主 agent 透過 Task tool 派出 sub-agent 跑 — 不是獨立 spawn。
+// 保留型別以供 future codex 走獨立 spawn 路徑。
+export type MergeSpawnOpts = {
+  kind: "merge";
+  // placeholder — 現階段不直接 spawn,呼叫端走 orchestrator.start 路徑
+};
+
+export type SpawnOpts = QASpawnOpts | RunnerSpawnOpts | SplitSpawnOpts | MergeSpawnOpts;
+
+// adapter spawn 結果:回 Bun Subprocess 或同形狀(stdout/stderr/exited/exitCode/stdin?)
+export type SpawnedProcess = Bun.Subprocess;
+
+export type ParseQA = (rawStdout: string) => QAReply;
+export type ParseSplit = (rawStdout: string) => TicketSpec[] | null;
+
+export type CliCapabilities = {
+  supportsSessionResume: boolean;
+  supportsTaskDispatch: boolean;
+  supportsStreamJson: boolean;
+  supportsToolWhitelist: boolean;
+};
+
+export interface CliAdapter {
+  readonly name: string;
+  readonly capabilities: CliCapabilities;
+
+  // 檢查 CLI 是否在 PATH 可呼叫(--version 試 spawn)
+  checkAvailable(): Promise<boolean>;
+
+  // 起一個對應 task class 的子行程
+  spawn(opts: SpawnOpts): SpawnedProcess;
+}

@@ -5,6 +5,7 @@
 
 import { isTestMode } from "../testMode";
 import type { TicketSpec } from "../../../shared/types";
+import { getAdapter } from "../cli";
 
 export class SplitError extends Error {
   constructor(public code: "not_available" | "exec_failed" | "parse_failed" | "empty_split", message: string) {
@@ -79,40 +80,19 @@ export async function splitTicketSpec(opts: {
   // claude CLI 當成 input 缺失,踩過)
   // model 用 Haiku 4.5:split 是結構化輸出任務(spec → JSON 陣列),Haiku 速度 ~3-5x 快、成本 ~1/10,
   // 品質夠用(這不需要深度推理)。User 預設 model 通常是 Opus,split 不該佔那麼多
-  const args = [
-    "claude",
-    "-p",
-    "--output-format",
-    "json",
-    "--model",
-    "claude-haiku-4-5-20251001",
-    "--effort",
-    "low",
-    // perf:split 是 server-controlled feature,system prompt 自己定 JSON 契約,
-    // 不該被 user setting / project hooks / MCP / slash commands / persistence 干擾。
-    // 與 QA / runner spawn 同步套用。
-    "--setting-sources",
-    "",
-    "--strict-mcp-config",
-    "--mcp-config",
-    '{"mcpServers":{}}',
-    "--no-session-persistence",
-    "--disable-slash-commands",
-    "--system-prompt",
-    SPLIT_BEHAVIOR_PROMPT,
-    "--disallowedTools",
-    "Edit Write Task",
-  ];
-
   let proc: ReturnType<typeof Bun.spawn>;
   try {
-    proc = Bun.spawn(args, { cwd, stdout: "pipe", stderr: "pipe", stdin: "pipe" });
+    proc = getAdapter("split").spawn({
+      kind: "split",
+      cwd,
+      userMessage,
+      systemPrompt: SPLIT_BEHAVIOR_PROMPT,
+      model: "claude-haiku-4-5-20251001",
+      effort: "low",
+    });
   } catch (e) {
     throw new SplitError("not_available", `claude CLI not found: ${e}`);
   }
-  // 寫 userMessage 進 stdin 後關閉,讓 claude CLI 讀取
-  proc.stdin.write(userMessage);
-  proc.stdin.end();
   const [stdoutText, stderrText] = await Promise.all([
     new Response(proc.stdout).text(),
     new Response(proc.stderr).text(),
