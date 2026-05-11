@@ -548,7 +548,7 @@ function OverflowMenu({
   return (
     <div ref={wrapRef} className="focus-overflow" style={{ position: "relative", display: "inline-block" }}>
       <button type="button"
-        className="btn btn-ghost"
+        className="btn"
         onClick={() => setOpen((o) => !o)}
         title="更多操作"
         aria-haspopup="menu"
