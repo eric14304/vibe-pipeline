@@ -181,3 +181,49 @@
 .diff-line.is-context {
   color: var(--fg-mute);
 }
+
+@media (max-width: 767px) {
+  .diff-modal-stage {
+    padding: 10px;
+  }
+
+  .diff-modal {
+    max-height: calc(100vh - 20px);
+  }
+
+  .diff-modal-head {
+    gap: 8px;
+  }
+
+  .diff-modal-title {
+    min-width: 0;
+  }
+
+  .diff-modal-branch {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .diff-modal-body {
+    grid-template-columns: 1fr;
+    min-width: 0;
+  }
+
+  .diff-modal-files {
+    max-height: 112px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .diff-modal-content,
+  .diff-modal-file-block {
+    min-width: 0;
+  }
+
+  .diff-modal-pre {
+    overflow-x: auto;
+    white-space: pre;
+    max-width: 100%;
+  }
+}
