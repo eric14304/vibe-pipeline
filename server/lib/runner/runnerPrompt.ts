@@ -204,10 +204,29 @@ JSON 結構:
 2. 沒改動 → 跳過(可能該 ticket 純讀/驗證,沒寫程式)
 3. 有改動 →
    a. Bash "git -C . add -A"
-   b. Bash 'git -C . commit -m "ticket(<n>): <title>"'(message 第一行,<n> 為 ticket.n,<title> 為 ticket.title;若 title 含特殊字元 escape 雙引號)
+   b. Bash 跑 \`git -C . commit\`,**用多個 -m flag 組多段 commit message**(每個 -m 之間 git 自動插空行)。格式:
+
+      \`\`\`
+      git -C . commit \\
+        -m "ticket(<n>): <title>" \\
+        -m "Goal: <ticket.goal 一句,trim>" \\
+        -m "Acceptance:\\n- <條目1>\\n- <條目2>\\n- <條目3>" \\
+        -m "<最後一輪 executorSummary 摘要,中文,壓在 6 行內;iter mode 同時補一行 verdict 鏈例 \\"#1 FAIL → #2 PASS\\";step mode 略過 verdict 行>"
+      \`\`\`
+
+      實際呼叫範例(注意 shell 引號 escape):
+      - 雙引號內的雙引號:用 \\" escape
+      - 換行:用 \\n,git 會解成真換行
+      - acceptance 條目 prefix 加 "- "
+      - 不要寫 "<>" 字面,要實際填值
+      - 若 acceptance 超過 5 條,只寫前 3 條 + "(共 N 條)"
+      - executorSummary 若超過 6 行,只保留結論段(通常是最後一段)
+
    c. Bash "git -C . rev-parse HEAD" 抓 hash
-   d. append { hash, subject: "ticket(<n>): <title>", ts: <unix ms> } 到 ticket.commits[]
+   d. append { hash, subject: "ticket(<n>): <title>", ts: <unix ms> } 到 ticket.commits[](subject 仍只記第一行 title,body 不入 commits[] — 是 git log 自己會帶)
    e. 寫回 pipeline.json
+
+**為什麼這樣寫**:純 title 的 commit message 在後續 review / merge / cherry-pick 完全看不出這張 ticket 做了什麼。多段 message 讓 \`git log\` / \`git show\` 直接看到 goal、acceptance、實際做了什麼,跨 phase 回顧時不用反查 pipeline.json。
 
 ## 失敗處理
 
