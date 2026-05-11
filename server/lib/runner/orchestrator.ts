@@ -397,10 +397,12 @@ async function spawnDirect(opts: {
   const mergeCfg = userCfg.defaults.merge;
   const runnerCfg = await getTaskConfigWithAdapter("runner");
 
-  // 跨 provider sub-agent:任何 task class 用 codex 都需 runner spawn 帶 bypass
-  // (claude 主 agent 派 codex-rescue Task → Bash node codex-companion.mjs 需放行)
-  const needsBypassPermissions =
-    subAgentCfg.provider === "codex" || mergeCfg.provider === "codex";
+  // 主 agent 永遠帶 bypass:現在 codex sub-agent 改走 Bash 直呼 `codex exec ...`
+  // (不再經 codex-rescue plugin),主 agent 必須能 Bash 任意指令才能派 codex / 跑
+  // 環境 setup。安全邊界:source code 改動仍走 sub-agent,主 agent 只 Bash 派發 +
+  // 環境工具,risk 跟既有「sub-agent 改 code」同等級
+  const needsBypassPermissions = true;
+  void subAgentCfg; void mergeCfg; // (保留 cfg 給未來條件用)
 
   let proc: Bun.Subprocess;
   try {
