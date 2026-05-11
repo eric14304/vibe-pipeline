@@ -37,6 +37,9 @@ npm-debug.log*
 !.env.example
 firebase-service-account*.json
 
+# FCM scratch / Firebase config (service account JSON、VAPID 抄寫等)
+.fcm/
+
 # editors
 .vscode/
 .idea/

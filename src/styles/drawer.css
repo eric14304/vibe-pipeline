@@ -651,6 +651,9 @@ html.light .drawer {
     width: 100vw;
     height: 100vh;
     overflow: hidden;
+    /* 要高於 .board-mobile-tabs (z-index:40),不然 QA / Ticket drawer 底部
+       輸入框被 Pipeline / Ticket 切換條蓋住 */
+    z-index: 50;
   }
 
   .drawer {
