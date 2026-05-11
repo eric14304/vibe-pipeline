@@ -431,7 +431,7 @@ export function SettingsPopover({
 
       {/* ─── AI 任務(跨 project) ─── */}
       <div style={{ ...sectionHeaderStyle, marginTop: 6 }}>
-        AI 任務 — provider / model
+        AI 任務
         <span
           style={{
             marginLeft: 8,
@@ -442,14 +442,14 @@ export function SettingsPopover({
             fontWeight: 400,
           }}
         >
-          跨 project
+          跨 project — provider / model / reasoning
         </span>
       </div>
       {userCfg ? (
         <div
           style={{
             display: "grid",
-            // 第一欄 auto 撐到最長 label;model 欄要容 'gpt-5-codex' 等較長 codex 名稱,給 max-content
+            // 第一欄 auto 撐到最長 label;model 欄要容 codex 較長名稱,給 max-content
             gridTemplateColumns: "auto max-content max-content max-content",
             columnGap: 8,
             rowGap: 8,
@@ -457,11 +457,6 @@ export function SettingsPopover({
             alignItems: "center",
           }}
         >
-          {/* column headers */}
-          <span style={{ fontSize: 10, color: "var(--fg-faint)", letterSpacing: "0.06em", textTransform: "uppercase", whiteSpace: "nowrap" }}>任務</span>
-          <span style={{ fontSize: 10, color: "var(--fg-faint)", letterSpacing: "0.06em", textTransform: "uppercase", textAlign: "center" }}>provider</span>
-          <span style={{ fontSize: 10, color: "var(--fg-faint)", letterSpacing: "0.06em", textTransform: "uppercase", textAlign: "center" }}>model</span>
-          <span aria-hidden />
           {TASK_CLASSES.map((tc) => (
             <TaskModelRow
               key={tc}
