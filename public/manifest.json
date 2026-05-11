@@ -1,6 +1,6 @@
 {
   "name": "Vibe Pipeline",
-  "short_name": "VibePipe",
+  "short_name": "VibePipeline",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#1c1916",
