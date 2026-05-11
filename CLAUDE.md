@@ -43,6 +43,7 @@
 - Phase 5 e2e mock 覆蓋(autoMerge / splitInto / sync / prune worktree / userConfig 等新功能)
 - self-dogfood 不靠手動 merge 的方案 → merge worktree isolation,規模 ~150 行,看 [refs/merge-isolation-2026-05-11.md](.claude/skills/vibe-pipeline/refs/merge-isolation-2026-05-11.md);99% user 不踩,當前不投入
 - runner spawn 的 `--setting-sources` 還沒砍(留給 Task sub-agent 讀 user/project CLAUDE.md);若日後把 sub-agent context 全 push 進 prompt,可拿 ~13% 額外 cache 改善
+- **手機遠端控制路線**:Tailscale + RWD + auth 層 + 可能 PWA push。先做 RWD(以 768px 為 breakpoint,Board / Drawer / TopBar / 表單 / Modal 全收;hover-only 互動補 touch 等效),auth + PWA push 後續再補
 
 **已 final 決定**(不再討論)
 - Theme 偏好 → localStorage(URL `?theme=` 仍 override)
