@@ -73,7 +73,7 @@ export function CreateCard({
           spellCheck={false}
           autoComplete="off"
         />
-        <span className="create-input-hint mono">{taken ? "已存在" : "Tab ▶"}</span>
+        {taken && <span className="create-input-hint mono">已存在</span>}
       </label>
       {taken && <div className="create-error mono">名稱已存在,改一個。</div>}
       {showFormatHint && !taken && (

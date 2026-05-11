@@ -3,7 +3,8 @@
     "base_branch": "main",
     "merge_strategy": "merge",
     "max_parallel": 3,
-    "cost_limit_usd": 0
+    "cost_limit_usd": 0,
+    "auto_merge": true
   },
   "scripts": {
     "setup": "",
