@@ -85,7 +85,7 @@ function TaskModelRow({
       >
         {modelsForProvider(provider).map((m) => (
           <option key={m} value={m}>
-            {m}
+            {m.replace(/^claude-/, "")}
           </option>
         ))}
       </select>
