@@ -3,9 +3,11 @@ import * as qa from "./routes/qa";
 import * as push from "./routes/push";
 import * as userConfigRoutes from "./routes/userConfig";
 import * as test from "./routes/test";
+import * as auth from "./routes/auth";
 import * as projectStore from "./lib/projectStore";
 import * as orchestrator from "./lib/runner/orchestrator";
 import * as testMode from "./lib/testMode";
+import { authGuard, guardResponse } from "./lib/auth/middleware";
 import { initFCM } from "./lib/fcm";
 
 const PORT = Number(process.env.PORT ?? 3001);
@@ -37,6 +39,7 @@ function withCors(response: Response, origin: string | null, requestHeaders?: st
     headers.set("Access-Control-Allow-Origin", origin);
     headers.set("Access-Control-Allow-Methods", CORS_METHODS);
     headers.set("Access-Control-Allow-Headers", requestHeaders || CORS_HEADERS);
+    headers.set("Access-Control-Allow-Credentials", "true");
     headers.append("Vary", "Origin");
   }
   return new Response(response.body, {
@@ -60,6 +63,19 @@ async function handle(req: Request): Promise<Response> {
 
   if (pathname === "/api/health" && method === "GET") {
     return Response.json({ ok: true, data: { status: "up", testMode: testMode.isTestMode() } });
+  }
+
+  if (pathname.startsWith("/api/auth/")) {
+    if (pathname === "/api/auth/setup-init" && method === "POST") return auth.setupInit();
+    if (pathname === "/api/auth/setup-verify" && method === "POST") return auth.setupVerify(req);
+    if (pathname === "/api/auth/login" && method === "POST") return auth.login(req);
+    if (pathname === "/api/auth/logout" && method === "POST") return auth.logout(req);
+    if (pathname === "/api/auth/status" && method === "GET") return auth.status();
+    if (pathname === "/api/auth/sessions" && method === "GET") return auth.listSessions();
+    if (pathname === "/api/auth/reset" && method === "POST") return auth.reset(req);
+    const sessionDelMatch = pathname.match(/^\/api\/auth\/sessions\/([a-f0-9]{64})$/);
+    if (sessionDelMatch && method === "DELETE") return auth.deleteSession(sessionDelMatch[1]);
+    return notFound();
   }
 
   // E2E 控制端點 — 只 mock 模式 mount,real 模式 404
@@ -232,7 +248,7 @@ const server = Bun.serve({
   // 預設 10s 太短 — QA / split / merge 都會 spawn claude CLI,單次跑 10-60s 常見;
   // 拉到 5min cover 大部分 case,真超過代表 claude 卡死,讓 bun 砍掉合理
   idleTimeout: 255, // bun 上限 255s (≈4.25min)
-  async fetch(req) {
+  async fetch(req, srv) {
     const origin = req.headers.get("Origin");
     if (req.method === "OPTIONS") {
       return withCors(
@@ -241,7 +257,15 @@ const server = Bun.serve({
         req.headers.get("Access-Control-Request-Headers")
       );
     }
+    const ip = srv.requestIP(req)?.address ?? null;
+    (req as unknown as { __ip?: string }).__ip = ip ?? "unknown";
     try {
+      const url = new URL(req.url);
+      if (url.pathname.startsWith("/api/")) {
+        const guard = await authGuard(req, ip);
+        const blocked = guardResponse(guard, req);
+        if (blocked) return withCors(blocked, origin);
+      }
       return withCors(await handle(req), origin);
     } catch (e) {
       return withCors(
