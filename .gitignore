@@ -35,6 +35,7 @@ npm-debug.log*
 .env
 .env.*
 !.env.example
+firebase-service-account*.json
 
 # editors
 .vscode/

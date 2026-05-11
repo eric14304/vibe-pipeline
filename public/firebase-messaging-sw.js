@@ -1,0 +1,90 @@
+importScripts("https://www.gstatic.com/firebasejs/12.13.0/firebase-app-compat.js");
+importScripts("https://www.gstatic.com/firebasejs/12.13.0/firebase-messaging-compat.js");
+
+let messagingInstance = null;
+
+async function ensureMessaging() {
+  if (messagingInstance) return messagingInstance;
+  const res = await fetch("/api/push/config");
+  if (!res.ok) throw new Error("failed to fetch /api/push/config");
+  const cfg = await res.json();
+  if (!firebase.apps || firebase.apps.length === 0) {
+    firebase.initializeApp({
+      apiKey: cfg.apiKey,
+      authDomain: cfg.authDomain,
+      projectId: cfg.projectId,
+      storageBucket: cfg.storageBucket,
+      messagingSenderId: cfg.messagingSenderId,
+      appId: cfg.appId,
+    });
+  }
+  messagingInstance = firebase.messaging();
+  messagingInstance.onBackgroundMessage((payload) => {
+    const title =
+      (payload.notification && payload.notification.title) ||
+      (payload.data && payload.data.title) ||
+      "Vibe Pipeline";
+    const body =
+      (payload.notification && payload.notification.body) ||
+      (payload.data && payload.data.body) ||
+      "";
+    const data = payload.data || {};
+    self.registration.showNotification(title, {
+      body,
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
+      data,
+    });
+  });
+  return messagingInstance;
+}
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(ensureMessaging().catch((e) => console.error("[sw] init failed", e)));
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    (async () => {
+      try {
+        await ensureMessaging();
+      } catch (e) {
+        console.error("[sw] activate init failed", e);
+      }
+      await self.clients.claim();
+    })()
+  );
+});
+
+self.addEventListener("push", () => {
+  ensureMessaging().catch((e) => console.error("[sw] push init failed", e));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = (event.notification.data && event.notification.data.url) || "/";
+  event.waitUntil(
+    (async () => {
+      const all = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const client of all) {
+        try {
+          const url = new URL(client.url);
+          const t = new URL(target, self.location.origin);
+          if (url.origin === t.origin) {
+            await client.focus();
+            if (url.pathname + url.search !== t.pathname + t.search) {
+              if ("navigate" in client) {
+                try {
+                  await client.navigate(t.href);
+                } catch {}
+              }
+            }
+            return;
+          }
+        } catch {}
+      }
+      await self.clients.openWindow(target);
+    })()
+  );
+});

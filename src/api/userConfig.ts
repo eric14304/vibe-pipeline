@@ -17,9 +17,10 @@ export function getUserConfig(): Promise<UserConfig> {
   return call<UserConfig>("/api/user/config");
 }
 
-export function updateUserConfig(patch: UserConfigPatch): Promise<UserConfig> {
+export function updateUserConfig(patch: UserConfigPatch, signal?: AbortSignal): Promise<UserConfig> {
   return call<UserConfig>("/api/user/config", {
     method: "PUT",
     body: patch,
+    signal,
   });
 }

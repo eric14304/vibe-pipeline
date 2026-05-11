@@ -1,12 +1,53 @@
 import * as projects from "./routes/projects";
 import * as qa from "./routes/qa";
+import * as push from "./routes/push";
 import * as userConfigRoutes from "./routes/userConfig";
 import * as test from "./routes/test";
+import * as auth from "./routes/auth";
 import * as projectStore from "./lib/projectStore";
 import * as orchestrator from "./lib/runner/orchestrator";
 import * as testMode from "./lib/testMode";
+import { authGuard, guardResponse } from "./lib/auth/middleware";
+import { initFCM } from "./lib/fcm";
 
 const PORT = Number(process.env.PORT ?? 3001);
+const ALLOWED_ORIGINS = new Set(
+  (process.env.ALLOWED_ORIGINS ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+);
+const TAILSCALE_ORIGIN_RE = /^https?:\/\/100\.\d+\.\d+\.\d+(:\d+)?$/;
+const CORS_METHODS = "GET, POST, PUT, DELETE, OPTIONS";
+const CORS_HEADERS = "Content-Type, Authorization";
+
+function isAllowedOrigin(origin: string | null): origin is string {
+  if (!origin) return false;
+  if (ALLOWED_ORIGINS.has(origin)) return true;
+  if (TAILSCALE_ORIGIN_RE.test(origin)) return true;
+  try {
+    const { hostname } = new URL(origin);
+    return hostname === "localhost" || hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
+}
+
+function withCors(response: Response, origin: string | null, requestHeaders?: string | null): Response {
+  const headers = new Headers(response.headers);
+  if (isAllowedOrigin(origin)) {
+    headers.set("Access-Control-Allow-Origin", origin);
+    headers.set("Access-Control-Allow-Methods", CORS_METHODS);
+    headers.set("Access-Control-Allow-Headers", requestHeaders || CORS_HEADERS);
+    headers.set("Access-Control-Allow-Credentials", "true");
+    headers.append("Vary", "Origin");
+  }
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
 
 function notFound(): Response {
   return Response.json(
@@ -24,6 +65,19 @@ async function handle(req: Request): Promise<Response> {
     return Response.json({ ok: true, data: { status: "up", testMode: testMode.isTestMode() } });
   }
 
+  if (pathname.startsWith("/api/auth/")) {
+    if (pathname === "/api/auth/setup-init" && method === "POST") return auth.setupInit();
+    if (pathname === "/api/auth/setup-verify" && method === "POST") return auth.setupVerify(req);
+    if (pathname === "/api/auth/login" && method === "POST") return auth.login(req);
+    if (pathname === "/api/auth/logout" && method === "POST") return auth.logout(req);
+    if (pathname === "/api/auth/status" && method === "GET") return auth.status();
+    if (pathname === "/api/auth/sessions" && method === "GET") return auth.listSessions();
+    if (pathname === "/api/auth/reset" && method === "POST") return auth.reset(req);
+    const sessionDelMatch = pathname.match(/^\/api\/auth\/sessions\/([a-f0-9]{64})$/);
+    if (sessionDelMatch && method === "DELETE") return auth.deleteSession(sessionDelMatch[1]);
+    return notFound();
+  }
+
   // E2E 控制端點 — 只 mock 模式 mount,real 模式 404
   if (testMode.isTestMode() && pathname.startsWith("/api/__test/")) {
     if (pathname === "/api/__test/register-project" && method === "POST")
@@ -33,6 +87,9 @@ async function handle(req: Request): Promise<Response> {
     if (pathname === "/api/__test/script/runner" && method === "POST")
       return test.setRunnerScript(req);
     if (pathname === "/api/__test/reset" && method === "POST") return test.reset();
+    if (pathname === "/api/__test/auth/reset" && method === "POST") return test.authReset();
+    if (pathname === "/api/__test/auth/seed-secret" && method === "POST")
+      return test.authSeedSecret(req);
     return notFound();
   }
 
@@ -42,6 +99,19 @@ async function handle(req: Request): Promise<Response> {
   }
   if (pathname === "/api/user/config" && method === "PUT") {
     return userConfigRoutes.updateConfig(req);
+  }
+
+  if (pathname === "/api/push/config" && method === "GET") {
+    return push.config();
+  }
+  if (pathname === "/api/push/register" && method === "POST") {
+    return push.register(req);
+  }
+  if (pathname === "/api/push/unregister" && method === "DELETE") {
+    return push.unregister(req);
+  }
+  if (pathname === "/api/push/tokens" && method === "GET") {
+    return push.tokens();
   }
 
   if (pathname === "/api/projects" && method === "GET") {
@@ -177,23 +247,51 @@ async function handle(req: Request): Promise<Response> {
 
 const server = Bun.serve({
   port: PORT,
-  hostname: "127.0.0.1",
+  hostname: "0.0.0.0",
   // 預設 10s 太短 — QA / split / merge 都會 spawn claude CLI,單次跑 10-60s 常見;
   // 拉到 5min cover 大部分 case,真超過代表 claude 卡死,讓 bun 砍掉合理
   idleTimeout: 255, // bun 上限 255s (≈4.25min)
-  async fetch(req) {
+  async fetch(req, srv) {
+    const origin = req.headers.get("Origin");
+    if (req.method === "OPTIONS") {
+      return withCors(
+        new Response(null, { status: 204 }),
+        origin,
+        req.headers.get("Access-Control-Request-Headers")
+      );
+    }
+    let ip = srv.requestIP(req)?.address ?? null;
+    // E2E escape hatch:mock 模式下可用 X-Forwarded-For 覆寫 IP,測非 loopback / 進入 auth flow。
+    // 僅在 VP_TEST_MODE=mock 啟用;production build 不會走到。
+    if (testMode.isTestMode()) {
+      const xff = req.headers.get("X-Forwarded-For");
+      if (xff) ip = xff.split(",")[0]!.trim();
+    }
+    (req as unknown as { __ip?: string }).__ip = ip ?? "unknown";
     try {
-      return await handle(req);
+      const url = new URL(req.url);
+      // /api/__test/* 在 mock 模式 mount,本身就是 e2e 控制面;不應走 authGuard(否則 spec 設 XFF 後自己進不來)
+      const skipGuard = testMode.isTestMode() && url.pathname.startsWith("/api/__test/");
+      if (url.pathname.startsWith("/api/") && !skipGuard) {
+        const guard = await authGuard(req, ip);
+        const blocked = guardResponse(guard, req);
+        if (blocked) return withCors(blocked, origin);
+      }
+      return withCors(await handle(req), origin);
     } catch (e) {
-      return Response.json(
-        { ok: false, error: { code: "internal_error", message: String(e) } },
-        { status: 500 }
+      return withCors(
+        Response.json(
+          { ok: false, error: { code: "internal_error", message: String(e) } },
+          { status: 500 }
+        ),
+        origin
       );
     }
   },
 });
 
 console.log(`vibe-pipeline backend listening on http://${server.hostname}:${server.port}`);
+void initFCM();
 
 // Crash recovery: 啟動時掃所有有 .vibe-pipeline/ 的 recent project,
 // 若 pipeline.state="running" 或 "stopping" 但 process 不在 (server 重啟),標 paused

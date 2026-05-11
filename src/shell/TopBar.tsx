@@ -20,9 +20,11 @@ export function TopBar({
   const { hash, setHash } = useActiveProjectHash();
   const [recents, setRecents] = useState<Project[]>([]);
   const [open, setOpen] = useState(false);
+  const [overflowOpen, setOverflowOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const overflowRef = useRef<HTMLDivElement>(null);
   // theme 來源:URL ?theme= override → localStorage → light
   // toggle 寫 localStorage 並同步 <html> class(useTheme hook 也會跑,雙保險;localStorage 觸發不了 React 重 render,所以這裡也手動 setIsDark)
   const [searchParams] = useSearchParams();
@@ -54,19 +56,35 @@ export function TopBar({
 
   useEffect(() => {
     if (!open) return;
-    function onClick(e: MouseEvent) {
+    function onPointerDown(e: PointerEvent) {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
     }
-    document.addEventListener("mousedown", onClick);
+    document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKey);
     return () => {
-      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKey);
     };
   }, [open]);
+
+  useEffect(() => {
+    if (!overflowOpen) return;
+    function onPointerDown(e: PointerEvent) {
+      if (overflowRef.current && !overflowRef.current.contains(e.target as Node)) setOverflowOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOverflowOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [overflowOpen]);
 
   // ⌘O / Ctrl+O 開選資料夾(對應 menu 裡的 kbd hint)
   // pickAndOpen 用 closure capture state(busy),不放進 deps 避免每 render 重綁
@@ -194,7 +212,7 @@ export function TopBar({
         </div>
 
         {active && (
-          <>
+          <div className="topbar-active-meta">
             {active.hasGit && (
               <span
                 className="chip mono"
@@ -213,25 +231,64 @@ export function TopBar({
               <FolderIcon />
               <span>開啟專案資料夾</span>
             </button>
-          </>
+          </div>
         )}
       </div>
 
-      <span style={{ flex: 1 }} />
+      <span className="topbar-spacer" />
 
       <div className="topbar-right">
-        {hash && maxParallel > 0 && (
-          <ParallelChip running={runningCount} max={maxParallel} />
-        )}
-        <button type="button"
-          className="icon-btn topbar-theme-toggle"
-          onClick={toggleTheme}
-          title={isDark ? "切到亮色" : "切到暗色"}
-          aria-label={isDark ? "切到亮色主題" : "切到暗色主題"}
-        >
-          {isDark ? <SunIcon /> : <MoonIcon />}
-        </button>
-        {settingsSlot}
+        <div className="topbar-overflow" ref={overflowRef}>
+          <button
+            type="button"
+            className={"icon-btn topbar-overflow-toggle" + (overflowOpen ? " is-open" : "")}
+            onClick={() => setOverflowOpen((o) => !o)}
+            title="更多操作"
+            aria-label="更多操作"
+            aria-expanded={overflowOpen}
+          >
+            ⋯
+          </button>
+          <div className={"topbar-overflow-menu" + (overflowOpen ? " is-open" : "")}>
+            {active && (
+              <div className="topbar-overflow-mobile-items">
+                {active.hasGit && (
+                  <span
+                    className="chip mono topbar-overflow-chip"
+                    title={active.currentBranch ? `當前 branch: ${active.currentBranch}` : "detached HEAD"}
+                  >
+                    <span style={{ color: "var(--fg-mute)" }}>⎇</span>{" "}
+                    {active.currentBranch ?? "(detached)"}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className="topbar-overflow-item"
+                  title="在檔案總管中開啟"
+                  onClick={() => {
+                    setOverflowOpen(false);
+                    api.reveal(active.hash).catch(() => {});
+                  }}
+                >
+                  <FolderIcon />
+                  <span>開啟專案資料夾</span>
+                </button>
+              </div>
+            )}
+            {hash && maxParallel > 0 && (
+              <ParallelChip running={runningCount} max={maxParallel} />
+            )}
+            <button type="button"
+              className="icon-btn topbar-theme-toggle"
+              onClick={toggleTheme}
+              title={isDark ? "切到亮色" : "切到暗色"}
+              aria-label={isDark ? "切到亮色主題" : "切到暗色主題"}
+            >
+              {isDark ? <SunIcon /> : <MoonIcon />}
+            </button>
+            {settingsSlot}
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -36,6 +36,7 @@ export function BoardScreen({
   const [actionError, setActionError] = useState<string | null>(null);
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [activeId, setActiveId] = useState<string>("");
+  const [activeTab, setActiveTab] = useState<"rail" | "focus">("focus");
   const [creating, setCreating] = useState(startCreating);
   const [tick, setTick] = useState(0);
   const [reloadKey, setReloadKey] = useState(0);
@@ -68,7 +69,10 @@ export function BoardScreen({
   }
   function focusNotif(id: string, pipelineId?: string) {
     setInboxState("expanded");
-    if (pipelineId) setActiveId(pipelineId);
+    if (pipelineId) {
+      setActiveId(pipelineId);
+      setActiveTab("focus");
+    }
     setHighlightId(id);
     markRead(id);
   }
@@ -292,6 +296,7 @@ export function BoardScreen({
       const created = (await api.createPipeline(project.hash, body)) as Pipeline;
       setPipelines((arr) => [created, ...arr]);
       setActiveId(created.id);
+      setActiveTab("focus");
       setCreating(false);
       setActionError(`✓ pipeline "${name}" 已建立`);
     } catch (e) {
@@ -323,6 +328,7 @@ export function BoardScreen({
       settingsSlot={
         <SettingsButton
           hash={hash}
+          onActionError={setActionError}
           onConfigSaved={(cfg) => {
             setMaxParallel(cfg.defaults.max_parallel);
             setDefaultAutoMerge(!!cfg.defaults.auto_merge);
@@ -390,7 +396,34 @@ export function BoardScreen({
       onItemClick={focusNotif}
     />
   );
-  const shellRootClass = "notif-root is-inbox-" + inboxState;
+  const shellRootClass =
+    "notif-root is-inbox-" + inboxState + " is-mobile-board is-mobile-tab-" + activeTab;
+  const mobileTabBar = (
+    <div className="board-mobile-tabs" role="tablist" aria-label="Board panels">
+      <button
+        type="button"
+        role="tab"
+        aria-selected={activeTab === "rail"}
+        className={"board-mobile-tab" + (activeTab === "rail" ? " is-active" : "")}
+        onClick={() => setActiveTab("rail")}
+      >
+        Rail
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={activeTab === "focus"}
+        className={"board-mobile-tab" + (activeTab === "focus" ? " is-active" : "")}
+        onClick={() => setActiveTab("focus")}
+      >
+        Focus
+      </button>
+    </div>
+  );
+  function handleSelectPipeline(id: string) {
+    setActiveId(id);
+    setActiveTab("focus");
+  }
 
   if (!hash) {
     return (
@@ -401,6 +434,7 @@ export function BoardScreen({
         rail={<Rail pipelines={[]} activeId="" onSelect={() => {}} />}
         main={<EmptyProject />}
         aside={inboxAside}
+        mobileTabBar={mobileTabBar}
       />
     );
   }
@@ -414,6 +448,7 @@ export function BoardScreen({
         rail={<Rail pipelines={[]} activeId="" onSelect={() => {}} />}
         main={<EmptyProject message="找不到這個專案" hint={loadError} />}
         aside={inboxAside}
+        mobileTabBar={mobileTabBar}
       />
     );
   }
@@ -427,6 +462,7 @@ export function BoardScreen({
         rail={<Rail pipelines={[]} activeId="" onSelect={() => {}} />}
         main={<EmptyProject message="載入中…" hint="" pointToTopBar={false} />}
         aside={inboxAside}
+        mobileTabBar={mobileTabBar}
       />
     );
   }
@@ -594,7 +630,7 @@ export function BoardScreen({
         <Rail
           pipelines={pipelines}
           activeId={activeId}
-          onSelect={setActiveId}
+          onSelect={handleSelectPipeline}
           creating={creating}
           onStartCreate={
             isUninit ? () => setPopupDismissed(false) : () => setCreating(true)
@@ -786,6 +822,7 @@ export function BoardScreen({
       }
       overlay={overlay}
       aside={inboxAside}
+      mobileTabBar={mobileTabBar}
     />
   );
 }
@@ -831,9 +868,11 @@ function fmtTs(ms: number): { ts: string; since: number } {
 function SettingsButton({
   hash,
   onConfigSaved,
+  onActionError,
 }: {
   hash: string | null;
   onConfigSaved?: (cfg: api.ProjectConfig) => void;
+  onActionError?: (message: string) => void;
 }) {
   const btnRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
@@ -859,6 +898,7 @@ function SettingsButton({
           onSaved={(cfg) => {
             onConfigSaved?.(cfg);
           }}
+          onActionError={onActionError}
           anchorRef={btnRef}
         />
       )}

@@ -887,3 +887,23 @@ html.light .qa-body.variant-step {
   .qa-body { grid-template-columns: 1fr; }
   .qa-draft { display: none; }
 }
+
+@media (max-width: 767px) {
+  .qa-drawer {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    max-width: none;
+    height: 100vh;
+    border-left: 0;
+    box-shadow: none;
+  }
+
+  .qa-drawer-chat {
+    padding: 16px 16px 12px;
+  }
+
+  .qa-drawer .qa-composer {
+    padding: 10px 12px calc(12px + env(safe-area-inset-bottom));
+  }
+}

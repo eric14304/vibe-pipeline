@@ -498,7 +498,7 @@ function SpecReview({
         />
       </Field>
       <Field label="mode">
-        <div style={{ display: "flex", gap: 16, fontSize: 13 }}>
+        <div className="qadr-choice-row" style={{ display: "flex", gap: 16, fontSize: 13 }}>
           <label style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
             <input
               type="radio"
@@ -534,7 +534,7 @@ function SpecReview({
             />
           </Field>
           <Field label="達上限後">
-            <div style={{ display: "flex", gap: 16, fontSize: 13 }}>
+            <div className="qadr-choice-row" style={{ display: "flex", gap: 16, fontSize: 13 }}>
               <label style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                 <input
                   type="radio"

@@ -144,6 +144,11 @@
   opacity: 1;
   transform: scale(1.4);
 }
+.inbox-strip-pip:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
 .inbox-strip-overflow {
   font-size: 9px;
   color: var(--fg-faint);
@@ -244,6 +249,7 @@
 .inbox-item.is-block:hover { background: color-mix(in srgb, var(--paused) 12%, transparent); }
 .inbox-item.is-muted { opacity: 0.72; }
 .inbox-item.is-muted:hover { opacity: 1; }
+.inbox-item.is-muted:focus-within { opacity: 1; }
 
 /* 單 dot:同時表 sev(顏色)+ read 狀態(實心/空心)。原本的 icon box + unread-dot 兩個合一。 */
 .inbox-item-dot {
@@ -281,6 +287,10 @@
   pointer-events: none;
 }
 .inbox-item:hover .inbox-item-x {
+  opacity: 1;
+  pointer-events: auto;
+}
+.inbox-item:focus-within .inbox-item-x {
   opacity: 1;
   pointer-events: auto;
 }
@@ -338,6 +348,11 @@
   max-height: 50px; margin-top: 6px;
   pointer-events: auto;
 }
+.inbox-item:not(.is-block):focus-within .inbox-item-actions {
+  opacity: 1; transform: translateY(0);
+  max-height: 50px; margin-top: 6px;
+  pointer-events: auto;
+}
 
 .inbox-item-action {
   font-size: 11px;
@@ -390,3 +405,26 @@
   text-decoration: none;
 }
 .inbox-foot-link:hover { color: var(--fg); }
+
+@media (hover: none) {
+  .inbox-strip-pip {
+    opacity: 1;
+  }
+
+  .inbox-item.is-muted {
+    opacity: 1;
+  }
+
+  .inbox-item-x {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .inbox-item:not(.is-block) .inbox-item-actions {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 50px;
+    margin-top: 6px;
+    pointer-events: auto;
+  }
+}

@@ -5,6 +5,8 @@
 import { watch, type FSWatcher } from "node:fs";
 import * as pipelineDir from "../pipelineDir";
 import * as notifs from "../notifs/store";
+import { fanoutPush } from "../fcm";
+import * as tokenStore from "../push/tokenStore";
 import type { NotifEventType } from "../../../shared/types";
 
 type Active = { unwatch: () => void };
@@ -23,18 +25,67 @@ function statusToEvent(status: string): NotifEventType | null {
 }
 
 type TicketLite = { id?: string; title?: string; status?: string; n?: number };
+type PipelineLite = {
+  state?: string;
+  name?: string;
+  tickets?: TicketLite[];
+};
+type Snapshot = {
+  ticketStatuses: Map<string, string>;
+  state?: string;
+};
 
-async function snapshot(projectPath: string, pipelineId: string): Promise<Map<string, string>> {
-  const p = (await pipelineDir.readPipeline(projectPath, pipelineId)) as {
-    tickets?: TicketLite[];
-  } | null;
-  const out = new Map<string, string>();
+async function snapshot(projectPath: string, pipelineId: string): Promise<Snapshot> {
+  const p = (await pipelineDir.readPipeline(projectPath, pipelineId)) as PipelineLite | null;
+  const ticketStatuses = new Map<string, string>();
   if (p && Array.isArray(p.tickets)) {
     for (const t of p.tickets) {
-      if (t.id && t.status) out.set(t.id, t.status);
+      if (t.id && t.status) ticketStatuses.set(t.id, t.status);
     }
   }
-  return out;
+  return { ticketStatuses, state: p?.state };
+}
+
+function currentTicket(tickets: TicketLite[]): TicketLite | undefined {
+  return (
+    tickets.find((x) => x.status === "running") ??
+    tickets.find((x) => x.status === "paused") ??
+    tickets.find((x) => x.status === "failed_iter_limit") ??
+    tickets.find((x) => x.status === "failed_transient") ??
+    tickets.find((x) => x.status === "failed")
+  );
+}
+
+function currentTicketTitle(tickets: TicketLite[]): string {
+  const t = currentTicket(tickets);
+  return t?.title || t?.id || "";
+}
+
+function pushAsync(opts: {
+  title: string;
+  body: string;
+  projectHash: string;
+  pipelineId: string;
+  ticketId: string;
+}): void {
+  void (async () => {
+    try {
+      const records = await tokenStore.listTokens();
+      const dead = await fanoutPush(
+        records.map((r) => r.token),
+        {
+          notification: { title: opts.title, body: opts.body },
+          data: {
+            workUnitId: opts.ticketId,
+            url: `/board?project=${opts.projectHash}&pipeline=${opts.pipelineId}`,
+          },
+        }
+      );
+      if (dead.length > 0) await tokenStore.removeDeadTokens(dead);
+    } catch (e) {
+      console.error(`[ticketWatcher ${opts.pipelineId}] push failed:`, e);
+    }
+  })();
 }
 
 export async function start(opts: {
@@ -59,10 +110,10 @@ export async function start(opts: {
           const p = (await pipelineDir.readPipeline(
             opts.projectPath,
             opts.pipelineId
-          )) as { tickets?: TicketLite[]; name?: string } | null;
+          )) as PipelineLite | null;
           const tickets = (p?.tickets ?? []) as TicketLite[];
-          for (const [tid, status] of cur) {
-            const prev = last.get(tid);
+          for (const [tid, status] of cur.ticketStatuses) {
+            const prev = last.ticketStatuses.get(tid);
             if (prev === status) continue;
             const ev = statusToEvent(status);
             if (!ev) continue;
@@ -73,6 +124,38 @@ export async function start(opts: {
               type: ev,
               title: `${numPart}${titlePart}: ${status}`,
               pipelineId: opts.pipelineId,
+            });
+            if (status === "done") {
+              pushAsync({
+                title: "✅ Ticket 完成",
+                body: titlePart,
+                projectHash: opts.projectHash,
+                pipelineId: opts.pipelineId,
+                ticketId: tid,
+              });
+            } else if (
+              status === "failed" ||
+              status === "failed_iter_limit" ||
+              status === "failed_transient"
+            ) {
+              pushAsync({
+                title: "❌ Ticket 失敗",
+                body: titlePart,
+                projectHash: opts.projectHash,
+                pipelineId: opts.pipelineId,
+                ticketId: tid,
+              });
+            }
+          }
+          if (last.state !== "paused" && cur.state === "paused") {
+            const current = currentTicket(tickets);
+            const title = currentTicketTitle(tickets);
+            pushAsync({
+              title: "⏳ 需要你的回應",
+              body: `${p?.name || opts.pipelineId}${title ? ` ${title}` : ""}`,
+              projectHash: opts.projectHash,
+              pipelineId: opts.pipelineId,
+              ticketId: current?.id || opts.pipelineId,
             });
           }
           last = cur;

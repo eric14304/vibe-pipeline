@@ -26,7 +26,7 @@ export function PickerSelect({
   const wrapRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
-    function onClick(e: MouseEvent) {
+    function onPointerDown(e: PointerEvent) {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
     }
     function onKey(e: KeyboardEvent) {
@@ -35,10 +35,10 @@ export function PickerSelect({
         setOpen(false);
       }
     }
-    document.addEventListener("mousedown", onClick);
+    document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKey, true);
     return () => {
-      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKey, true);
     };
   }, [open, setOpen]);

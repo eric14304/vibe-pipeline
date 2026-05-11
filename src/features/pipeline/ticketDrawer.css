@@ -524,6 +524,12 @@
   background: color-mix(in srgb, var(--accent, var(--running)) 14%, transparent);
   border-color: var(--line);
 }
+.tdrw-commit-hash-btn:focus-visible {
+  background: color-mix(in srgb, var(--accent, var(--running)) 14%, transparent);
+  border-color: var(--line);
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
 .tdrw-commit-subject {
   color: var(--fg);
   overflow: hidden;
@@ -533,4 +539,51 @@
 .tdrw-commit-ts {
   font-size: 11px;
   color: var(--fg-faint);
+}
+
+@media (max-width: 767px) {
+  .tdrw-stage {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .tdrw-drawer {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    max-width: none;
+    height: 100vh;
+    border-left: 0;
+    box-shadow: none;
+  }
+
+  .tdrw-body {
+    padding: 12px 16px calc(16px + env(safe-area-inset-bottom));
+  }
+
+  .tdrw-split-confirm-actions {
+    flex-direction: column;
+  }
+
+  .tdrw-split-confirm-actions .tdrw-action {
+    width: 100%;
+  }
+
+  .tdrw-commit {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .tdrw-commit-ts {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (hover: none) {
+  .tdrw-commit-hash-btn {
+    background: color-mix(in srgb, var(--accent, var(--running)) 10%, transparent);
+    border-color: var(--line);
+  }
 }
