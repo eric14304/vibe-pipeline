@@ -929,19 +929,6 @@ export function SettingsPopover({
         <SecurityTab status={authStatus} onActionError={onActionError} />
       )}
 
-      <div
-        className="settings-popover-footer"
-        style={{
-          display: "flex",
-          justifyContent: "flex-end",
-          paddingTop: 10,
-          borderTop: "1px solid var(--line)",
-        }}
-      >
-        <button type="button" className="btn" onClick={onClose}>
-          關閉
-        </button>
-      </div>
     </div>
   );
 }
