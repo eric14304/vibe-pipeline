@@ -1,10 +1,12 @@
 import * as projects from "./routes/projects";
 import * as qa from "./routes/qa";
+import * as push from "./routes/push";
 import * as userConfigRoutes from "./routes/userConfig";
 import * as test from "./routes/test";
 import * as projectStore from "./lib/projectStore";
 import * as orchestrator from "./lib/runner/orchestrator";
 import * as testMode from "./lib/testMode";
+import { initFCM } from "./lib/fcm";
 
 const PORT = Number(process.env.PORT ?? 3001);
 const ALLOWED_ORIGINS = new Set(
@@ -78,6 +80,19 @@ async function handle(req: Request): Promise<Response> {
   }
   if (pathname === "/api/user/config" && method === "PUT") {
     return userConfigRoutes.updateConfig(req);
+  }
+
+  if (pathname === "/api/push/config" && method === "GET") {
+    return push.config();
+  }
+  if (pathname === "/api/push/register" && method === "POST") {
+    return push.register(req);
+  }
+  if (pathname === "/api/push/unregister" && method === "DELETE") {
+    return push.unregister(req);
+  }
+  if (pathname === "/api/push/tokens" && method === "GET") {
+    return push.tokens();
   }
 
   if (pathname === "/api/projects" && method === "GET") {
@@ -241,6 +256,7 @@ const server = Bun.serve({
 });
 
 console.log(`vibe-pipeline backend listening on http://${server.hostname}:${server.port}`);
+void initFCM();
 
 // Crash recovery: 啟動時掃所有有 .vibe-pipeline/ 的 recent project,
 // 若 pipeline.state="running" 或 "stopping" 但 process 不在 (server 重啟),標 paused

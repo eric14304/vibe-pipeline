@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import * as api from "../../api/projects";
 import * as userConfigApi from "../../api/userConfig";
+import {
+  getPermission,
+  getStoredToken,
+  isFcmSupported,
+  requestAndRegisterToken,
+  unregisterToken as unregisterFcm,
+} from "../../lib/fcm";
 import "./SettingsPopover.css";
 import {
   PROVIDERS,
@@ -118,6 +125,143 @@ function TaskModelRow({
         ))}
       </select>
     </>
+  );
+}
+
+function PushNotificationsSection({
+  onActionError,
+}: {
+  onActionError?: (message: string) => void;
+}) {
+  const [supported, setSupported] = useState<boolean | null>(null);
+  const [permission, setPermission] = useState<NotificationPermission>(getPermission());
+  const [token, setToken] = useState<string | null>(getStoredToken());
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void isFcmSupported().then((ok) => {
+      if (!cancelled) setSupported(ok);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function refreshPermission() {
+    setPermission(getPermission());
+    setToken(getStoredToken());
+  }
+
+  async function enable() {
+    setLoading(true);
+    try {
+      await requestAndRegisterToken();
+      refreshPermission();
+    } catch (e) {
+      const message = e instanceof Error && e.message ? e.message : "啟用通知失敗";
+      onActionError?.(message);
+      refreshPermission();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function disable() {
+    setLoading(true);
+    try {
+      await unregisterFcm();
+      refreshPermission();
+    } catch (e) {
+      const message = e instanceof Error && e.message ? e.message : "停用通知失敗";
+      onActionError?.(message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const sectionHeader: React.CSSProperties = {
+    fontSize: 10.5,
+    letterSpacing: "0.08em",
+    color: "var(--fg-mute)",
+    textTransform: "uppercase",
+    fontWeight: 600,
+    marginBottom: 10,
+    paddingBottom: 6,
+    borderBottom: "1px solid var(--line)",
+    marginTop: 6,
+  };
+  const hint: React.CSSProperties = {
+    fontSize: 11,
+    color: "var(--fg-faint)",
+    lineHeight: 1.5,
+    marginBottom: 8,
+  };
+  const statusRow: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+    fontSize: 12.5,
+  };
+
+  let statusIcon = "○";
+  let statusText = "尚未啟用";
+  let statusColor: string = "var(--fg-faint)";
+  if (supported === false) {
+    statusIcon = "✕";
+    statusText = "瀏覽器不支援推播";
+    statusColor = "var(--fg-faint)";
+  } else if (permission === "denied") {
+    statusIcon = "✕";
+    statusText = "權限已封鎖";
+    statusColor = "var(--failed)";
+  } else if (permission === "granted" && token) {
+    statusIcon = "●";
+    statusText = "已啟用";
+    statusColor = "var(--done)";
+  } else if (permission === "granted") {
+    statusIcon = "○";
+    statusText = "已授權,尚未註冊";
+    statusColor = "var(--fg-mute)";
+  }
+
+  return (
+    <div>
+      <div style={sectionHeader}>Push 通知</div>
+      <div style={statusRow}>
+        <span style={{ color: statusColor, fontFamily: "var(--font-mono)" }}>{statusIcon}</span>
+        <span style={{ color: "var(--fg)" }}>{statusText}</span>
+      </div>
+      {supported === false ? (
+        <div style={hint}>此瀏覽器不支援 Web Push,改用桌面通知或行動 App。</div>
+      ) : permission === "denied" ? (
+        <div style={hint}>已封鎖,請到瀏覽器網址列設定中重新允許後再回到此頁啟用。</div>
+      ) : token ? (
+        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+          <button
+            type="button"
+            className="btn"
+            disabled={loading}
+            onClick={() => void disable()}
+          >
+            {loading ? "處理中…" : "停用通知"}
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+          <button
+            type="button"
+            className="btn"
+            disabled={loading || supported === null}
+            onClick={() => void enable()}
+          >
+            {loading ? "處理中…" : "啟用通知"}
+          </button>
+        </div>
+      )}
+      <div style={hint}>啟用後 pipeline 完成 / 失敗會推到此裝置(背景或前景皆可)。</div>
+    </div>
   );
 }
 
@@ -753,6 +897,8 @@ export function SettingsPopover({
           {error}
         </div>
       )}
+
+      <PushNotificationsSection onActionError={onActionError} />
 
       <div
         className="settings-popover-footer"
