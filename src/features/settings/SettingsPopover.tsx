@@ -305,6 +305,9 @@ export function SettingsPopover({
   const [userCfg, setUserCfg] = useState<UserConfig | null>(null);
   const [userCfgError, setUserCfgError] = useState<string | null>(null);
   const { status: authStatus } = useAuthStatus();
+  // tab 切換 — 取代之前 stacked sections,避免 popover 越來越長
+  type TabKey = "project" | "ai" | "notifications" | "security";
+  const [activeTab, setActiveTab] = useState<TabKey>("project");
 
   function isAbortError(e: unknown): boolean {
     return e instanceof Error && e.name === "AbortError";
@@ -626,17 +629,6 @@ export function SettingsPopover({
     fontWeight: 500,
   };
 
-  const sectionHeaderStyle: React.CSSProperties = {
-    fontSize: 10.5,
-    letterSpacing: "0.08em",
-    color: "var(--fg-mute)",
-    textTransform: "uppercase",
-    fontWeight: 600,
-    marginBottom: 10,
-    paddingBottom: 6,
-    borderBottom: "1px solid var(--line)",
-  };
-
   const fieldRowStyle: React.CSSProperties = {
     display: "grid",
     gridTemplateColumns: "112px 1fr",
@@ -677,17 +669,51 @@ export function SettingsPopover({
         fontSize: 13,
       }}
     >
-      {/* ─── Project 設定 ─── */}
+      {/* ─── Tab bar + 全域「已儲存」chip ─── */}
       <div
         style={{
-          ...sectionHeaderStyle,
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
-          gap: "0.75rem",
+          gap: 4,
+          marginBottom: 14,
+          borderBottom: "1px solid var(--line)",
+          paddingBottom: 0,
         }}
       >
-        <span>Project 設定</span>
+        {(
+          [
+            { key: "project", label: "Project" },
+            { key: "ai", label: "AI 任務" },
+            { key: "notifications", label: "通知" },
+            ...(authStatus?.bound === true
+              ? ([{ key: "security", label: "安全" }] as const)
+              : []),
+          ] as ReadonlyArray<{ key: TabKey; label: string }>
+        ).map((t) => {
+          const isActive = activeTab === t.key;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setActiveTab(t.key)}
+              style={{
+                padding: "7px 12px",
+                marginBottom: -1,
+                background: "transparent",
+                border: "none",
+                borderBottom: isActive ? "2px solid var(--accent)" : "2px solid transparent",
+                color: isActive ? "var(--fg)" : "var(--fg-mute)",
+                fontSize: 12.5,
+                fontWeight: isActive ? 600 : 500,
+                cursor: "pointer",
+                transition: "color 120ms",
+              }}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+        <span style={{ flex: 1 }} />
         {savedVisible && (
           <span
             className="chip"
@@ -698,6 +724,7 @@ export function SettingsPopover({
               borderColor: "var(--done-soft)",
               opacity: savedFading ? 0 : 1,
               transition: "opacity 350ms ease",
+              marginBottom: 6,
             }}
           >
             已儲存 ✓
@@ -705,6 +732,8 @@ export function SettingsPopover({
         )}
       </div>
 
+      {/* ─── Project tab ─── */}
+      {activeTab === "project" && <>
       <div style={fieldRowStyle}>
         <label style={labelStyle}>平行上限</label>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -828,22 +857,12 @@ export function SettingsPopover({
         </label>
       </div>
       <div style={subhintStyle}>每條 pipeline 也可單獨切換。</div>
+      </>}
 
-      {/* ─── AI 任務(跨 project) ─── */}
-      <div style={{ ...sectionHeaderStyle, marginTop: 6 }}>
-        AI 任務
-        <span
-          style={{
-            marginLeft: 8,
-            fontSize: 10,
-            color: "var(--fg-faint)",
-            textTransform: "none",
-            letterSpacing: 0,
-            fontWeight: 400,
-          }}
-        >
-          跨 project — provider / model / reasoning
-        </span>
+      {/* ─── AI 任務 tab ─── */}
+      {activeTab === "ai" && <>
+      <div style={{ fontSize: 11, color: "var(--fg-faint)", marginBottom: 10 }}>
+        跨 project — provider / model / reasoning
       </div>
       {userCfg ? (
         <div
@@ -900,10 +919,13 @@ export function SettingsPopover({
           {error}
         </div>
       )}
+      </>}
 
-      <PushNotificationsSection onActionError={onActionError} />
+      {activeTab === "notifications" && (
+        <PushNotificationsSection onActionError={onActionError} />
+      )}
 
-      {authStatus?.bound === true && (
+      {activeTab === "security" && authStatus?.bound === true && (
         <SecurityTab status={authStatus} onActionError={onActionError} />
       )}
 
