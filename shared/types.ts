@@ -30,9 +30,20 @@ export const PROVIDERS: Provider[] = ["claude", "codex"];
 // (不走 -m,ChatGPT auth -m 會 400)。--oss 跑 local model 不在此列。
 // effort 對應 codex 的 `model_reasoning_effort` config key,OpenAI 標準 minimal/low/medium/high
 export const MODELS_BY_PROVIDER: Record<Provider, readonly ModelName[]> = {
-  // claude aliases resolve 到最新版(opus=Opus 4.7, sonnet=Sonnet 4.6, haiku=Haiku 4.5)
-  // opusplan = 混搭(Opus planning + Sonnet exec)
-  claude: ["opus", "opusplan", "sonnet", "haiku"],
+  // claude:aliases resolve 到最新版,full ID 鎖特定 version
+  // - opus = 最新 Opus(2026-05 = 4.7,Max/Team 計畫自動 1M context)
+  // - claude-opus-4-7[1m] = 顯式 1M context(API key 或想強制 1M 時用)
+  // - claude-opus-4-6 = 上一代 Opus(穩定 / 便宜)
+  // - opusplan = 混搭(Opus planning + Sonnet exec)
+  // - sonnet / haiku = 最新 alias(4.6 / 4.5)
+  claude: [
+    "opus",
+    "claude-opus-4-7[1m]",
+    "claude-opus-4-6",
+    "opusplan",
+    "sonnet",
+    "haiku",
+  ],
   codex: ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex", "gpt-5.2"],
 };
 
