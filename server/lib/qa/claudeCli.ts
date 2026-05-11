@@ -3,7 +3,7 @@ import type { QAReply } from "./schema";
 import type { TicketSpec } from "../../../shared/types";
 import { isTestMode, nextQAReply } from "../testMode";
 import { projectHash } from "../hash";
-import { getTaskConfig } from "../userConfig";
+import { getTaskConfigWithAdapter } from "../userConfig";
 
 export class ClaudeCliError extends Error {
   constructor(public code: "not_available" | "exec_failed" | "parse_failed", message: string) {
@@ -14,13 +14,9 @@ export class ClaudeCliError extends Error {
 export async function checkAvailable(): Promise<boolean> {
   // Mock 模式:跳過 spawn,假裝 claude 在,讓 e2e 不依賴 user 機器有沒有裝
   if (isTestMode()) return true;
-  try {
-    const proc = Bun.spawn(["claude", "--version"], { stdout: "pipe", stderr: "pipe" });
-    await proc.exited;
-    return proc.exitCode === 0;
-  } catch {
-    return false;
-  }
+  // 依 user config 的 QA provider 檢查對應 CLI(未設 → claude)
+  const cfg = await getTaskConfigWithAdapter("qa");
+  return cfg.adapter.checkAvailable();
 }
 
 type RunOpts = {
@@ -32,6 +28,9 @@ type RunOpts = {
   progressHint?: string;
   // pipeline 內既有 ticket 摘要,/qa/start 時 snapshot 進 draft;每輪都 append 進 system prompt
   pipelineContext?: string;
+  // 之前已完成的輪次(不含本輪 userMessage)。
+  // claude:不需要(--resume 從 session 接續);codex:必須,沒 session resume 會失憶。
+  history?: Array<{ role: "user" | "assistant"; content: string }>;
 };
 
 // Run one turn through claude CLI. First turn supplies session-id + system prompt,
@@ -43,6 +42,7 @@ export async function runTurn({
   isFirstTurn,
   progressHint,
   pipelineContext,
+  history,
 }: RunOpts): Promise<QAReply> {
   // E2E mock:從 testMode store 拿下一筆 scripted reply。不 spawn 真 claude。
   // 走 enforceContract 通過保留跟 real 模式同樣的 spec coercion / completeness check。
@@ -56,49 +56,38 @@ export async function runTurn({
     return enforceContract(reply);
   }
 
-  const qaCfg = await getTaskConfig("qa");
-  const args = [
-    "claude",
-    "-p",
-    "--output-format",
-    "json",
-    "--model",
-    qaCfg.model,
-    "--effort",
-    qaCfg.effort,
-  ];
+  const qaCfg = await getTaskConfigWithAdapter("qa");
   // perf:QA 是 server-controlled feature,system prompt 自己定完整契約,不該被 user 個人設定 / project hooks /
   // MCP servers / slash commands 干擾。砍 setting-sources / mcp / slash-commands 後 cold start ~快 125ms、
   // 1h cache_creation tokens 從 19512 降到 0(cost -89%)。量測見 refs/claude-cli-spawn-perf-2026-05-11.md。
   //
   // 注意:**不能加 --no-session-persistence** — QA 多輪靠 --resume 接續,
   // 第二輪起需要前一輪 session 落地到 disk,no-persist 會讓 follow-up turn 直接 500。
-  args.push("--setting-sources", "");
-  args.push("--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}');
-  args.push("--disable-slash-commands");
-  // QA 階段:鎖會改檔 / 跑 sub-agent / 上網的工具,其他(Bash / Read / Grep / Glob / MCP)放行讓 AI 收斂時可查專案。
-  args.push("--disallowedTools", "Edit Write Task");
-  if (isFirstTurn) {
-    args.push("--session-id", sessionId);
-    const sysPrompt = pipelineContext
-      ? QA_BEHAVIOR_PROMPT + "\n\n" + pipelineContext
-      : QA_BEHAVIOR_PROMPT;
-    args.push("--system-prompt", sysPrompt);
-  } else {
-    args.push("--resume", sessionId);
-    const hint =
-      "提醒:你只負責對話收斂 ticket 需求,不要實際執行任何工具(Bash/Read/Edit/Grep/...)。回覆永遠用單一 JSON 物件 {message, options, complete, spec, splitInto?},splitInto 只在 complete=true 且範圍跨多件獨立 ticket 時填 N 個完整 spec(見系統 prompt ## splitInto 段)。不要解釋、不要 markdown 包裝。" +
-      (pipelineContext ? "\n\n" + pipelineContext : "") +
-      (progressHint ? "\n\n" + progressHint : "");
-    args.push("--append-system-prompt", hint);
-  }
-  args.push(userMessage);
+  const sysPrompt = pipelineContext
+    ? QA_BEHAVIOR_PROMPT + "\n\n" + pipelineContext
+    : QA_BEHAVIOR_PROMPT;
+  const hint = isFirstTurn
+    ? undefined
+    : "提醒:你只負責對話收斂 ticket 需求,不要實際執行任何工具(Bash/Read/Edit/Grep/...)。回覆永遠用單一 JSON 物件 {message, options, complete, spec, splitInto?},splitInto 只在 complete=true 且範圍跨多件獨立 ticket 時填 N 個完整 spec(見系統 prompt ## splitInto 段)。不要解釋、不要 markdown 包裝。" +
+        (pipelineContext ? "\n\n" + pipelineContext : "") +
+        (progressHint ? "\n\n" + progressHint : "");
 
-  let proc: ReturnType<typeof Bun.spawn>;
+  let proc: import("../cli/adapter").SpawnedProcess;
   try {
-    proc = Bun.spawn(args, { cwd, stdout: "pipe", stderr: "pipe" });
+    proc = qaCfg.adapter.spawn({
+      kind: "qa",
+      cwd,
+      sessionId,
+      userMessage,
+      isFirstTurn,
+      systemPrompt: sysPrompt,
+      appendSystemPrompt: hint,
+      model: qaCfg.model,
+      effort: qaCfg.effort,
+      history,
+    });
   } catch (e) {
-    throw new ClaudeCliError("not_available", `claude CLI not found: ${e}`);
+    throw new ClaudeCliError("not_available", `${qaCfg.adapter.name} CLI not found: ${e}`);
   }
   const [stdoutText, stderrText] = await Promise.all([
     new Response(proc.stdout).text(),
@@ -109,19 +98,20 @@ export async function runTurn({
   if (proc.exitCode !== 0) {
     throw new ClaudeCliError(
       "exec_failed",
-      `claude exited ${proc.exitCode}: ${stderrText.trim() || stdoutText.trim()}`
+      `${qaCfg.adapter.name} exited ${proc.exitCode}: ${stderrText.trim() || stdoutText.trim()}`
     );
   }
 
-  // --output-format json wraps result in: { type:"result", result:"<actual text>", session_id, ... }
-  let outerJson: { result?: string; text?: string; session_id?: string; [k: string]: unknown };
+  // adapter.parseResult 統一從原始 stdout 取出「LLM 最終訊息字串」(claude=outer JSON.result;codex=JSONL last agent_message)
+  let innerStr: string;
   try {
-    outerJson = JSON.parse(stdoutText);
-  } catch {
-    throw new ClaudeCliError("parse_failed", `claude output not JSON: ${stdoutText.slice(0, 200)}`);
+    innerStr = qaCfg.adapter.parseResult("qa", stdoutText);
+  } catch (e) {
+    throw new ClaudeCliError(
+      "parse_failed",
+      `${qaCfg.adapter.name} output not parseable: ${String(e).slice(0, 200)}`
+    );
   }
-  const inner = outerJson.result ?? outerJson.text ?? outerJson;
-  const innerStr = typeof inner === "string" ? inner : JSON.stringify(inner);
   return enforceContract(parseReply(innerStr));
 }
 

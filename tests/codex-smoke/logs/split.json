@@ -1,0 +1,31 @@
+{
+  "A": {
+    "ok": true,
+    "detail": "adapter 回 2 spec",
+    "ms": 14832
+  },
+  "B": {
+    "ok": true,
+    "detail": "raw 回 2 spec",
+    "ms": 9863,
+    "exit": 0,
+    "usage": {
+      "input_tokens": 13766,
+      "cached_input_tokens": 11136,
+      "output_tokens": 558,
+      "reasoning_output_tokens": 106
+    },
+    "arrSample": [
+      {
+        "title": "重構 settings 頁分頁元件",
+        "mode": "step",
+        "acc": 4
+      },
+      {
+        "title": "新增 keyboard shortcuts 對照表文檔",
+        "mode": "step",
+        "acc": 4
+      }
+    ]
+  }
+}

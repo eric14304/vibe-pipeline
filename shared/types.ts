@@ -4,9 +4,13 @@
 // 跟 <target-repo>/.vibe-pipeline/config.json (per-project, max_parallel 等) 不同層。
 export type ModelName = "opus" | "sonnet" | "haiku";
 export type Effort = "low" | "medium" | "high";
-export type TaskClass = "qa" | "runner" | "subAgent" | "merge";
+// provider 決定走 ClaudeAdapter 還是 CodexAdapter;舊 config 沒這欄預設 'claude' 維持相容
+export type Provider = "claude" | "codex";
+// split = QA 拆 ticket 的 one-shot call(獨立 task class,可用便宜 model)
+export type TaskClass = "qa" | "split" | "runner" | "subAgent" | "merge";
 
 export type TaskModelConfig = {
+  provider: Provider;
   model: ModelName;
   effort: Effort;
 };
@@ -17,19 +21,22 @@ export type UserConfig = {
 
 export const DEFAULT_USER_CONFIG: UserConfig = {
   defaults: {
-    qa: { model: "sonnet", effort: "low" },
-    runner: { model: "opus", effort: "medium" },
-    subAgent: { model: "opus", effort: "high" },
-    merge: { model: "opus", effort: "high" },
+    qa: { provider: "claude", model: "sonnet", effort: "low" },
+    split: { provider: "claude", model: "haiku", effort: "low" },
+    runner: { provider: "claude", model: "opus", effort: "medium" },
+    subAgent: { provider: "claude", model: "opus", effort: "high" },
+    merge: { provider: "claude", model: "opus", effort: "high" },
   },
 };
 
-export const TASK_CLASSES: TaskClass[] = ["qa", "runner", "subAgent", "merge"];
+export const TASK_CLASSES: TaskClass[] = ["qa", "split", "runner", "subAgent", "merge"];
 export const MODEL_NAMES: ModelName[] = ["opus", "sonnet", "haiku"];
 export const EFFORT_LEVELS: Effort[] = ["low", "medium", "high"];
+export const PROVIDERS: Provider[] = ["claude", "codex"];
 
 export const TASK_CLASS_LABELS: Record<TaskClass, string> = {
   qa: "QA(規格收斂)",
+  split: "Split(拆 ticket)",
   runner: "Runner 主 agent",
   subAgent: "Sub-agent(執行AI / 審核AI)",
   merge: "AI 合併",

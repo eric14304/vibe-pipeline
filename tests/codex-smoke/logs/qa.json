@@ -1,0 +1,20 @@
+{
+  "A": {
+    "ok": true,
+    "detail": "adapter ok reply.message.len=47 complete=false",
+    "ms": 11691
+  },
+  "B": {
+    "ok": true,
+    "detail": "raw 回 JSON message.len=24 complete=false options=3",
+    "ms": 6487,
+    "exit": 0,
+    "usage": {
+      "input_tokens": 13571,
+      "cached_input_tokens": 11136,
+      "output_tokens": 241,
+      "reasoning_output_tokens": 165
+    },
+    "message_preview": "cheatsheet 浮窗要顯示哪些快捷鍵內容？"
+  }
+}

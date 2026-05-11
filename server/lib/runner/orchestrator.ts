@@ -8,7 +8,7 @@ import * as ticketWatcher from "./ticketWatcher";
 import * as runLog from "./runLog";
 import * as testMode from "../testMode";
 import { buildRunnerBehaviorPrompt } from "./runnerPrompt";
-import { loadUserConfig } from "../userConfig";
+import { loadUserConfig, getTaskConfigWithAdapter } from "../userConfig";
 
 type RunningProcess = {
   pipelineId: string;
@@ -307,43 +307,23 @@ async function spawnDirect(opts: {
   // 擋 Edit/Write 就等於 sub-agent 也不能改 code,ticket 跑不了。
   // 改用 system prompt 約束主 agent 自己不直接改 source(只用 Edit/Write 更新 pipeline.json)
   const userCfg = await loadUserConfig();
-  const runnerCfg = userCfg.defaults.runner;
   const subAgentCfg = userCfg.defaults.subAgent;
   const mergeCfg = userCfg.defaults.merge;
-  const args = [
-    "claude",
-    "-p",
-    "--output-format",
-    "json",
-    // perf:runner 主 agent 系統 prompt 自寫完整流程,不依賴 user MCP / slash commands / 上次 session。
-    // 砍這幾項砍 cold start ~700ms + 砍 1h cache_creation ~12000 tokens / spawn(~$0.075 → ~$0.057)。
-    // 保留 --setting-sources 預設(user/project/local),因為 Task sub-agent 改 source code 時
-    // 仍可能需要 user CLAUDE.md / project lint config 等繼承,完整砍會影響 sub-agent 編碼品質。
-    "--strict-mcp-config",
-    "--mcp-config",
-    '{"mcpServers":{}}',
-    "--no-session-persistence",
-    "--disable-slash-commands",
-    "--session-id",
-    sessionId,
-    "--model",
-    runnerCfg.model,
-    "--effort",
-    runnerCfg.effort,
-    "--system-prompt",
-    buildRunnerBehaviorPrompt({ subAgent: subAgentCfg, merge: mergeCfg }),
-    initialMessage,
-  ];
+  const runnerCfg = await getTaskConfigWithAdapter("runner");
 
   let proc: Bun.Subprocess;
   try {
-    proc = Bun.spawn(args, {
+    proc = runnerCfg.adapter.spawn({
+      kind: "runner",
       cwd: wtPath,
-      stdout: "pipe",
-      stderr: "pipe",
+      sessionId,
+      initialMessage,
+      systemPrompt: buildRunnerBehaviorPrompt({ subAgent: subAgentCfg, merge: mergeCfg }),
+      model: runnerCfg.model,
+      effort: runnerCfg.effort,
     });
   } catch (e) {
-    return { ok: false, error: `spawn claude failed: ${String(e)}` };
+    return { ok: false, error: `spawn ${runnerCfg.adapter.name} failed: ${String(e)}` };
   }
 
   running.set(k, { pipelineId, proc, startedAt: Date.now() });
