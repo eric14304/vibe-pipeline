@@ -44,7 +44,7 @@ function TaskModelRow({
 }) {
   return (
     <>
-      <span style={{ fontSize: 12, color: "var(--fg)", alignSelf: "center" }}>{label}</span>
+      <span style={{ fontSize: 12, color: "var(--fg)", alignSelf: "center", whiteSpace: "nowrap" }}>{label}</span>
       <select
         value={provider}
         disabled={disabled}
@@ -416,7 +416,8 @@ export function SettingsPopover({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "112px minmax(72px, auto) minmax(72px, auto) minmax(72px, auto)",
+            // 第一欄 auto 撐到最長 label 寬度(Sub-agent(執行AI / 審核AI) 一條最長),其他 row 跟齊不換行
+            gridTemplateColumns: "auto minmax(72px, auto) minmax(72px, auto) minmax(72px, auto)",
             columnGap: 8,
             rowGap: 8,
             marginBottom: 12,
@@ -424,7 +425,7 @@ export function SettingsPopover({
           }}
         >
           {/* column headers */}
-          <span style={{ fontSize: 10, color: "var(--fg-faint)", letterSpacing: "0.06em", textTransform: "uppercase" }}>任務</span>
+          <span style={{ fontSize: 10, color: "var(--fg-faint)", letterSpacing: "0.06em", textTransform: "uppercase", whiteSpace: "nowrap" }}>任務</span>
           <span style={{ fontSize: 10, color: "var(--fg-faint)", letterSpacing: "0.06em", textTransform: "uppercase", textAlign: "center" }}>provider</span>
           <span style={{ fontSize: 10, color: "var(--fg-faint)", letterSpacing: "0.06em", textTransform: "uppercase", textAlign: "center" }}>model</span>
           <span style={{ fontSize: 10, color: "var(--fg-faint)", letterSpacing: "0.06em", textTransform: "uppercase", textAlign: "center" }}>effort</span>
