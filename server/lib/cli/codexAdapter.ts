@@ -133,15 +133,21 @@ function spawnCodexWithStdinPrompt(args: string[], cwd: string, prompt: string):
   return proc;
 }
 
-// 在 prompt 前綴註明 model preference(因 ChatGPT auth 不接 -m,只能 hint)。
+// 在 prompt 前綴註明 model preference(雙保險:--config 已正確設了,prompt hint 給 AI 一個 hint
+// 知道自己應該怎麼回應)。
 function modelHint(model: string, effort?: string): string {
   const eff = effort ? `, effort: ${effort}` : "";
   return `[Model preference: ${model}${eff}]\n\n`;
 }
 
 // ─── 共用 args ──────────────────────────────────────────────────────
+//
+// codex `-c key=value` 覆寫 ~/.codex/config.toml 的對應值。比起 -m flag(ChatGPT auth 下會 400),
+// `-c model="<name>"` 走 config override path,ChatGPT auth 也吃。同樣的 `-c model_reasoning_effort=`
+// 控制推理 effort(對應 OpenAI reasoning_effort enum:minimal/low/medium/high)。
 
-function commonExecArgs(): string[] {
+function commonExecArgs(model: string, effort: string): string[] {
+  // value 一律當 TOML 字串(double quote 包),簡單情況夠用;特殊字元需要更嚴格 escape 才再加
   return [
     "codex",
     "exec",
@@ -151,6 +157,10 @@ function commonExecArgs(): string[] {
     "--ignore-rules",
     "-c",
     "mcp_servers={}",
+    "-c",
+    `model="${model}"`,
+    "-c",
+    `model_reasoning_effort="${effort}"`,
   ];
 }
 
@@ -200,7 +210,7 @@ function spawnQA(opts: QASpawnOpts): SpawnedProcess {
     prompt = hint + wrapPrompt(systemPrompt, userMessage);
   }
   const args = [
-    ...commonExecArgs(),
+    ...commonExecArgs(model, effort),
     "-C",
     cwd,
     "-s",
@@ -218,7 +228,7 @@ function spawnRunner(opts: RunnerSpawnOpts): SpawnedProcess {
   // 寫 rollout history 對後續除錯 / resume / 觀測有用。
   const prompt = modelHint(model, effort) + wrapPrompt(systemPrompt, initialMessage);
   const args = [
-    ...commonExecArgs(),
+    ...commonExecArgs(model, effort),
     "-C",
     cwd,
     "-s",
@@ -233,7 +243,7 @@ function spawnSplit(opts: SplitSpawnOpts): SpawnedProcess {
   const { cwd, systemPrompt, model, effort, userMessage } = opts;
   const prompt = modelHint(model, effort) + wrapPrompt(systemPrompt, userMessage);
   const args = [
-    ...commonExecArgs(),
+    ...commonExecArgs(model, effort),
     "-C",
     cwd,
     "-s",

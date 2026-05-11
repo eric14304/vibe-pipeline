@@ -314,7 +314,7 @@ export function SettingsPopover({
         position: "absolute",
         top: "calc(100% + 6px)",
         right: 0,
-        width: 440,
+        width: 520,
         maxHeight: "calc(100vh - 80px)",
         overflowY: "auto",
         background: "var(--bg-elevated)",
@@ -433,8 +433,8 @@ export function SettingsPopover({
         <div
           style={{
             display: "grid",
-            // 第一欄 auto 撐到最長 label 寬度(Sub-agent(執行AI / 審核AI) 一條最長),其他 row 跟齊不換行
-            gridTemplateColumns: "auto minmax(72px, auto) minmax(72px, auto) minmax(72px, auto)",
+            // 第一欄 auto 撐到最長 label;model 欄要容 'gpt-5-codex' 等較長 codex 名稱,給 max-content
+            gridTemplateColumns: "auto max-content max-content max-content",
             columnGap: 8,
             rowGap: 8,
             marginBottom: 12,
