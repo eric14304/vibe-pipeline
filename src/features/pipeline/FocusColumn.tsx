@@ -94,7 +94,7 @@ export function RunButton({
           ? "按上方「+ ticket」開 QA 建第一張"
           : "沒可跑的 ticket(失敗 / done 不算可跑;merge / sync 處理走 banner / chip)";
         return (
-          <button type="button" className="btn" disabled title={title}>
+          <button type="button" className="btn run-btn-empty" disabled title={title}>
             無ticket可執行
           </button>
         );
@@ -391,7 +391,7 @@ export function FocusColumn({
 
           {onToggleAutoMerge && (
             <label
-              className={"toggle-pill mono" + (pipeline.autoMerge ? " is-on" : "")}
+              className={"toggle-pill mono focus-auto-merge" + (pipeline.autoMerge ? " is-on" : "")}
               title="全 ticket done → backend 自動 append merge ticket 走 runner 流程"
             >
               <input
