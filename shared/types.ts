@@ -83,7 +83,7 @@ export const TASK_CLASS_LABELS: Record<TaskClass, string> = {
 // 第二行說明文字 — 弱化 hint,在 UI 主 label 下方小字顯
 export const TASK_CLASS_HINTS: Record<TaskClass, string> = {
   qa: "規格收斂",
-  split: "拆 ticket",
+  split: "大任務拆小 Ticket",
   runner: "任務執行主 Agent",
   subAgent: "執行AI / 審核AI",
   merge: "合併衝突解決",
