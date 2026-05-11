@@ -247,6 +247,29 @@ export async function runPipeline(hash: string, pipelineId: string): Promise<Res
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);
   if (!validProjectPath(project.path)) return err("invalid_path", `Path missing: ${project.path}`);
   if (!project.hasGit) return err("invalid_path", "Project 沒 .git/,先 git init 再跑 pipeline");
+  // User 顯式按繼續 = 明確要重試:把所有 failed_transient ticket reset 成 paused,
+  // 否則 runner 主迴圈規則「遇 failed_transient 立刻暫停」會讓 pipeline 秒退。
+  // 設計初衷是「不自動重試燒 token」,但 user 主動點繼續就是 explicit consent。
+  try {
+    const p = (await pipelineDir.readPipeline(project.path, pipelineId)) as {
+      tickets?: Array<{ status?: string; [k: string]: unknown }>;
+      [k: string]: unknown;
+    } | null;
+    if (p?.tickets) {
+      let changed = false;
+      for (const t of p.tickets) {
+        if (t.status === "failed_transient") {
+          t.status = "paused";
+          changed = true;
+        }
+      }
+      if (changed) {
+        await pipelineDir.writePipeline(project.path, pipelineId, p);
+      }
+    }
+  } catch (e) {
+    console.warn(`[runPipeline] reset failed_transient skipped: ${String(e)}`);
+  }
   const r = await orchestrator.start({
     projectPath: project.path,
     projectHash: hash,
