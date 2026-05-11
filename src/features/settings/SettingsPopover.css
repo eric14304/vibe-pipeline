@@ -74,6 +74,9 @@
     white-space: normal !important;
     flex-direction: row !important;
     align-items: baseline !important;
+    /* 原 inline 樣式有 alignSelf:"center",mobile 全寬卡式靠左 */
+    align-self: flex-start !important;
+    justify-content: flex-start !important;
     gap: 8px;
   }
 
