@@ -12,11 +12,9 @@ function readToken(body: Record<string, unknown>): string | null {
 export async function register(req: Request): Promise<Response> {
   const body = await readJson(req);
   const token = readToken(body);
-  console.log(`[push/register] body keys: ${Object.keys(body).join(",")}, token len: ${token?.length ?? 0}`);
   if (!token) return err("invalid_path", "token 必須為非空字串", 400);
   const platform = typeof body.platform === "string" ? body.platform : "unknown";
   const record = await tokenStore.registerToken(token, platform);
-  console.log(`[push/register] OK platform=${platform}, total tokens=${(await tokenStore.listTokens()).length}`);
   return Response.json({ token: record }, { status: 201 });
 }
 
@@ -30,19 +28,6 @@ export async function unregister(req: Request): Promise<Response> {
 
 export async function tokens(): Promise<Response> {
   return Response.json({ tokens: await tokenStore.listTokens() });
-}
-
-// 前端 FCM enable 流程診斷:不影響功能,只 log 到 backend stdout
-export async function diagnostic(req: Request): Promise<Response> {
-  try {
-    const body = await readJson(req);
-    const step = typeof body.step === "string" ? body.step : "?";
-    const info = JSON.stringify(body);
-    console.log(`[fcm-diag] ${step} :: ${info}`);
-  } catch {
-    console.log("[fcm-diag] (failed to parse body)");
-  }
-  return new Response(null, { status: 204 });
 }
 
 // Smoke test:對所有 registered tokens fan-out 一發測試 push,驗證鏈路

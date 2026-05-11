@@ -268,30 +268,23 @@ function PushNotificationsSection({
       )}
       <div style={hint}>啟用後 pipeline 完成 / 失敗會推到此裝置(背景或前景皆可)。</div>
 
-      {/* 診斷區:把 FCM 內部狀態露出來,診斷手機端為何 register 沒打進 backend */}
-      <div
-        className="mono"
-        style={{
-          fontSize: 10.5,
-          color: "var(--fg-faint)",
-          marginTop: 10,
-          padding: 8,
-          background: "var(--panel)",
-          border: "1px solid var(--line)",
-          borderRadius: 4,
-          lineHeight: 1.6,
-          wordBreak: "break-all",
-        }}
-      >
-        <div>supported: {supported === null ? "checking…" : String(supported)}</div>
-        <div>permission: {permission}</div>
-        <div>token(local): {token ? token.slice(0, 24) + "…" : "(none)"}</div>
-        {lastError && (
-          <div style={{ color: "var(--failed)", marginTop: 4 }}>
-            last error: {lastError}
-          </div>
-        )}
-      </div>
+      {lastError && (
+        <div
+          className="mono"
+          style={{
+            fontSize: 11,
+            color: "var(--failed)",
+            marginTop: 8,
+            padding: 8,
+            background: "color-mix(in srgb, var(--failed) 8%, transparent)",
+            border: "1px solid color-mix(in srgb, var(--failed) 30%, var(--line))",
+            borderRadius: 4,
+            wordBreak: "break-all",
+          }}
+        >
+          {lastError}
+        </div>
+      )}
     </div>
   );
 }

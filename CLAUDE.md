@@ -65,7 +65,6 @@
 - runner spawn 的 `--setting-sources` 還沒砍(留給 Task sub-agent 讀 user/project CLAUDE.md);若日後把 sub-agent context 全 push 進 prompt,可拿 ~13% 額外 cache 改善
 - **CLI(`vbpl` 暫定名)**:命名已 brainstorm 過,實作未啟動。長遠目標是讓 user 不開 browser 也能管 pipeline / ticket
 - **iOS PWA push 實測**:iOS 16.4+ 已支援 Web Push 但需先「加入主畫面」,目前只在 Android 驗過
-- **diagnostic endpoint 清理**:`/api/push/diagnostic` + frontend `diag()` 是 debug FCM permission 流程留下的,production 不需要,擇日砍
 - **背景 push 待人工觸發測試**:測過 `/api/push/test` 鎖屏可收;runner 真實 pipeline 完成事件 → push 還沒實機跑過(ticketWatcher 路徑已寫好,缺最後一哩驗證)
 
 **已 final 決定**(不再討論)

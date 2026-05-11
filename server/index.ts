@@ -116,9 +116,6 @@ async function handle(req: Request): Promise<Response> {
   if (pathname === "/api/push/test" && method === "POST") {
     return push.test();
   }
-  if (pathname === "/api/push/diagnostic" && method === "POST") {
-    return push.diagnostic(req);
-  }
 
   if (pathname === "/api/projects" && method === "GET") {
     return projects.listRecent();
