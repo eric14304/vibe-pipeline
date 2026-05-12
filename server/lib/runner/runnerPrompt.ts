@@ -4,18 +4,21 @@
 import type { TaskModelConfig } from "../../../shared/types";
 
 export function buildRunnerBehaviorPrompt(opts: {
-  subAgent: TaskModelConfig;
+  executor: TaskModelConfig;
+  critic: TaskModelConfig;
   merge: TaskModelConfig;
 }): string {
-  const { subAgent, merge } = opts;
+  const { executor, critic, merge } = opts;
   const subAgentDirective =
     '\n## 派 sub-agent 用的 provider / model / effort\n\n' +
-    '本次 run 的 sub-agent 配置:\n' +
-    '- 一般 ticket(mode=step / iter):provider=' + subAgent.provider + ',model=' + subAgent.model + ',effort=' + subAgent.effort + '\n' +
+    '本次 run 的 sub-agent 配置(2026-05 起 executor / critic 拆開,可各自挑 model):\n' +
+    '- 執行AI(doer,改 code / 跑指令):provider=' + executor.provider + ',model=' + executor.model + ',effort=' + executor.effort + '\n' +
+    '- 審核AI(critic,讀 diff 判 PASS/FAIL):provider=' + critic.provider + ',model=' + critic.model + ',effort=' + critic.effort + '\n' +
     '- merge ticket(mode=merge):provider=' + merge.provider + ',model=' + merge.model + ',effort=' + merge.effort + '\n\n' +
-    dispatchInstructions("一般 ticket", subAgent, /* allowWrite */ true) +
+    dispatchInstructions("執行AI(改 code)", executor, /* allowWrite */ true) +
+    dispatchInstructions("審核AI(read-only 驗收)", critic, /* allowWrite */ false) +
     dispatchInstructions("merge ticket", merge, /* allowWrite */ true) +
-    '\n**注意**:iter mode 的「審核 AI」(critic)派 sub-agent 時,prompt 內明確寫「只驗收、不改 code」;codex provider 派審核 AI 時,Bash 改用 `-s read-only` 取代 `-s workspace-write`(避免審核步驟誤改檔)。\n';
+    '\n**注意**:審核AI prompt 內明確寫「只驗收、不改 code」;codex 審核派發已在 dispatch 範例用 -s read-only 避免誤改檔。\n';
   return RUNNER_BEHAVIOR_PROMPT_HEAD + subAgentDirective + RUNNER_BEHAVIOR_PROMPT_TAIL;
 }
 

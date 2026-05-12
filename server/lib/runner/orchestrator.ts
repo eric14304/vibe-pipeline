@@ -451,7 +451,8 @@ async function spawnDirect(opts: {
   // 擋 Edit/Write 就等於 sub-agent 也不能改 code,ticket 跑不了。
   // 改用 system prompt 約束主 agent 自己不直接改 source(只用 Edit/Write 更新 pipeline.json)
   const userCfg = await loadUserConfig();
-  const subAgentCfg = userCfg.defaults.subAgent;
+  const executorCfg = userCfg.defaults.executor;
+  const criticCfg = userCfg.defaults.critic;
   const mergeCfg = userCfg.defaults.merge;
   const runnerCfg = await getTaskConfigWithAdapter("runner");
 
@@ -460,7 +461,6 @@ async function spawnDirect(opts: {
   // 環境 setup。安全邊界:source code 改動仍走 sub-agent,主 agent 只 Bash 派發 +
   // 環境工具,risk 跟既有「sub-agent 改 code」同等級
   const needsBypassPermissions = true;
-  void subAgentCfg; void mergeCfg; // (保留 cfg 給未來條件用)
 
   let proc: Bun.Subprocess;
   try {
@@ -469,7 +469,7 @@ async function spawnDirect(opts: {
       cwd: wtPath,
       sessionId,
       initialMessage,
-      systemPrompt: buildRunnerBehaviorPrompt({ subAgent: subAgentCfg, merge: mergeCfg }),
+      systemPrompt: buildRunnerBehaviorPrompt({ executor: executorCfg, critic: criticCfg, merge: mergeCfg }),
       model: runnerCfg.model,
       effort: runnerCfg.effort,
       needsBypassPermissions,

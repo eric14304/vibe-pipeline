@@ -215,7 +215,8 @@ export async function confirmAi(opts: {
 
   // 用 merge task class 的 model/effort(衝突解算 merge 性質)
   const mergeCfg = await getTaskConfigWithAdapter("merge");
-  const subCfg = await getTaskConfigWithAdapter("subAgent");
+  // sync 衝突解是執行性工作(實際改 code + commit),用 executor cfg 不用 critic
+  const subCfg = await getTaskConfigWithAdapter("executor");
   // 跨 provider:codex sub-agent 需要 bypass(同 orchestrator 邏輯)
   const needsBypassPermissions =
     subCfg.provider === "codex" || mergeCfg.provider === "codex";

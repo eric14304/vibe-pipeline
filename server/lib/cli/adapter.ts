@@ -8,7 +8,8 @@
 import type { TicketSpec } from "../../../shared/types";
 import type { QAReply } from "../qa/schema";
 
-export type TaskClass = "qa" | "runner" | "split" | "subAgent" | "merge";
+// 跟 shared/types 同步 — adapter.ts 維持自己一份(server/lib/cli 不依賴 shared)
+export type TaskClass = "qa" | "runner" | "split" | "executor" | "critic" | "merge";
 
 // QA spawn opts:多輪對話、--resume / --session-id 視 isFirstTurn 切。
 export type QASpawnOpts = {

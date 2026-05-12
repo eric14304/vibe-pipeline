@@ -75,6 +75,12 @@ function coerceConfig(raw: unknown): UserConfig {
     string,
     unknown
   >;
+  // 2026-05-12 migration:舊 config 用 'subAgent' 一個 key 涵蓋 executor + critic。
+  // 新 schema 拆兩個。讀檔時把 subAgent 當 executor 預設(critic 走 fallback 預設 sonnet)
+  // 讓 user 之前的設定不丟,critic 由 user 在 SettingsPopover 後續挑便宜 model
+  if (rawDefaults.subAgent && !rawDefaults.executor) {
+    rawDefaults.executor = rawDefaults.subAgent;
+  }
   const out: UserConfig["defaults"] = { ...fallback.defaults };
   for (const tc of TASK_CLASSES) {
     out[tc] = coerceTaskModel(rawDefaults[tc], fallback.defaults[tc]);
@@ -103,7 +109,7 @@ export async function writeUserConfig(cfg: UserConfig): Promise<UserConfig> {
   return cfg;
 }
 
-// PUT 接 partial body,白名單 defaults.{qa,runner,subAgent,merge}.{model,effort}。
+// PUT 接 partial body,白名單 defaults.{qa,runner,executor,critic,merge}.{model,effort}。
 // 其他鍵忽略。型別錯 → 拋 invalid_path err,routes 層轉 400。
 export class UserConfigPatchError extends Error {
   constructor(public field: string, message: string) {

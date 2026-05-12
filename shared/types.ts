@@ -10,7 +10,9 @@ export type ModelName = string;
 export type Effort = string;
 export type Provider = "claude" | "codex";
 // split = QA 拆 ticket 的 one-shot call(獨立 task class,可用便宜 model)
-export type TaskClass = "qa" | "split" | "runner" | "subAgent" | "merge";
+// executor / critic 原本是同一個 subAgent,2026-05-12 拆開:執行用高 capability(opus/gpt-5.5),
+// 審核可用便宜 model(sonnet/gpt-5.4-mini)省 token
+export type TaskClass = "qa" | "split" | "runner" | "executor" | "critic" | "merge";
 
 export type TaskModelConfig = {
   provider: Provider;
@@ -22,7 +24,7 @@ export type UserConfig = {
   defaults: Record<TaskClass, TaskModelConfig>;
 };
 
-export const TASK_CLASSES: TaskClass[] = ["qa", "split", "runner", "subAgent", "merge"];
+export const TASK_CLASSES: TaskClass[] = ["qa", "split", "runner", "executor", "critic", "merge"];
 export const PROVIDERS: Provider[] = ["claude", "codex"];
 
 // 每 provider 各自的 model / effort 允許字典。第一個元素是該 provider 預設值。
@@ -64,7 +66,10 @@ export const DEFAULT_USER_CONFIG: UserConfig = {
     qa: { provider: "claude", model: "claude-sonnet-4-6", effort: "low" },
     split: { provider: "claude", model: "claude-sonnet-4-6", effort: "low" },
     runner: { provider: "claude", model: "claude-opus-4-7", effort: "medium" },
-    subAgent: { provider: "claude", model: "claude-opus-4-7", effort: "high" },
+    // 執行AI:真的改 code,要 capability
+    executor: { provider: "claude", model: "claude-opus-4-7", effort: "high" },
+    // 審核AI:讀 diff 判 PASS/FAIL,sonnet + medium 已夠用,省 token
+    critic: { provider: "claude", model: "claude-sonnet-4-6", effort: "medium" },
     merge: { provider: "claude", model: "claude-opus-4-7", effort: "high" },
   },
 };
@@ -77,7 +82,8 @@ export const TASK_CLASS_LABELS: Record<TaskClass, string> = {
   qa: "QA Spec",
   split: "Ticket Split",
   runner: "Main Agent",
-  subAgent: "Sub Agent",
+  executor: "Executor",
+  critic: "Critic",
   merge: "Merge Agent",
 };
 
@@ -86,7 +92,8 @@ export const TASK_CLASS_HINTS: Record<TaskClass, string> = {
   qa: "規格收斂",
   split: "大任務拆分 Ticket",
   runner: "任務執行主 Agent",
-  subAgent: "執行AI / 審核AI",
+  executor: "執行AI(改 code)",
+  critic: "審核AI(判 PASS/FAIL)",
   merge: "合併衝突解決",
 };
 
