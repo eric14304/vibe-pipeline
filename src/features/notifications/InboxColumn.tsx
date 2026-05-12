@@ -71,10 +71,13 @@ function InboxStrip({
     }
     const el = pipsRef.current;
     if (!el) return;
-    const r = el.getBoundingClientRect();
+    // 抓被 preview 那顆 dot 的 rect,垂直對齊它;水平錨在 pips 區左外 8px
+    const dot = el.querySelectorAll<HTMLElement>(".inbox-strip-pip")[previewIdx];
+    const pipsRect = el.getBoundingClientRect();
+    const dotRect = dot?.getBoundingClientRect();
     setPreviewPos({
-      top: r.top + r.height / 2,
-      right: window.innerWidth - r.left + 8, // strip 左邊外 8px
+      top: dotRect ? dotRect.top + dotRect.height / 2 : pipsRect.top + pipsRect.height / 2,
+      right: window.innerWidth - pipsRect.left + 8,
     });
   }, [previewIdx]);
 
