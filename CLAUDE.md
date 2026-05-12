@@ -10,6 +10,7 @@
 - **Sync 重構(Plan C)**:`Pipeline.syncJob` 寄生欄位取代舊 `mode=sync` ticket;git-first → 衝突才 AI;新 4 endpoints `/sync` `/sync/ai` `/sync/cancel` `/sync/dismiss`。細節 → [`refs/sync-redesign-2026-05-13.md`](.claude/skills/vibe-pipeline/refs/sync-redesign-2026-05-13.md)
 - **`subAgent` 拆 `executor` + `critic`**:兩個獨立 TaskClass,critic 可挑便宜 model(sonnet+medium)省 token 5-10x;userConfig 自動 migrate(舊 subAgent → executor,critic 走 default)
 - **Client-side folder browser**:新 `GET /api/projects/browse?path=` endpoint,瀏覽器內導覽 host 上目錄;Tailscale 遠端開 project 走這個(native picker 跑在 host user 看不到 dialog)
+- **`vbpl` CLI 落地**:`cli/` 內,reuse `server/lib/*` 直接讀寫 fs(no HTTP)。4 nouns(project/pipeline/ticket/config)+ `--json` mode。`bun run vbpl <noun> <verb>`。約定見 [`vibe-pipeline-cli` SKILL](.claude/skills/vibe-pipeline-cli/SKILL.md)
 - **`pipelineDir.init` 改 idempotent**:`.vibe-pipeline/` partial init 殘骸自動補齊不報錯;`.gitignore` 自動補 `pipelines/`(原本漏)
 - **UX 收斂**:Pipeline 執行紀錄從 TicketDrawer 拆到 pipeline-level OverflowMenu;Inbox strip 整塊觸碰 + 滾輪 preview popover;QA reopen + viewOverride 雙向
 
@@ -36,7 +37,7 @@
 - Budget tracker UI(backend cost_limit_usd 已落地會擋 /run + 發 budget notif,UI 顯示「目前累積」之類的 dashboard 缺)
 - self-dogfood 不靠手動 merge 的方案 → merge worktree isolation,規模 ~150 行,看 [refs/merge-isolation-2026-05-11.md](.claude/skills/vibe-pipeline/refs/merge-isolation-2026-05-11.md);99% user 不踩,當前不投入
 - runner spawn 的 `--setting-sources` 還沒砍(留給 Task sub-agent 讀 user/project CLAUDE.md);若日後把 sub-agent context 全 push 進 prompt,可拿 ~13% 額外 cache 改善
-- **CLI(`vbpl` 暫定名)**:命名已 brainstorm 過,實作未啟動。長遠目標是讓 user 不開 browser 也能管 pipeline / ticket
+- **CLI 跨平台打包**:`vbpl` CLI 已落地(`cli/` 內,2026-05-13 merge 進 main),`bun run vbpl <noun> <verb>` 可用。**還沒做**:`bun build --compile` 打單一 binary(讓 user 不裝 Bun 就能跑)/ shell completion / `vbpl pipeline log --follow` log streaming
 - **iOS PWA push 實測**:iOS 16.4+ 已支援 Web Push 但需先「加入主畫面」,目前只在 Android 驗過
 - **背景 push 待人工觸發測試**:測過 `/api/push/test` 鎖屏可收;runner 真實 pipeline 完成事件 → push 還沒實機跑過(ticketWatcher 路徑已寫好,缺最後一哩驗證)
 - **runner 主 agent 鎖 claude**:SettingsPopover 雖然 runner 欄位讓 user 可選 codex,實際上 `runnerPrompt.ts` 全是 claude-isms(Task tool / subagent_type / Edit/Write 規則),codex 主 runner 跑起來會忽略 sub-agent 派發指令,iter 紀律破功。要支援 codex 主 runner 需 rewrite prompt provider-agnostic(Task tool 換成 Bash 派下一層 CLI 統一寫法)或寫 codex-flavored 變體,~200-300 行 prompt 重設計。目前最務實做法是 UI 禁掉 runner=codex 選項 / backend `getTaskConfig("runner")` 強制 fallback claude,但暫不擋(待真正實作前看是否有 user 誤選)
@@ -79,6 +80,12 @@ vibe-pipeline/
 │   └── icon-{192,512}.png     ImageMagick 從 SVG 產(`bun run icons`)
 ├── scripts/
 │   └── gen-icons.ts           SVG → PNG 工具腳本(需 ImageMagick)
+│
+├── cli/                       vbpl CLI。約定見 vibe-pipeline-cli SKILL
+│   ├── vbpl.ts                entry — parseArgs + dispatch noun → commands/*
+│   ├── commands/{project,pipeline,ticket,config}.ts   noun × verb 實作
+│   └── lib/{args,output,project}.ts                   參數解析 / 統一輸出 / project 解析
+│   (透過 import server/lib/* 直接讀寫 fs,不發 HTTP;bun run vbpl 入口)
 │
 ├── src/                       前端。約定見 vibe-pipeline-frontend SKILL
 │   ├── App.tsx                router (BrowserRouter + Routes)
@@ -246,10 +253,11 @@ routes:
 - `/board` → 主介面
 - `/dev/states` → 狀態 gallery(改 RunButton / ReadyBanner 視覺驗收)
 
-## 四 SKILL 對應路由
+## 五 SKILL 對應路由
 
 - 改前端(畫面 / 元件 / styles / route / API 串接) → **`vibe-pipeline-frontend`**
 - 做 backend(Bun server / fs / spawn / SQLite / runner / Q&A / budget) → **`vibe-pipeline-backend`**
+- 改 / 加 CLI 指令(`vbpl`,`cli/` 內) → **`vibe-pipeline-cli`**
 - 寫 / 改 / 跑 E2E(Playwright mock + real,覆蓋矩陣) → **`vibe-pipeline-e2e`**
 - 思考 scope / 決策優先順序 / 看完整功能清單 / 看外部產品對照 → **`vibe-pipeline`**(主)
 
