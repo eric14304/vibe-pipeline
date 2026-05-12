@@ -190,22 +190,34 @@
   gap: 0;
 }
 
-/* 每個 section 上方有分隔線 + 加大內距,視覺上明顯分組;第一段不要 border-top */
+/* section 之間用 label 本身的視覺份量做分隔(label 大 / 重 / 全色),border-top 退成淡淡的輔助線 */
 .tdrw-section {
-  padding: 14px 0 4px;
-  border-top: 1px solid var(--line);
+  padding: 16px 0 6px;
+  border-top: 1px solid var(--line-faint, var(--line));
 }
 .tdrw-section:first-child {
   border-top: 0;
-  padding-top: 10px;
+  padding-top: 8px;
 }
 .tdrw-section-label {
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--fg-mute);
-  margin-bottom: 8px;
+  letter-spacing: 0;
+  color: var(--fg);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+/* accent 色直條當 label 視覺錨點,user 一眼掃就抓到 section 起點 */
+.tdrw-section-label::before {
+  content: "";
+  display: inline-block;
+  width: 3px;
+  height: 14px;
+  background: var(--accent, #d4956d);
+  border-radius: 2px;
+  flex-shrink: 0;
 }
 .tdrw-section-body {
   font-size: 13px;
