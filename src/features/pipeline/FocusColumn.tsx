@@ -241,6 +241,9 @@ export function FocusColumn({
   // 跟 diffStat 同節奏:running/stopping 才 poll(base 那時可能被別條 pipeline 推進);
   // 其他 state 一次抓完,不同 pipeline.state 自動 refetch。
   const [behind, setBehind] = useState<number | null>(null);
+  // syncJob.state 也當 deps:user 點 ✕ 關掉 done/failed chip → syncJob undefined → 觸發 refetch
+  // 否則 chip 消失但「落後 N · 同步」按鈕要等下次 polling 才出現
+  const syncJobState = pipeline.syncJob?.state;
   useEffect(() => {
     if (!projectHash || pipeline.state === "planning") {
       setBehind(null);
@@ -262,7 +265,7 @@ export function FocusColumn({
       cancelled = true;
       if (id) clearInterval(id);
     };
-  }, [projectHash, pipeline.id, pipeline.state]);
+  }, [projectHash, pipeline.id, pipeline.state, syncJobState]);
 
   const totalCost = runs.reduce((sum, r) => sum + (r.costUsd ?? 0), 0);
   const lastRun = runs[0] ?? null;
