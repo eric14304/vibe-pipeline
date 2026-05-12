@@ -376,14 +376,44 @@ async function waitAndFinish(opts: {
     // 不是合法 JSON(可能 codex 不同格式)→ 直接看 stdout 字串
   }
 
-  const firstLine = (resultText.split(/\r?\n/, 1)[0] || "").trim();
-  const isPass = firstLine.startsWith("PASS");
+  // 不靠 AI 自然語言 — AI 可能把 PASS\nSYNC_DONE 寫在中段或結尾,first-line 判定會誤殺。
+  // 改用 git 實際狀態當 ground truth:
+  //   1. .git/MERGE_HEAD 不存在(merge 已 commit 收尾)
+  //   2. git status --porcelain 沒衝突行(沒 UU/AA 等)
+  //   3. behindBaseCount === 0(HEAD 已包含 base)
+  // 三條都成立 → 視為成功,完全不看 AI 字串。
+  const wtPath = worktree.worktreePath(projectPath, pipelineId);
+  const gitOk = async (args: string[]): Promise<{ ok: boolean; out: string }> => {
+    try {
+      const proc2 = Bun.spawn(["git", ...args], { cwd: wtPath, stdout: "pipe", stderr: "pipe" });
+      const out = await new Response(proc2.stdout).text();
+      const code = await proc2.exited;
+      return { ok: code === 0, out: out.trim() };
+    } catch {
+      return { ok: false, out: "" };
+    }
+  };
+  const statusRes = await gitOk(["status", "--porcelain"]);
+  const hasConflictMarkers = statusRes.ok && statusRes.out
+    .split(/\r?\n/)
+    .some((l) => /^(UU|AA|DD|AU|UA|DU|UD)\s/.test(l));
+  const mergeHeadExists = await (async () => {
+    try {
+      return require("node:fs").existsSync(require("node:path").join(wtPath, ".git", "MERGE_HEAD"));
+    } catch {
+      return false;
+    }
+  })();
 
   const p = (await pipelineDir.readPipeline(projectPath, pipelineId)) as PipelineLike | null;
   if (!p || !p.syncJob) return;
   const startedAt = p.syncJob.startedAt;
+  const baseBranch = p.baseBranch || "main";
+  const behindAfter = await worktree.behindBaseCount(projectPath, pipelineId, baseBranch);
 
-  if (isPass && exitCode === 0) {
+  const isPass = !hasConflictMarkers && !mergeHeadExists && behindAfter === 0;
+
+  if (isPass) {
     // 取 merge commit hash
     const headHash = await (async () => {
       try {
@@ -427,7 +457,15 @@ async function waitAndFinish(opts: {
   } else {
     // 失敗:abort merge 把 worktree 帶回原狀
     await worktree.mergeAbort(projectPath, pipelineId);
+    const gitReason = mergeHeadExists
+      ? "AI 沒完成 merge commit(MERGE_HEAD 還在)"
+      : hasConflictMarkers
+      ? "worktree 仍有未解衝突檔"
+      : behindAfter && behindAfter > 0
+      ? `worktree 仍落後 base ${behindAfter} commits`
+      : null;
     const reason =
+      gitReason ||
       stderrBuf.slice(0, 200) ||
       resultText.slice(0, 200) ||
       `${adapterName} 退出 code=${exitCode}`;

@@ -529,7 +529,10 @@ function SyncStatusBar({
   // 有 syncJob → 依 state 渲染
   if (j.state === "merging") {
     return (
-      <span className="sync-chip sync-chip-busy" title="git merge 進行中">
+      <span
+        className="sync-chip sync-chip-busy"
+        title={`git merge ${pipeline.baseBranch || "base"} 進行中(落後 ${j.behindCount} commits)`}
+      >
         <span className="qadr-thinking-dots" style={{ display: "inline-flex", verticalAlign: "middle" }}>
           <span /><span /><span />
         </span>
@@ -539,9 +542,15 @@ function SyncStatusBar({
   }
 
   if (j.state === "conflict_await") {
-    const n = j.conflictFiles?.length ?? 0;
+    const files = j.conflictFiles ?? [];
+    const n = files.length;
+    const tipPreview = files.slice(0, 8).join("\n");
+    const tipMore = files.length > 8 ? `\n…還有 ${files.length - 8} 檔` : "";
     return (
-      <span className="sync-chip sync-chip-conflict" title="git merge 撞到衝突,等使用者決定要不要讓 AI 解">
+      <span
+        className="sync-chip sync-chip-conflict"
+        title={`遇衝突 ${n} 檔(落後 ${j.behindCount} commits):\n${tipPreview}${tipMore}\n\n按 ✓ 讓 AI 解 / ✕ 跳過(abort merge)`}
+      >
         <span className="sync-chip-arrow" aria-hidden>!</span>
         遇衝突({n} 檔)
         <button
@@ -569,8 +578,14 @@ function SyncStatusBar({
   if (j.state === "ai_running") {
     const elapsedSec = Math.max(0, Math.round((Date.now() - j.startedAt) / 1000));
     void tick;
+    const files = j.conflictFiles ?? [];
+    const tipPreview = files.slice(0, 8).join("\n");
+    const tipMore = files.length > 8 ? `\n…還有 ${files.length - 8} 檔` : "";
     return (
-      <span className="sync-chip sync-chip-busy" title="AI 在解衝突">
+      <span
+        className="sync-chip sync-chip-busy"
+        title={`AI 解衝突中 · ${fmtElapsed(elapsedSec)} elapsed\n衝突檔(${files.length}):\n${tipPreview}${tipMore}`}
+      >
         <span className="qadr-thinking-dots" style={{ display: "inline-flex", verticalAlign: "middle" }}>
           <span /><span /><span />
         </span>
@@ -589,10 +604,12 @@ function SyncStatusBar({
   }
 
   if (j.state === "failed") {
+    const files = j.conflictFiles ?? [];
+    const tipPreview = files.length > 0 ? `\n衝突檔(${files.length}):\n${files.slice(0, 8).join("\n")}${files.length > 8 ? `\n…還有 ${files.length - 8} 檔` : ""}` : "";
     return (
       <span
         className="sync-chip sync-chip-failed"
-        title={j.reason || "同步失敗"}
+        title={`同步失敗(落後 ${j.behindCount} commits)\n原因:${j.reason || "(未知)"}${tipPreview}`}
       >
         <span className="sync-chip-arrow" aria-hidden>✕</span>
         同步失敗
@@ -619,8 +636,13 @@ function SyncStatusBar({
   }
 
   // done
+  const doneTitle = j.mergeCommit
+    ? `同步完成(merge commit ${j.mergeCommit.hash.slice(0, 7)})\n${j.mergeCommit.subject}`
+    : j.behindCount > 0
+    ? `同步完成(整合 ${j.behindCount} commits)`
+    : "已是最新,無需同步";
   return (
-    <span className="sync-chip sync-chip-done" title="同步完成">
+    <span className="sync-chip sync-chip-done" title={doneTitle}>
       <span className="sync-chip-arrow" aria-hidden>✓</span>
       已同步
       <button
