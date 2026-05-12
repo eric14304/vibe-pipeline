@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { CheckCircleIcon, FolderIcon, MergeIcon, PlusIcon, ProhibitIcon, RefreshIcon, TrashIcon } from "../../ui/icons";
 import { STATE_COLOR, STATE_LABEL, fmtElapsed, fmtDuration, normalizeVerdict } from "../../data/pipelines";
 import { MODE_LABELS } from "../../api/qa";
@@ -17,6 +18,7 @@ export function RunButton({
   lastRun,
   spawning = false,
   queuePosition,
+  syncActive = false,
 }: {
   pipeline: Pipeline;
   onRun?: (id: string) => void;
@@ -26,10 +28,24 @@ export function RunButton({
   // 避開「點下去看似沒反應」的視覺空窗(POST 回來到第一個 ticket 真跑可能 0-7s)
   spawning?: boolean;
   queuePosition?: number;
+  // syncJob.state ∈ {merging, conflict_await, ai_running} → RunButton 一律 disabled,避免撞 worktree
+  syncActive?: boolean;
 }) {
   const s = pipeline.state;
   const noTickets = pipeline.tickets.length === 0;
   const lastDur = lastRun?.durationMs ? fmtDuration(lastRun.durationMs) : null;
+
+  // sync 進行中:RunButton 完全鎖,顯示「同步中」覆蓋,避免 user 誤觸發 runner 撞 worktree
+  if (syncActive) {
+    return (
+      <button type="button" className="btn" disabled title="同步進行中,等同步收尾才能跑 ticket">
+        <span className="qadr-thinking-dots" style={{ display: "inline-flex", verticalAlign: "middle" }}>
+          <span /><span /><span />
+        </span>{" "}
+        同步中
+      </button>
+    );
+  }
 
   // spawning 期間統一顯「啟動中…」覆蓋掉原本的「開始/繼續/重試」狀態
   if (
@@ -417,6 +433,7 @@ export function FocusColumn({
               lastRun={lastRun}
               spawning={spawning}
               queuePosition={queuePosition}
+              syncActive={syncActive}
             />
             <OverflowMenu
               pipeline={pipeline}
@@ -596,7 +613,8 @@ function SyncConflictModal({
   const j = pipeline.syncJob;
   if (!j || j.state !== "conflict_await") return null;
   const files = j.conflictFiles ?? [];
-  return (
+  // Portal 到 body 避免被 focus-head 的 transform / overflow 鎖死
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
@@ -629,7 +647,8 @@ function SyncConflictModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
