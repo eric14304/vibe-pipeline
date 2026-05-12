@@ -20,6 +20,19 @@ export function selectFolder(): Promise<{ path: string }> {
   return call<{ path: string }>("/api/projects/select", { method: "POST" });
 }
 
+export type BrowseResult = {
+  path: string;
+  parent: string | null;
+  sep: string;
+  home: string;
+  entries: Array<{ name: string; isDir: boolean }>;
+};
+
+export function browseFolder(path?: string): Promise<BrowseResult> {
+  const q = path ? `?path=${encodeURIComponent(path)}` : "";
+  return call<BrowseResult>(`/api/projects/browse${q}`);
+}
+
 export function openProject(path: string): Promise<Project> {
   return call<Project>("/api/projects/open", { method: "POST", body: { path } });
 }

@@ -45,6 +45,61 @@ export async function openProject(req: Request): Promise<Response> {
   return ok(project);
 }
 
+// Client-side folder picker:列當前路徑下的子資料夾 + 系統 drives(Windows)/ home(POSIX)
+// 給遠端(Tailscale 手機)用,native picker 跑在 host 上看不到所以靠這個 browse
+export async function browseFolder(req: Request): Promise<Response> {
+  const url = new URL(req.url);
+  const queryPath = url.searchParams.get("path");
+
+  const { homedir } = await import("node:os");
+  const { readdirSync, statSync, existsSync } = await import("node:fs");
+  const { resolve: pathResolve, dirname, sep } = await import("node:path");
+
+  // 沒帶 path → home dir(Windows / POSIX 都對)
+  const target = queryPath && queryPath.trim() ? pathResolve(queryPath.trim()) : homedir();
+
+  if (!existsSync(target)) {
+    return err("invalid_path", `路徑不存在:${target}`, 404);
+  }
+  let st: ReturnType<typeof statSync>;
+  try {
+    st = statSync(target);
+  } catch (e) {
+    return err("invalid_path", `stat 失敗:${String(e)}`, 400);
+  }
+  if (!st.isDirectory()) {
+    return err("invalid_path", `不是資料夾:${target}`, 400);
+  }
+
+  let entries: Array<{ name: string; isDir: boolean }>;
+  try {
+    entries = readdirSync(target, { withFileTypes: true })
+      .filter((d) => !d.name.startsWith(".")) // 跳隱藏檔
+      .map((d) => ({ name: d.name, isDir: d.isDirectory() }))
+      .sort((a, b) => {
+        if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+  } catch (e) {
+    return err("permission_denied", `讀目錄失敗(權限?):${String(e)}`, 403);
+  }
+
+  // 算 parent;root(C:\ 或 /)沒 parent
+  const parent = (() => {
+    const p = dirname(target);
+    if (p === target) return null;
+    return p;
+  })();
+
+  return ok({
+    path: target,
+    parent,
+    sep,
+    entries,
+    home: homedir(),
+  });
+}
+
 export async function status(hash: string): Promise<Response> {
   const project = await projectStore.findByHash(hash);
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);

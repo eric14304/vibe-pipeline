@@ -130,6 +130,9 @@ async function handle(req: Request): Promise<Response> {
   if (pathname === "/api/projects/select" && method === "POST") {
     return projects.selectFolder();
   }
+  if (pathname === "/api/projects/browse" && method === "GET") {
+    return projects.browseFolder(req);
+  }
   if (pathname === "/api/projects/open" && method === "POST") {
     return projects.openProject(req);
   }

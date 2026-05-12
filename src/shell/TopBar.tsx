@@ -26,9 +26,24 @@ export function TopBar({
   const [error, setError] = useState<string | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const overflowRef = useRef<HTMLDivElement>(null);
-  // 手動路徑 modal — remote(Tailscale)用,native picker 在 host 上跳 user 看不到,改 user 自己打 path
-  const [pathDialogOpen, setPathDialogOpen] = useState(false);
-  const [pathInput, setPathInput] = useState("");
+  // Browser folder picker — remote(Tailscale)用,native picker 在 host 上跳 user 看不到,
+  // 改成 client-side browse:抓 host 上目錄列表,UI 點擊導覽 + 選擇
+  const [browseOpen, setBrowseOpen] = useState(false);
+  const [browseData, setBrowseData] = useState<api.BrowseResult | null>(null);
+  const [browseLoading, setBrowseLoading] = useState(false);
+
+  async function loadBrowse(path?: string) {
+    setBrowseLoading(true);
+    setError(null);
+    try {
+      const data = await api.browseFolder(path);
+      setBrowseData(data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBrowseLoading(false);
+    }
+  }
   // theme 來源:URL ?theme= override → localStorage → light
   // toggle 寫 localStorage 並同步 <html> class(useTheme hook 也會跑,雙保險;localStorage 觸發不了 React 重 render,所以這裡也手動 setIsDark)
   const [searchParams] = useSearchParams();
@@ -154,8 +169,8 @@ export function TopBar({
       const list = await api.listRecent();
       setRecents(list);
       setHash(project.hash);
-      setPathDialogOpen(false);
-      setPathInput("");
+      setBrowseOpen(false);
+      setBrowseData(null);
       setOpen(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -231,15 +246,15 @@ export function TopBar({
                 className="proj-menu-item proj-menu-item-action"
                 onClick={() => {
                   setOpen(false);
-                  setPathInput("");
                   setError(null);
-                  setPathDialogOpen(true);
+                  setBrowseOpen(true);
+                  void loadBrowse();
                 }}
                 disabled={busy}
-                title="遠端(Tailscale)無法用 native picker,改手動打 host 上的絕對路徑"
+                title="遠端(Tailscale)用 — 在瀏覽器內導覽 host 上目錄選擇"
               >
                 <FolderIcon />
-                <span>手動輸入路徑…</span>
+                <span>瀏覽資料夾…</span>
                 <span
                   className="mono"
                   style={{ marginLeft: "auto", fontSize: 10, color: "var(--fg-faint)" }}
@@ -338,44 +353,118 @@ export function TopBar({
           </div>
         </div>
       </div>
-      {pathDialogOpen && createPortal(
+      {browseOpen && createPortal(
         <div
           role="dialog"
           aria-modal="true"
           className="modal-backdrop"
           onClick={(e) => {
             if (e.target === e.currentTarget && !busy) {
-              setPathDialogOpen(false);
+              setBrowseOpen(false);
+              setBrowseData(null);
               setError(null);
             }
           }}
         >
-          <div className="modal-card">
-            <div className="modal-title">開啟專案(輸入路徑)</div>
+          <div className="modal-card" style={{ maxWidth: 600, width: "100%" }}>
+            <div className="modal-title">瀏覽資料夾</div>
             <div className="modal-body">
-              <p style={{ margin: "6px 0", fontSize: 13, color: "var(--fg-mute)" }}>
-                輸入 host 上的絕對路徑(遠端 Tailscale 連入時用,native 檔案總管只在 host 開)。
-              </p>
-              <input
-                autoFocus
-                className="qadr-input"
-                placeholder={isMac() ? "/Users/you/projects/foo" : "D:\\code\\foo"}
-                value={pathInput}
-                onChange={(e) => setPathInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    void openByPath(pathInput);
-                  } else if (e.key === "Escape") {
-                    if (!busy) {
-                      setPathDialogOpen(false);
-                      setError(null);
-                    }
-                  }
+              <div
+                className="mono"
+                style={{
+                  fontSize: 12,
+                  color: "var(--fg-mute)",
+                  padding: "8px 10px",
+                  background: "var(--panel-2, var(--bg))",
+                  border: "1px solid var(--line)",
+                  borderRadius: 6,
+                  wordBreak: "break-all",
+                  marginBottom: 10,
                 }}
-                disabled={busy}
-                style={{ width: "100%", marginTop: 8 }}
-              />
+                title="當前路徑"
+              >
+                {browseData?.path ?? "(loading…)"}
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  marginBottom: 8,
+                  flexWrap: "wrap",
+                }}
+              >
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => void loadBrowse(browseData?.parent ?? undefined)}
+                  disabled={!browseData?.parent || browseLoading}
+                  title="上一層"
+                >
+                  ↑ 上層
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => void loadBrowse(browseData?.home)}
+                  disabled={browseLoading || !browseData?.home}
+                  title="跳回 home"
+                >
+                  🏠 home
+                </button>
+              </div>
+              <div
+                style={{
+                  height: 280,
+                  overflowY: "auto",
+                  border: "1px solid var(--line)",
+                  borderRadius: 6,
+                  background: "var(--bg)",
+                }}
+              >
+                {browseLoading ? (
+                  <div style={{ padding: 16, color: "var(--fg-mute)" }}>載入中…</div>
+                ) : !browseData ? (
+                  <div style={{ padding: 16, color: "var(--fg-mute)" }}>—</div>
+                ) : browseData.entries.length === 0 ? (
+                  <div style={{ padding: 16, color: "var(--fg-mute)" }}>(空資料夾)</div>
+                ) : (
+                  browseData.entries.map((e) => (
+                    <button
+                      type="button"
+                      key={e.name}
+                      onClick={() => {
+                        if (!e.isDir) return;
+                        const next = browseData.path + (browseData.path.endsWith(browseData.sep) ? "" : browseData.sep) + e.name;
+                        void loadBrowse(next);
+                      }}
+                      disabled={!e.isDir || browseLoading}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        width: "100%",
+                        padding: "8px 12px",
+                        border: 0,
+                        background: "transparent",
+                        color: e.isDir ? "var(--fg)" : "var(--fg-faint)",
+                        cursor: e.isDir ? "pointer" : "default",
+                        fontSize: 13,
+                        textAlign: "left",
+                        borderBottom: "1px solid var(--line-faint, var(--line))",
+                      }}
+                      onMouseEnter={(ev) => {
+                        if (e.isDir) ev.currentTarget.style.background = "var(--hover, rgba(0,0,0,0.04))";
+                      }}
+                      onMouseLeave={(ev) => {
+                        ev.currentTarget.style.background = "transparent";
+                      }}
+                    >
+                      <span aria-hidden>{e.isDir ? "📁" : "📄"}</span>
+                      <span style={{ wordBreak: "break-all" }}>{e.name}</span>
+                    </button>
+                  ))
+                )}
+              </div>
               {error && (
                 <div
                   style={{
@@ -395,7 +484,8 @@ export function TopBar({
                 className="btn"
                 onClick={() => {
                   if (busy) return;
-                  setPathDialogOpen(false);
+                  setBrowseOpen(false);
+                  setBrowseData(null);
                   setError(null);
                 }}
                 disabled={busy}
@@ -405,10 +495,10 @@ export function TopBar({
               <button
                 type="button"
                 className="btn btn-primary"
-                onClick={() => void openByPath(pathInput)}
-                disabled={busy || !pathInput.trim()}
+                onClick={() => browseData && void openByPath(browseData.path)}
+                disabled={busy || !browseData}
               >
-                {busy ? "開啟中…" : "開啟"}
+                {busy ? "開啟中…" : "選擇此資料夾"}
               </button>
             </div>
           </div>
