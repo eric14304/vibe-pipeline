@@ -153,3 +153,70 @@ test("draft ticket(沒 done)不顯示重置按鈕", async ({ page }) => {
 
   await expect(page.locator("button", { hasText: "重置 ticket 狀態" })).toHaveCount(0);
 });
+
+test("iter ticket 審核 block:PASS 沒 feedback 顯 placeholder「(通過,無補充意見)」", async ({ page }) => {
+  // 2026-05-13 修法:critic PASS 不寫 feedback 是允許的(systemPrompt 寫「PASS 可空」)。
+  // UI 不再用 truthy check 隱藏整段,改顯灰字 italic placeholder,避免 user 誤以為審核沒跑。
+  proj = await createTempProject({
+    pipelines: [
+      {
+        id: "p1",
+        name: "td-pipe",
+        branch: "pipeline/td-pipe",
+        baseBranch: "main",
+        state: "ready",
+        tickets: [
+          {
+            id: "t-iter",
+            n: 1,
+            title: "iter-ticket",
+            goal: "g",
+            acceptance: ["a"],
+            prompt: "p",
+            mode: "iter",
+            status: "done",
+            iter: {
+              current: 2,
+              stage: "done",
+              verdicts: ["PARTIAL", "PASS"],
+              rounds: [
+                {
+                  n: 1,
+                  startedAt: Date.now() - 60_000,
+                  endedAt: Date.now() - 50_000,
+                  executorSummary: "Round 1 改了 X",
+                  criticVerdict: "PARTIAL",
+                  criticFeedback: "Round 1 還缺 Y",
+                },
+                {
+                  n: 2,
+                  startedAt: Date.now() - 30_000,
+                  endedAt: Date.now() - 20_000,
+                  executorSummary: "Round 2 補了 Y",
+                  criticVerdict: "PASS",
+                  criticFeedback: "",
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ],
+  });
+  await page.goto(`/board?project=${proj.hash}`);
+  await page.locator(".ticket", { hasText: "iter-ticket" }).click();
+  await expect(page.locator(".tdrw-drawer")).toBeVisible();
+
+  // 兩 round 都顯示 — 第二輪是 PASS + 空 feedback,審核 section 不該整段隱掉
+  const roundCards = page.locator(".tdrw-iter-round");
+  await expect(roundCards).toHaveCount(2);
+
+  // Round 2 內必須含「審核 回饋」label 跟 placeholder 文字
+  const round2 = roundCards.nth(1);
+  await expect(round2.locator(".tdrw-iter-round-label", { hasText: "審核 回饋" })).toBeVisible();
+  await expect(round2.locator(".tdrw-text", { hasText: "通過,無補充意見" })).toBeVisible();
+
+  // Round 1 PARTIAL 有實 feedback,placeholder 不該出現
+  const round1 = roundCards.nth(0);
+  await expect(round1.locator(".tdrw-text", { hasText: "Round 1 還缺 Y" })).toBeVisible();
+});
