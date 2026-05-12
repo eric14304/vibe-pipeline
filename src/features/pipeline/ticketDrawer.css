@@ -221,7 +221,7 @@
 }
 .tdrw-section-body {
   font-size: 13px;
-  color: var(--fg);
+  color: var(--fg-mute);
   line-height: 1.55;
 }
 .tdrw-text {
