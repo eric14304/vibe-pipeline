@@ -195,6 +195,8 @@ export function generatePipelineId(name: string): string {
 }
 
 export async function listPipelines(projectPath: string): Promise<unknown[]> {
+  // 按 id 倒序回(id 開頭是 hex timestamp,等同建立時間新→舊)。
+  // UI 把最新建的 pipeline 列在上面,user 不用滾到底找剛建的那條
   return readJsonDir(join(rootPath(projectPath), "pipelines"));
 }
 
@@ -202,7 +204,8 @@ async function readJsonDir(dir: string): Promise<unknown[]> {
   if (!existsSync(dir)) return [];
   const files = readdirSync(dir)
     .filter((f) => f.endsWith(".json"))
-    .sort();
+    // filename 開頭 = id(hex timestamp),反向排 = 新→舊
+    .sort((a, b) => b.localeCompare(a));
   const out: unknown[] = [];
   for (const f of files) {
     const text = await Bun.file(join(dir, f)).text();
