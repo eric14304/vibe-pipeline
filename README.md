@@ -43,20 +43,30 @@ bun run cli:build:linux     # Linux x64
 
 ## 架構
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│  Web UI (Vite + React 18)                                    │
-│   ↓ /api/* proxy                                             │
-│  Bun server (3001)                                           │
-│   ↓ spawn                                                    │
-│  AI runner (claude-code / codex CLI)                         │
-│   ↓ Task / Bash                                              │
-│  執行 AI sub-agent          審核 AI sub-agent                │
-│  (真的改 code,高 capability)  (讀 diff 判 PASS/FAIL,可便宜) │
-└──────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+  subgraph web["Web UI（Vite + React 18 / 5173）"]
+    ui[Board / Drawer / Settings]
+  end
+  subgraph backend["Bun server（3001）"]
+    routes[routes/*<br/>純 dispatch]
+    lib[lib/*<br/>業務邏輯]
+  end
+  subgraph runner["AI runner（claude / codex CLI 子程）"]
+    main[runner 主 agent]
+    exec[執行 AI sub-agent<br/>真的改 code<br/>高 capability]
+    crit[審核 AI sub-agent<br/>讀 diff 判 PASS/FAIL<br/>可用便宜 model]
+  end
+  cli[vbpl CLI]
 
-vbpl CLI ─── read 操作:直接 reuse server/lib/*
-         └── spawn / kill 操作:POST 給 backend(避免子程孤兒)
+  ui -->|"/api/* proxy"| routes
+  routes --> lib
+  lib -->|spawn| main
+  main -->|Task / Bash| exec
+  main -->|Task / Bash| crit
+
+  cli -.->|"read（list/show/status/log）<br/>reuse server/lib/* 直存 fs"| lib
+  cli -->|"spawn / kill 操作<br/>POST /api/* 避免子程孤兒"| routes
 ```
 
 每個 task class 的 AI 配置(model + reasoning effort 各自可選):
