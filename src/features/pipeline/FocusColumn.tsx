@@ -964,27 +964,31 @@ function TicketCard({
   const isPaused = ticket.status === "paused";
   const isDraft = ticket.status === "draft";
 
-  // Wall clock 計時:ticket.startedAt → Date.now()(running)/ ticket.endedAt(已結束)。
-  // 含暫停期間,但與 user 心智模型一致(「這 ticket 跑多久了」)。
-  // 沒有 ticket.startedAt(舊資料 / draft)時 fallback 用 rounds 總和。
-  // tick 只當 re-render 訊號,不參與計算
+  // Round-sum 計時:已完成 round 累加 + in-progress round live(到 Date.now())。
+  // 避免 wall-clock 把暫停 / 跨日的閒置時間也算進去(觀感「6 小時還沒跑完」其實多半在等 user)。
+  // tick 當 re-render 訊號,使 in-progress round 每秒重算
   void tick;
   let elapsed: number;
-  const ts = (ticket as { startedAt?: number; endedAt?: number }).startedAt;
-  const te = (ticket as { startedAt?: number; endedAt?: number }).endedAt;
-  if (typeof ts === "number") {
-    const end = isRunning ? Date.now() : (te ?? Date.now());
-    elapsed = Math.max(0, Math.round((end - ts) / 1000));
+  const rs = ticket.iter?.rounds ?? [];
+  if (rs.length > 0) {
+    const completedSec = rs.reduce(
+      (sum, r) => sum + (r.endedAt && r.startedAt ? Math.max(0, r.endedAt - r.startedAt) : 0),
+      0
+    ) / 1000;
+    const inProg = rs.find((r) => !r.endedAt);
+    const liveSec = isRunning && inProg?.startedAt
+      ? Math.max(0, (Date.now() - inProg.startedAt) / 1000)
+      : 0;
+    elapsed = Math.round(completedSec + liveSec);
   } else {
-    elapsed = ticket.iter?.totalElapsed
-      ?? (ticket.iter?.rounds
-        ? Math.round(
-            ticket.iter.rounds.reduce(
-              (sum, r) => sum + Math.max(0, (r.endedAt ?? r.startedAt) - r.startedAt),
-              0
-            ) / 1000
-          )
-        : 0);
+    const ts = (ticket as { startedAt?: number; endedAt?: number }).startedAt;
+    const te = (ticket as { startedAt?: number; endedAt?: number }).endedAt;
+    if (typeof ts === "number") {
+      const end = isRunning ? Date.now() : (te ?? Date.now());
+      elapsed = Math.max(0, Math.round((end - ts) / 1000));
+    } else {
+      elapsed = ticket.iter?.totalElapsed ?? 0;
+    }
   }
   const iterCurrentLabel = ticket.iter ? Math.max(1, ticket.iter.current) : 0;
   const accent = STATE_COLOR[ticket.status] || "var(--draft)";
@@ -1043,7 +1047,7 @@ function TicketCard({
           ticket.iter.stage !== "done";
         return (
           <>
-            {rounds.map((r) => (
+            {rounds.filter((r) => r.endedAt).map((r) => (
               <div key={r.n} className="ticket-iter ticket-iter-row">
                 <span className="iter-round-num mono">#{r.n}</span>
                 <IterStages
@@ -1053,24 +1057,26 @@ function TicketCard({
                   lastVerdict={r.criticVerdict}
                 />
                 <span className="iter-meta mono">
-                  {r.endedAt && r.startedAt
-                    ? fmtElapsed(Math.round((r.endedAt - r.startedAt) / 1000))
+                  {r.startedAt
+                    ? fmtElapsed(Math.round((r.endedAt! - r.startedAt) / 1000))
                     : "—"}
                 </span>
               </div>
             ))}
             {inProgress && (() => {
-              // in-progress round 沒 startedAt(runner 完成才 append rounds[]),
-              // 估算:用最後一筆 completed round 的 endedAt;否則用 ticket.startedAt
-              const lastEnded = rounds[rounds.length - 1]?.endedAt;
-              const roundStart = lastEnded ?? (ticket as { startedAt?: number }).startedAt;
+              // in-progress round 可能已有 startedAt(runner 開始即 append)或還沒 append。
+              // 優先用 in-progress round 自己的 startedAt;次選最後一筆 completed round 的 endedAt
+              const inProg = rounds.find((r) => !r.endedAt);
+              const completed = rounds.filter((r) => r.endedAt);
+              const lastEnded = completed[completed.length - 1]?.endedAt;
+              const roundStart = inProg?.startedAt ?? lastEnded ?? (ticket as { startedAt?: number }).startedAt;
               const live = typeof roundStart === "number"
                 ? Math.max(0, Math.round((Date.now() - roundStart) / 1000))
                 : 0;
               return (
                 <div className="ticket-iter ticket-iter-row">
                   <span className="iter-round-num mono">
-                    #{(ticket.iter?.current ?? 0) + 1}
+                    #{inProg?.n ?? (ticket.iter?.current ?? 0) + 1}
                   </span>
                   <IterStages
                     stage={ticket.iter!.stage}
