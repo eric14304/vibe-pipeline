@@ -1,29 +1,29 @@
 # vibe-pipeline
 
-Multi-AI agent ticket / pipeline orchestrator. Each ticket is run by an **executor** AI and reviewed by a **critic** AI; iterative tickets auto-loop until the critic passes. Pipelines are ordered tickets that run on isolated git branches and merge back when done.
+多 AI agent(執行 + 審核)的 ticket / pipeline 編排器。每張 ticket 由 **執行 AI** 跑、**審核 AI** 審,迭代模式自動迴圈到審核 pass。Pipeline 是有序 ticket 列表,跑在獨立 git branch 上,完成後 merge 回 base。
 
-Web UI for daily use, `vbpl` CLI for terminal workflows. Backend reuses the same modules either way (no HTTP-only paths).
+平常用 Web UI,終端機則有 `vbpl` CLI。兩邊共用同一套 backend lib,沒有 HTTP-only 路徑。
 
 ---
 
-## Quick start
+## 快速開始
 
-Requires [Bun](https://bun.sh) (≥ 1.1) + Git.
+需要 [Bun](https://bun.sh)(≥ 1.1)+ Git。
 
 ```bash
 bun install
-bun run dev:all       # vite (5173) + bun server (3001) concurrent
-# open http://127.0.0.1:5173/board
+bun run dev:all       # vite (5173) + bun server (3001) 同時跑
+# 開 http://127.0.0.1:5173/board
 ```
 
-Or run them separately:
+或分開跑:
 
 ```bash
-bun run dev           # frontend
-bun run server        # backend
+bun run dev           # 前端
+bun run server        # 後端
 ```
 
-Build CLI binary:
+打包 CLI 成單檔 binary:
 
 ```bash
 bun run cli:build           # Windows
@@ -34,7 +34,7 @@ bun run cli:build:linux     # Linux x64
 
 ---
 
-## Architecture
+## 架構
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -44,130 +44,130 @@ bun run cli:build:linux     # Linux x64
 │   ↓ spawn                                                    │
 │  AI runner (claude-code / codex CLI)                         │
 │   ↓ Task / Bash                                              │
-│  Executor sub-agent          Critic sub-agent                │
-│   (real edits, high-cap)      (read-only diff judge)         │
+│  執行 AI sub-agent          審核 AI sub-agent                │
+│  (真的改 code,高 capability)  (讀 diff 判 PASS/FAIL,可便宜) │
 └──────────────────────────────────────────────────────────────┘
 
-`vbpl` CLI ─── reuses server/lib/* directly for read ops
-           └── POSTs to backend for spawn/kill ops
+vbpl CLI ─── read 操作:直接 reuse server/lib/*
+         └── spawn / kill 操作:POST 給 backend(避免子程孤兒)
 ```
 
-Per-task AI configuration (model + reasoning effort):
+每個 task class 的 AI 配置(model + reasoning effort 各自可選):
 
-| Task class | Default | What it does |
+| Task class | 預設 | 用途 |
 |---|---|---|
-| `qa` | sonnet-4-6 / low | Conversational ticket spec refinement |
-| `split` | sonnet-4-6 / low | One-shot "is this 1 ticket or N?" splitter |
-| `runner` | opus-4-7 / medium | Pipeline main agent (orchestrates tickets) |
-| `executor` | opus-4-7 / high | Writes / edits code |
-| `critic` | sonnet-4-6 / medium | Reads diff, PASS / FAIL / PARTIAL |
-| `merge` | opus-4-7 / high | Conflict resolution on merge |
+| `qa` | sonnet-4-6 / low | 跟 user 對話收斂 ticket 規格 |
+| `split` | sonnet-4-6 / low | One-shot 判「這該拆 N 張」 |
+| `runner` | opus-4-7 / medium | Pipeline 主 agent(編排 ticket) |
+| `executor` | opus-4-7 / high | 寫 / 改 code |
+| `critic` | sonnet-4-6 / medium | 讀 diff,PASS / FAIL / PARTIAL |
+| `merge` | opus-4-7 / high | 衝突解 |
 
-User can swap providers (claude / codex) and models per task class from Settings.
+從 Settings 可逐項切 provider(claude / codex)+ model。
 
 ---
 
-## Features
+## 功能
 
-- **Pipeline = ordered ticket list** on its own git branch, runs in `~/.vibe-pipeline/worktrees/<projHash>/<pipelineId>/`
-- **QA drawer**: chat with AI to spec out a ticket; auto-splits when the AI sees the scope spans multiple independent tickets
-- **Iterative mode**: executor → critic → retry loop until PASS or iter limit
-- **Auto-merge** (when all tickets done + `autoMerge=true`): backend tries pure `git merge --no-ff` first; only spawns AI if there's a real conflict
-- **Sync**: pull base branch into a pipeline's worktree, same git-first → AI-on-conflict flow
-- **Cross-provider sub-agents**: claude main → Task tool; codex → Bash directly to `codex exec`
-- **PWA + Tailscale + TOTP**: run desktop server, access from phone via Tailscale HTTPS, TOTP-gated for non-loopback access, FCM push for ticket events
-- **CLI `vbpl`**: 4 nouns (project / pipeline / ticket / config), `--json` mode for scripting; spawn ops go through backend HTTP so children don't orphan
-- **State recovery**: crash-safe — server boot scans pipelines and reconciles `running`/`stopping` stale states; runtime watchdog catches dead PIDs
+- **Pipeline = 有序 ticket 列表**,跑在獨立 git branch,worktree 隔離在 `~/.vibe-pipeline/worktrees/<projHash>/<pipelineId>/`
+- **QA drawer**:跟 AI 聊出 ticket 規格;AI 看到 scope 跨多件獨立工作會自動建議拆分
+- **迭代模式**:執行 → 審核 → retry 迴圈到 PASS 或達 iter 上限
+- **自動合併**(全 ticket done + `autoMerge=true`):後端先試純 `git merge --no-ff`,撞衝突才 spawn AI
+- **同步**:把 base 拉進 pipeline worktree,同 git-first → 衝突才 AI 的二段式
+- **跨 provider sub-agent**:claude main → Task tool;codex → Bash 直呼 `codex exec`
+- **PWA + Tailscale + TOTP**:桌機跑 server,手機透過 Tailscale HTTPS 連入,非 loopback 強制 TOTP,FCM push ticket 事件到手機
+- **CLI `vbpl`**:4 nouns(project / pipeline / ticket / config)+ `--json` mode;spawn 操作走 backend HTTP 避免子程孤兒
+- **狀態恢復**:server 重啟時自動掃 pipeline 收斂 stale `running`/`stopping`;runtime watchdog 抓死 PID
 
 ---
 
 ## CLI
 
 ```bash
-# Install (after `bun run cli:build`)
-mkdir ~/bin && cp dist-cli/vbpl* ~/bin/   # add ~/bin to PATH
+# 安裝(跑完 bun run cli:build 後)
+mkdir ~/bin && cp dist-cli/vbpl* ~/bin/   # 把 ~/bin 加進 PATH
 
-# Common verbs
+# 常用指令
 vbpl project list
 vbpl pipeline list --project <hash>
 vbpl pipeline status <id>
-vbpl pipeline run <id>                                          # spawn runner (needs backend)
-vbpl pipeline log <id>                                          # past run summaries
+vbpl pipeline run <id>                                          # 啟動 runner(需要 backend)
+vbpl pipeline log <id>                                          # 過往 run 摘要
 vbpl ticket add --pipeline <id> --title "..." --mode iter
 vbpl config set runner.model claude-opus-4-7
 vbpl pipeline sync <id>                                         # git merge base → worktree
-vbpl pipeline sync <id> --ai                                    # AI resolves conflicts
-vbpl pipeline merge <id>                                        # AI merge to base
+vbpl pipeline sync <id> --ai                                    # 讓 AI 解衝突
+vbpl pipeline merge <id>                                        # AI merge 回 base
 ```
 
-`--json` works on every verb for piping into `jq` / PowerShell `ConvertFrom-Json`.
+每個 verb 都吃 `--json`,搭配 `jq` / PowerShell `ConvertFrom-Json` 寫 script 用。
 
 ---
 
-## Remote access (Tailscale)
+## 遠端存取(Tailscale)
 
-1. Install Tailscale on host + phone (same tailnet)
-2. `tailscale serve --https=443 http://localhost:5173` on host
-3. Open `https://<machine>.<tailnet>.ts.net` on phone, install as PWA
-4. First connection from non-loopback → TOTP setup (scan QR with Authenticator app, then login each new session)
-5. Enable push in Settings → 「Push Notifications」 to get ticket events on phone
+1. 桌機 + 手機都裝 Tailscale,登入同 tailnet
+2. 桌機跑 `tailscale serve --https=443 http://localhost:5173`
+3. 手機開 `https://<machine>.<tailnet>.ts.net`,安裝成 PWA
+4. 首次非 loopback 連線 → TOTP 設定(掃 QR 加進 Authenticator,之後每個 session 輸入 6 碼登入)
+5. Settings →「Push Notifications」開啟推播,ticket 事件會到手機
 
-See [`CLAUDE.md`](CLAUDE.md) § 手機遠端使用方式 for FCM service-account setup.
+詳細 FCM service-account 設定見 [`CLAUDE.md`](CLAUDE.md) § 手機遠端使用方式。
 
 ---
 
-## Repo layout
+## Repo 結構
 
 ```
-src/         frontend (Vite + React)
-server/      Bun backend (one route file per domain, lib/ for pure logic)
-cli/         vbpl CLI (reuses server/lib/*)
-shared/      cross-side persistence types
-.claude/     skills / refs for AI editors working on this repo
-public/      static (PWA manifest, service worker, icons)
-tests/e2e/   Playwright (mock CI mode + real mode)
+src/         前端(Vite + React)
+server/      Bun 後端(routes 純 dispatch,lib/ 純邏輯)
+cli/         vbpl CLI(reuse server/lib/*)
+shared/      跨前後端持久化型別
+.claude/     給編輯本 repo 的 AI 用的 SKILL / refs
+public/      靜態(PWA manifest、service worker、icons)
+tests/e2e/   Playwright(mock CI 模式 + real 模式)
 ```
 
-Each layer has a SKILL doc under `.claude/skills/` describing conventions in detail — read those before non-trivial changes:
+每層有對應 SKILL 文件在 `.claude/skills/` 內描述慣例 — 動非 trivial 改動前先讀:
 
-- [vibe-pipeline](.claude/skills/vibe-pipeline/SKILL.md) — product / scope / refs
-- [vibe-pipeline-frontend](.claude/skills/vibe-pipeline-frontend/SKILL.md) — UI conventions
+- [vibe-pipeline](.claude/skills/vibe-pipeline/SKILL.md) — 產品定位 / scope / 外部對照
+- [vibe-pipeline-frontend](.claude/skills/vibe-pipeline-frontend/SKILL.md) — UI 慣例
 - [vibe-pipeline-backend](.claude/skills/vibe-pipeline-backend/SKILL.md) — server / runner / sync
-- [vibe-pipeline-cli](.claude/skills/vibe-pipeline-cli/SKILL.md) — CLI conventions
-- [vibe-pipeline-e2e](.claude/skills/vibe-pipeline-e2e/SKILL.md) — Playwright coverage matrix
+- [vibe-pipeline-cli](.claude/skills/vibe-pipeline-cli/SKILL.md) — CLI 慣例
+- [vibe-pipeline-e2e](.claude/skills/vibe-pipeline-e2e/SKILL.md) — Playwright 覆蓋矩陣
 
 ---
 
-## Status
+## 當前狀態
 
-Phase 1-5 landed (CRUD + QA + Runner + Worktree + Merge/Sync + Auto + Tailscale + TOTP + FCM + cross-provider sub-agent + CLI). Self-dogfooding: the project manages its own development via its own pipelines.
+Phase 1-5 全套已落地(CRUD + QA + Runner + Worktree + Merge/Sync + Auto + Tailscale + TOTP + FCM + cross-provider sub-agent + CLI)。**Self-dogfood**:本專案靠自己的 pipeline 推進自己的開發。
 
-Currently working but not polished:
-- Budget tracker UI (cost limits already enforced server-side, missing dashboard)
-- Transient retry fixture (no natural reproduction case yet)
-- iOS PWA push (Android verified, iOS needs manual install + 16.4+)
-- `vbpl pipeline log --follow` (currently one-shot, not tailing)
+可運作但未打磨:
+- Budget tracker UI(成本上限後端已強制執行,缺前端 dashboard)
+- Transient retry fixture(沒自然 reproduction case)
+- iOS PWA push(Android 驗過,iOS 需手動「加入主畫面」+ 16.4 以上)
+- `vbpl pipeline log --follow`(目前 one-shot 不會 tail)
 
 ---
 
 ## Scripts
 
-| Command | Purpose |
+| 指令 | 用途 |
 |---|---|
-| `bun run dev` | Vite frontend (5173) |
-| `bun run server` | Bun backend (3001, no watch) |
-| `bun run server:watch` | Backend with hot reload (don't use during self-merge — `bun --watch` reload kills spawned runner children) |
-| `bun run dev:all` | Both concurrently |
+| `bun run dev` | Vite 前端(5173) |
+| `bun run server` | Bun 後端(3001,不 watch) |
+| `bun run server:watch` | 後端熱重載(self-merge 期間別用 — `bun --watch` reload 會殺掉 spawn 出去的 runner 子程) |
+| `bun run dev:all` | 同時跑兩個 |
 | `bun run build` | `tsc -b && vite build` |
 | `bun run lint` | Biome lint |
-| `bun run test:e2e` | Playwright mock mode (CI default) |
-| `bun run test:e2e:real` | Playwright real mode (burns tokens; opt-in) |
-| `bun run vbpl <noun> <verb>` | CLI dev mode (no rebuild) |
-| `bun run cli:build` | Compile CLI to single binary |
-| `bun run icons` | Regenerate PWA icons from `public/icon.svg` (needs ImageMagick) |
+| `bun run test:e2e` | Playwright mock 模式(CI 預設) |
+| `bun run test:e2e:real` | Playwright real 模式(燒 token,opt-in) |
+| `bun run vbpl <noun> <verb>` | CLI 開發模式(不用每次 rebuild) |
+| `bun run cli:build` | 把 CLI 編成單檔 binary |
+| `bun run icons` | 從 `public/icon.svg` 重產 PWA icons(需 ImageMagick) |
 
 ---
 
 ## License
 
-No license declared — currently for personal / collaborator use. Open an issue if you want clarification on a specific use case.
+目前未明確開放,以個人 / 協作使用為主。要釐清特定用途請開 issue。
