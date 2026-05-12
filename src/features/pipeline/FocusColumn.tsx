@@ -606,10 +606,12 @@ function SyncStatusBar({
   if (j.state === "failed") {
     const files = j.conflictFiles ?? [];
     const tipPreview = files.length > 0 ? `\n衝突檔(${files.length}):\n${files.slice(0, 8).join("\n")}${files.length > 8 ? `\n…還有 ${files.length - 8} 檔` : ""}` : "";
+    // reason 可能是 AI raw stdout(幾百字),截短避免 tooltip 爆炸
+    const shortReason = (j.reason || "(未知)").slice(0, 200);
     return (
       <span
         className="sync-chip sync-chip-failed"
-        title={`同步失敗(落後 ${j.behindCount} commits)\n原因:${j.reason || "(未知)"}${tipPreview}`}
+        title={`同步失敗(落後 ${j.behindCount} commits)\n原因:${shortReason}${tipPreview}`}
       >
         <span className="sync-chip-arrow" aria-hidden>✕</span>
         同步失敗
