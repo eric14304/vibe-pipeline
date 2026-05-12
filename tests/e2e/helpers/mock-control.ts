@@ -47,6 +47,15 @@ export async function setQAScript(projectHash: string, replies: QAReply[]): Prom
   await post("/script/qa", { hash: projectHash, replies });
 }
 
+import type { TicketSpec } from "../../../shared/types";
+
+export async function setSplitScript(
+  projectHash: string,
+  specs: TicketSpec[]
+): Promise<void> {
+  await post("/script/split", { hash: projectHash, specs });
+}
+
 export async function setRunnerScript(
   projectHash: string,
   pipelineId: string,

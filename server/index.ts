@@ -87,6 +87,8 @@ async function handle(req: Request): Promise<Response> {
       return test.setQAScript(req);
     if (pathname === "/api/__test/script/runner" && method === "POST")
       return test.setRunnerScript(req);
+    if (pathname === "/api/__test/script/split" && method === "POST")
+      return test.setSplitScript(req);
     if (pathname === "/api/__test/reset" && method === "POST") return test.reset();
     if (pathname === "/api/__test/fcm/calls" && method === "GET") return test.fcmCalls();
     if (pathname === "/api/__test/fcm/reset" && method === "POST") return test.fcmReset();

@@ -200,7 +200,7 @@ export async function previewSplit(hash: string, draftId: string, req: Request):
   const finalSpec = { ...draft.spec, ...edits } as TicketSpec;
 
   try {
-    const specs = await splitTicketSpec({ cwd: project.path, spec: finalSpec });
+    const specs = await splitTicketSpec({ cwd: project.path, spec: finalSpec, projectHash: hash });
     return ok({ count: specs.length, specs });
   } catch (e) {
     // 失敗 → 回 count=1,讓前端走預設「直接 finalize 1 張」path,不擋 user
@@ -324,7 +324,7 @@ export async function splitTicket(
 
   let split: TicketSpec[];
   try {
-    split = await splitTicketSpec({ cwd: project.path, spec });
+    split = await splitTicketSpec({ cwd: project.path, spec, projectHash: hash });
   } catch (e) {
     if (e instanceof SplitError) {
       return err("internal_error", `拆分失敗 (${e.code}): ${e.message}`, 502);

@@ -3,7 +3,7 @@
 //
 // 重要:不能用 inline backtick(踩過兩次),所有 inline code 用單引號或不框。
 
-import { isTestMode } from "../testMode";
+import { isTestMode, getSplitScript } from "../testMode";
 import type { TicketSpec } from "../../../shared/types";
 import { getTaskConfigWithAdapter } from "../userConfig";
 
@@ -62,11 +62,17 @@ export type SplitResult = TicketSpec[];
 export async function splitTicketSpec(opts: {
   cwd: string;
   spec: TicketSpec;
+  projectHash?: string;
 }): Promise<SplitResult> {
-  const { cwd, spec } = opts;
+  const { cwd, spec, projectHash } = opts;
 
-  // E2E mock:回單元素「不拆」測試 path。真實拆要靠真 claude
+  // E2E mock:有設 split script 走預定義 splitInto;沒設則回單元素「不拆」path。
+  // 真實拆要靠真 claude
   if (isTestMode()) {
+    if (projectHash) {
+      const scripted = getSplitScript(projectHash);
+      if (scripted && scripted.length > 0) return scripted;
+    }
     return [spec];
   }
 

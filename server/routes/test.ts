@@ -10,6 +10,7 @@ import { fakeFcmCalls, resetFakeFcmCalls } from "../lib/fcm";
 import { vibeHome } from "../lib/paths";
 import type { QAReply } from "../lib/qa/schema";
 import type { RunnerScript } from "../lib/testMode";
+import type { TicketSpec } from "../../shared/types";
 
 function ok(data: unknown): Response {
   return Response.json({ ok: true, data });
@@ -79,6 +80,21 @@ export async function setRunnerScript(req: Request): Promise<Response> {
   }
   testMode.setRunnerScript(body.hash, body.pipelineId, body.script);
   return ok({ ticketCount: body.script.tickets.length });
+}
+
+// POST /api/__test/script/split
+// body: { hash: string, specs: TicketSpec[] }
+// 設定 inline AI 拆分 mock 結果:specs.length>=2 → 拆成 N 張;length 1 → nothingToSplit
+export async function setSplitScript(req: Request): Promise<Response> {
+  const body = (await req.json().catch(() => ({}))) as {
+    hash?: string;
+    specs?: TicketSpec[];
+  };
+  if (!body.hash || !Array.isArray(body.specs)) {
+    return err("bad_request", "hash + specs[] required");
+  }
+  testMode.setSplitScript(body.hash, body.specs);
+  return ok({ count: body.specs.length });
 }
 
 // POST /api/__test/reset
