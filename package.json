@@ -15,7 +15,10 @@
     "test:e2e": "playwright test --config=tests/e2e/playwright.config.ts",
     "test:e2e:real": "playwright test --config=tests/e2e/playwright.real.config.ts",
     "icons": "bun run scripts/gen-icons.ts",
-    "vbpl": "bun run cli/vbpl.ts"
+    "vbpl": "bun run cli/vbpl.ts",
+    "cli:build": "bun build --compile --minify --target=bun-windows-x64 cli/vbpl.ts --outfile dist-cli/vbpl.exe",
+    "cli:build:mac": "bun build --compile --minify --target=bun-darwin-arm64 cli/vbpl.ts --outfile dist-cli/vbpl-mac",
+    "cli:build:linux": "bun build --compile --minify --target=bun-linux-x64 cli/vbpl.ts --outfile dist-cli/vbpl-linux"
   },
   "dependencies": {
     "firebase": "^12.13.0",
