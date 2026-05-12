@@ -144,8 +144,8 @@ export async function init(hash: string): Promise<Response> {
   const project = await projectStore.findByHash(hash);
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);
   if (!validProjectPath(project.path)) return err("invalid_path", `Path missing: ${project.path}`);
-  if (pipelineDir.hasInit(project.path))
-    return err("already_initialized", `.vibe-pipeline/ already exists in ${project.path}`);
+  // pipelineDir.init 已 idempotent(2026-05-12 改):.vibe-pipeline/ 已存在但內容缺 → 補齊,
+  // 不再 throw already_initialized。route 層也不再前置擋 hasInit。
   try {
     await pipelineDir.init(project.path);
   } catch (e) {
