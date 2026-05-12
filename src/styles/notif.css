@@ -161,11 +161,10 @@
   margin-top: 4px;
 }
 
-/* preview popover:hover/wheel 時 slide 出來。絕對定位錨在 strip 右邊外(strip 在右側欄,popover 往左展) */
+/* preview popover:portal 到 body,fixed 定位避開 .inbox-col 的 overflow:hidden;
+   位置在 InboxColumn.tsx 內用 getBoundingClientRect 計算後 inline style 灌進來 */
 .inbox-strip-preview {
-  position: absolute;
-  right: calc(100% + 8px);
-  top: 50%;
+  position: fixed;
   transform: translateY(-50%);
   min-width: 260px;
   max-width: 320px;
@@ -175,7 +174,7 @@
   border-left: 3px solid var(--preview-color, var(--accent));
   border-radius: 8px;
   box-shadow: var(--shadow-lg, 0 8px 24px rgba(0,0,0,0.3));
-  z-index: 100;
+  z-index: 1000;
   animation: fadeUp 120ms ease-out both;
   pointer-events: none; /* hover preview 期間不擋滑鼠回到 strip 上 */
 }

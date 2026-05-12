@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { BellIcon, ChevronRightIcon, CloseIcon, InboxEmptyIcon } from "../../ui/icons";
 // strip 改 bell + 數字 badge 一顆按鈕(取代原本 ChevronLeft 展開鈕 + 獨立 count box 兩件)。
 import { SEV_COLOR } from "../../data/notifications";
@@ -60,6 +61,22 @@ function InboxStrip({
 
   const [previewIdx, setPreviewIdx] = useState<number | null>(null);
   const stripRef = useRef<HTMLDivElement>(null);
+  const pipsRef = useRef<HTMLButtonElement>(null);
+  // popover 用 portal 跳出 .inbox-col 的 overflow:hidden,改 fixed 定位
+  const [previewPos, setPreviewPos] = useState<{ top: number; right: number } | null>(null);
+  useEffect(() => {
+    if (previewIdx === null) {
+      setPreviewPos(null);
+      return;
+    }
+    const el = pipsRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setPreviewPos({
+      top: r.top + r.height / 2,
+      right: window.innerWidth - r.left + 8, // strip 左邊外 8px
+    });
+  }, [previewIdx]);
 
   // wheel 換 preview 項。preventDefault 不讓頁面跟著捲(passive: false)
   useEffect(() => {
@@ -113,6 +130,7 @@ function InboxStrip({
 
       {/* dots 區整塊當一個觸碰區:click 跳當前 preview 項,沒 preview 就展開 inbox */}
       <button
+        ref={pipsRef}
         type="button"
         className="inbox-strip-pips"
         onClick={() => {
@@ -157,10 +175,14 @@ function InboxStrip({
       <div className="inbox-strip-spacer"></div>
       <div className="inbox-strip-label">INBOX</div>
 
-      {previewItem && (
+      {previewItem && previewPos && createPortal(
         <div
           className="inbox-strip-preview"
-          style={{ ["--preview-color" as string]: SEV_COLOR[previewItem.sev] } as React.CSSProperties}
+          style={{
+            ["--preview-color" as string]: SEV_COLOR[previewItem.sev],
+            top: previewPos.top,
+            right: previewPos.right,
+          } as React.CSSProperties}
         >
           <div className="inbox-strip-preview-head">
             <span className={"inbox-strip-preview-dot is-" + previewItem.sev} />
@@ -173,7 +195,8 @@ function InboxStrip({
             {previewItem.ts} · {previewIdx! + 1}/{visible.length}
             {previewItem.unread ? " · 未讀" : ""}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
