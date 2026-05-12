@@ -105,15 +105,17 @@ export function TopBar({
     };
   }, [overflowOpen]);
 
-  // ⌘O / Ctrl+O 開選資料夾(對應 menu 裡的 kbd hint)
-  // pickAndOpen 用 closure capture state(busy),不放進 deps 避免每 render 重綁
-  // biome-ignore lint/correctness/useExhaustiveDependencies: pickAndOpen 不放 deps 避免每 render 重綁聽器
+  // ⌘O / Ctrl+O 開瀏覽資料夾 modal(對應 menu 裡的 kbd hint)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: 不放 deps 避免每 render 重綁聽器
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const isMod = e.metaKey || e.ctrlKey;
       if (isMod && (e.key === "o" || e.key === "O")) {
         e.preventDefault();
-        pickAndOpen();
+        if (busy) return;
+        setError(null);
+        setBrowseOpen(true);
+        void loadBrowse();
       }
     }
     document.addEventListener("keydown", onKey);
@@ -121,26 +123,6 @@ export function TopBar({
   }, []);
 
   const active = recents.find((p) => p.hash === hash) ?? null;
-
-  async function pickAndOpen() {
-    if (busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const { path } = await api.selectFolder();
-      const project = await api.openProject(path);
-      const list = await api.listRecent();
-      setRecents(list);
-      setHash(project.hash);
-      setOpen(false);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      const code = (e as { code?: string }).code;
-      if (code !== "dialog_cancelled") setError(msg);
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function selectExisting(p: Project) {
     setBusy(true);
@@ -230,17 +212,6 @@ export function TopBar({
                 </button>
               ))}
               <div className="proj-menu-divider" />
-              <button type="button"
-                className="proj-menu-item proj-menu-item-action"
-                onClick={pickAndOpen}
-                disabled={busy}
-              >
-                <PlusIcon />
-                <span>{busy ? "開啟中…" : "選擇其他資料夾…"}</span>
-                <span className="kbd mono" style={{ marginLeft: "auto" }}>
-                  {isMac() ? "⌘O" : "Ctrl+O"}
-                </span>
-              </button>
               <button
                 type="button"
                 className="proj-menu-item proj-menu-item-action"
@@ -251,15 +222,12 @@ export function TopBar({
                   void loadBrowse();
                 }}
                 disabled={busy}
-                title="遠端(Tailscale)用 — 在瀏覽器內導覽 host 上目錄選擇"
+                title="瀏覽器內導覽 host 上目錄(local + Tailscale 遠端都用同一套)"
               >
-                <FolderIcon />
-                <span>瀏覽資料夾…</span>
-                <span
-                  className="mono"
-                  style={{ marginLeft: "auto", fontSize: 10, color: "var(--fg-faint)" }}
-                >
-                  Tailscale
+                <PlusIcon />
+                <span>選擇其他資料夾…</span>
+                <span className="kbd mono" style={{ marginLeft: "auto" }}>
+                  {isMac() ? "⌘O" : "Ctrl+O"}
                 </span>
               </button>
               {error && (
