@@ -1271,11 +1271,14 @@ function TicketCard({
   let elapsed: number;
   const rs = ticket.iter?.rounds ?? [];
   if (rs.length > 0) {
+    // 完成 round 的定義跟下方 IterRounds 渲染一致:endedAt + criticVerdict 都有才算完成
+    // (runner 提早寫 endedAt 但 verdict 還空,該 round 仍視為進行中)
     const completedSec = rs.reduce(
-      (sum, r) => sum + (r.endedAt && r.startedAt ? Math.max(0, r.endedAt - r.startedAt) : 0),
+      (sum, r) =>
+        sum + (r.endedAt && r.criticVerdict && r.startedAt ? Math.max(0, r.endedAt - r.startedAt) : 0),
       0
     ) / 1000;
-    const inProg = rs.find((r) => !r.endedAt);
+    const inProg = rs.find((r) => !r.endedAt || !r.criticVerdict);
     const liveSec = isRunning && inProg?.startedAt
       ? Math.max(0, (Date.now() - inProg.startedAt) / 1000)
       : 0;
@@ -1347,7 +1350,9 @@ function TicketCard({
           ticket.iter.stage !== "done";
         return (
           <>
-            {rounds.filter((r) => r.endedAt).map((r) => (
+            {/* 「完成」收緊定義:endedAt 真有值 + criticVerdict 真有值(runner 偶發提早寫 endedAt 但 verdict 還空,
+                舊版只看 endedAt → 那條會被誤算完成又被 inProgress 重複渲染 = #2 雙顯) */}
+            {rounds.filter((r) => r.endedAt && r.criticVerdict).map((r) => (
               <div key={r.n} className="ticket-iter ticket-iter-row">
                 <span className="iter-round-num mono">#{r.n}</span>
                 <IterStages
@@ -1364,10 +1369,10 @@ function TicketCard({
               </div>
             ))}
             {inProgress && (() => {
-              // in-progress round 可能已有 startedAt(runner 開始即 append)或還沒 append。
-              // 優先用 in-progress round 自己的 startedAt;次選最後一筆 completed round 的 endedAt
-              const inProg = rounds.find((r) => !r.endedAt);
-              const completed = rounds.filter((r) => r.endedAt);
+              // in-progress round = rounds 內最後一筆「endedAt 沒有 或 verdict 空」(代表 critic 還沒判完),
+              // 沒這種 entry 就 fallback ticket.startedAt
+              const inProg = rounds.find((r) => !r.endedAt || !r.criticVerdict);
+              const completed = rounds.filter((r) => r.endedAt && r.criticVerdict);
               const lastEnded = completed[completed.length - 1]?.endedAt;
               const roundStart = inProg?.startedAt ?? lastEnded ?? (ticket as { startedAt?: number }).startedAt;
               const live = typeof roundStart === "number"
