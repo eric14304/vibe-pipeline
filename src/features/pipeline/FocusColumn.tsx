@@ -252,8 +252,10 @@ export function FocusColumn({
   const lastRun = runs[0] ?? null;
   const stateColor = STATE_COLOR[pipeline.state];
   const stateLabel = STATE_LABEL[pipeline.state];
-  const done = pipeline.tickets.filter((t) => t.status === "done").length;
-  const total = pipeline.tickets.length;
+  // mode=sync 是舊 synthetic ticket(已換 pipeline.syncJob),不計入 done/total
+  const realTickets = pipeline.tickets.filter((t) => t.mode !== "sync");
+  const done = realTickets.filter((t) => t.status === "done").length;
+  const total = realTickets.length;
   const allDone = done === total && pipeline.state === "ready";
   // 看是否有失敗 / paused 的 merge ticket(讓 banner 顯重試,不靠 RunButton 的繼續)
   const failedMergeTicket = pipeline.tickets.find(
@@ -444,16 +446,19 @@ export function FocusColumn({
             onAddTicket={() => onAddTicket?.(pipeline.id)}
           />
         ) : (
-          pipeline.tickets.map((t, i) => (
-            <TicketCard
-              key={t.id}
-              ticket={t}
-              tick={tick}
-              index={i}
-              isSplitting={splittingTicketId === t.id}
-              onClick={onTicketClick ? () => onTicketClick(t) : undefined}
-            />
-          ))
+          pipeline.tickets
+            // mode=sync 是舊版 synthetic ticket(已換成 pipeline.syncJob),歷史資料還可能存在 → 過濾不顯
+            .filter((t) => t.mode !== "sync")
+            .map((t, i) => (
+              <TicketCard
+                key={t.id}
+                ticket={t}
+                tick={tick}
+                index={i}
+                isSplitting={splittingTicketId === t.id}
+                onClick={onTicketClick ? () => onTicketClick(t) : undefined}
+              />
+            ))
         )}
       </div>
     </main>

@@ -281,69 +281,6 @@ export async function appendMergeTicket(opts: {
   return { ok: true, ticket, reused: false };
 }
 
-// Append 一張 synthetic sync ticket。把 base 的更新 merge 進 worktree。
-// 不允許條件:沒 pipeline / 已 merged / 已有 running 的 ticket(merge 或 sync 都算)。
-// 已有 paused/failed sync ticket → reset(類比 mergeTicket reset 邏輯)。
-export async function appendSyncTicket(opts: {
-  projectPath: string;
-  pipelineId: string;
-  prompt: string;
-  behindCount: number;
-}): Promise<{ ok: true; ticket: Record<string, unknown>; reused: boolean } | { ok: false; error: string }> {
-  const { projectPath, pipelineId, prompt, behindCount } = opts;
-  const p = (await readPipeline(projectPath, pipelineId)) as {
-    state?: string;
-    tickets?: Array<{ status?: string; mode?: string; n?: number; [k: string]: unknown }>;
-    [k: string]: unknown;
-  } | null;
-  if (!p) return { ok: false, error: "Pipeline not found" };
-  const tickets = p.tickets ?? [];
-  const anyRunning = tickets.some((t) => t.status === "running");
-  if (anyRunning) return { ok: false, error: "有 ticket 正在跑,先 pause 才能 sync" };
-  // 已有 sync ticket(failed/paused → reset;running 上面擋了;done → 可以再加新一張,base 又動了)
-  const lastSyncIdx = (() => {
-    for (let i = tickets.length - 1; i >= 0; i--) {
-      if (tickets[i].mode === "sync") return i;
-    }
-    return -1;
-  })();
-  if (lastSyncIdx !== -1) {
-    const existing = tickets[lastSyncIdx];
-    if (existing.status !== "done") {
-      tickets[lastSyncIdx] = {
-        ...existing,
-        status: "ready",
-        prompt,
-        title: `AI sync ← base (落後 ${behindCount})`,
-        iter: undefined,
-        startedAt: undefined,
-        endedAt: undefined,
-        reason: undefined,
-      };
-      await writePipeline(projectPath, pipelineId, { ...p, tickets });
-      return { ok: true, ticket: tickets[lastSyncIdx], reused: true };
-    }
-  }
-  const nextN = tickets.reduce((m, t) => Math.max(m, typeof t.n === "number" ? t.n : 0), 0) + 1;
-  const ts = Date.now().toString(16).padStart(12, "0");
-  const ticket = {
-    id: `t${nextN}-${ts}`,
-    n: nextN,
-    title: `AI sync ← base (落後 ${behindCount})`,
-    goal: "把 base branch 上的最新 commit merge 進 pipeline worktree,衝突自動解,跑驗證",
-    acceptance: ["worktree 上 HEAD 包含 base 最新 commit", "tsc / test / build 通過(若 project 有)"],
-    prompt,
-    mode: "sync",
-    status: "ready",
-    iterLimit: 3,
-    iterStopAtLimit: true,
-    _synthetic: true,
-  };
-  tickets.push(ticket);
-  await writePipeline(projectPath, pipelineId, { ...p, tickets });
-  return { ok: true, ticket, reused: false };
-}
-
 // 刪 pipeline.json(worktree 不動,user 想清自己去)
 export function deletePipeline(projectPath: string, id: string): boolean {
   const file = pipelineFile(projectPath, id);
