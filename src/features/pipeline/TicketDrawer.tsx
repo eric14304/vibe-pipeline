@@ -263,15 +263,20 @@ export function TicketDrawer({
             )}
           </Section>
           {ticket.iter && (
-            <Section label="iter 概況">
-              <div className="mono" style={{ fontSize: 12, color: "var(--fg-mute)" }}>
+            <Section label="iter 輪次">
+              <div
+                className="mono"
+                style={{
+                  fontSize: 12,
+                  color: "var(--fg-mute)",
+                  marginBottom: ticket.iter.rounds && ticket.iter.rounds.length > 0 ? 10 : 0,
+                }}
+              >
                 iter {ticket.iter.current} · {ticket.iter.verdicts.length} verdict
               </div>
-            </Section>
-          )}
-          {ticket.iter?.rounds && ticket.iter.rounds.length > 0 && (
-            <Section label="iter 輪次明細">
-              <IterRounds rounds={ticket.iter.rounds} />
+              {ticket.iter.rounds && ticket.iter.rounds.length > 0 && (
+                <IterRounds rounds={ticket.iter.rounds} />
+              )}
             </Section>
           )}
           {ticket.commits && ticket.commits.length > 0 && (
