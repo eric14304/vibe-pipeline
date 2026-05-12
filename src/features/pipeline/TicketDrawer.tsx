@@ -7,7 +7,6 @@ import { MODE_LABELS } from "../../api/qa";
 import { STATE_COLOR, fmtDuration, normalizeVerdict } from "../../data/pipelines";
 import { useConfirm } from "../../ui/ConfirmDialog";
 import { RefreshIcon, ScissorsIcon, TrashIcon } from "../../ui/icons";
-import { RunHistory } from "./RunHistory";
 
 const STATUS_LABEL: Record<string, string> = {
   draft: "草稿",
@@ -290,9 +289,7 @@ export function TicketDrawer({
               <ReadOnlyValue value={ticket.reason} />
             </Section>
           )}
-          <Section label="pipeline 執行紀錄">
-            <RunHistory projectHash={projectHash} pipelineId={pipelineId} />
-          </Section>
+          {/* pipeline 執行紀錄已移到 pipeline header OverflowMenu「執行紀錄」(整 pipeline scope,不該塞 ticket drawer) */}
         </div>
       </div>
     </div>

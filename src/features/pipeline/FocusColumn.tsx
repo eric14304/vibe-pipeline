@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CheckCircleIcon, CheckIconSm, CloseIcon, FolderIcon, MergeIcon, PlusIcon, ProhibitIcon, RefreshIcon, TrashIcon } from "../../ui/icons";
+import { PipelineHistoryDrawer } from "./PipelineHistoryDrawer";
 import { STATE_COLOR, STATE_LABEL, fmtElapsed, fmtDuration, normalizeVerdict } from "../../data/pipelines";
 import { MODE_LABELS } from "../../api/qa";
 import { useConfirm } from "../../ui/ConfirmDialog";
@@ -311,6 +312,9 @@ export function FocusColumn({
     pipeline.state === "queued" ||
     syncActive;
 
+  // 「執行紀錄」drawer 開關(pipeline-level,不在 ticket drawer 內)
+  const [historyOpen, setHistoryOpen] = useState(false);
+
   // Spawning state:點 開始/繼續/重試 後到 polling 看到 state 跳出 [planning/paused/failed]。
   // 解掉「點下去看似沒反應」的視覺空窗(POST 回 → state.json 寫入 → polling 抓到 ≤ 1.5s + claude 啟動 0~5s)。
   const [spawning, setSpawning] = useState(false);
@@ -447,9 +451,19 @@ export function FocusColumn({
               onPruneWorktree={onPruneWorktree}
               onDelete={onDelete}
               onToggleAutoMerge={onToggleAutoMerge}
+              onShowHistory={projectHash ? () => setHistoryOpen(true) : undefined}
             />
           </div>
         </div>
+        {historyOpen && projectHash && (
+          <PipelineHistoryDrawer
+            pipelineName={pipeline.name}
+            pipelineBranch={pipeline.branch}
+            pipelineId={pipeline.id}
+            projectHash={projectHash}
+            onClose={() => setHistoryOpen(false)}
+          />
+        )}
 
         {showMergeBanner && (
           <ReadyBanner
@@ -771,6 +785,7 @@ function OverflowMenu({
   onPruneWorktree,
   onDelete,
   onToggleAutoMerge,
+  onShowHistory,
 }: {
   pipeline: Pipeline;
   hasResettable: boolean;
@@ -780,6 +795,7 @@ function OverflowMenu({
   onPruneWorktree?: (id: string) => void;
   onDelete?: (id: string) => void;
   onToggleAutoMerge?: (id: string, next: boolean) => void;
+  onShowHistory?: () => void;
 }) {
   const confirm = useConfirm();
   const [open, setOpen] = useState(false);
@@ -801,7 +817,7 @@ function OverflowMenu({
   }, [open]);
 
   // 沒任何 action 可做就不顯示
-  if (!onResetAll && !onRevealWorktree && !onPruneWorktree && !onDelete && !onToggleAutoMerge) return null;
+  if (!onResetAll && !onRevealWorktree && !onPruneWorktree && !onDelete && !onToggleAutoMerge && !onShowHistory) return null;
 
   return (
     <div ref={wrapRef} className="focus-overflow" style={{ position: "relative", display: "inline-block" }}>
@@ -841,6 +857,17 @@ function OverflowMenu({
               hint={pipeline.autoMerge ? "on" : "off"}
               onClick={() => {
                 onToggleAutoMerge(pipeline.id, !pipeline.autoMerge);
+              }}
+            />
+          )}
+          {onShowHistory && (
+            <MenuItem
+              icon={<RefreshIcon />}
+              label="執行紀錄"
+              hint="runner spawn log"
+              onClick={() => {
+                setOpen(false);
+                onShowHistory();
               }}
             />
           )}
