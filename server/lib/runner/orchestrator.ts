@@ -66,8 +66,9 @@ async function watchdogTick(): Promise<void> {
           name?: string;
           [k: string]: unknown;
         } | null;
-        if (p && p.state === "running") {
-          // 用 recoverStale 等效語意:running → paused,保留 worktree 進度
+        if (p && (p.state === "running" || p.state === "stopping")) {
+          // running:runner 直接死;stopping:user 按 pause 等主 agent 自己退,但主 agent 已死無法自我標 paused
+          // 兩種都收斂成 paused,保留 worktree 進度
           await pipelineDir.writePipeline(project.path, entry.pipelineId, {
             ...p,
             state: "paused",
