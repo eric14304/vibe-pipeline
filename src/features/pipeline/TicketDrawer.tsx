@@ -253,7 +253,7 @@ export function TicketDrawer({
               <ReadOnlyValue value={undefined} />
             )}
           </Section>
-          <Section label="prompt">
+          <Section label="提示詞">
             {spec.prompt ? (
               <div className="tdrw-prompt-md">
                 <ReactMarkdown>{spec.prompt}</ReactMarkdown>

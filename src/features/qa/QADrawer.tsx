@@ -187,7 +187,7 @@ const FIELD_LABELS: { key: keyof TicketSpec; label: string }[] = [
   { key: "title", label: "標題" },
   { key: "goal", label: "目標" },
   { key: "acceptance", label: "驗收" },
-  { key: "prompt", label: "prompt" },
+  { key: "prompt", label: "提示詞" },
   { key: "mode", label: "模式" },
 ];
 
@@ -479,14 +479,14 @@ function SpecReview({
           </div>
         </div>
       )}
-      <Field label="title">
+      <Field label="標題">
         <input
           className="qadr-input"
           value={edited.title}
           onChange={(e) => setEdited({ ...edited, title: e.target.value })}
         />
       </Field>
-      <Field label="goal">
+      <Field label="目標">
         <textarea
           className="qadr-input qadr-textarea"
           rows={3}
@@ -494,7 +494,7 @@ function SpecReview({
           onChange={(e) => setEdited({ ...edited, goal: e.target.value })}
         />
       </Field>
-      <Field label="acceptance">
+      <Field label="驗收">
         <textarea
           className="qadr-input qadr-textarea"
           rows={Math.max(4, edited.acceptance.length + 1)}
@@ -504,7 +504,7 @@ function SpecReview({
           }
         />
       </Field>
-      <Field label="prompt">
+      <Field label="提示詞">
         <textarea
           className="qadr-input qadr-textarea"
           rows={10}
@@ -512,7 +512,7 @@ function SpecReview({
           onChange={(e) => setEdited({ ...edited, prompt: e.target.value })}
         />
       </Field>
-      <Field label="mode">
+      <Field label="模式">
         <div className="qadr-choice-row" style={{ display: "flex", gap: 16, fontSize: 13 }}>
           <label style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
             <input
