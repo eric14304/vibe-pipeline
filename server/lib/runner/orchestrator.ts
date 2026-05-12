@@ -742,11 +742,34 @@ async function startMockRunner(opts: {
     try {
       const tickets = pipeline.tickets ?? [];
       let pausedMid = false;
+      // mock 模式下若最後一張是 merge ticket 且沒對應 script 條目,自動帶過
+      // (auto-merge / 手動 /merge 都會 append synthetic merge ticket,spec 不需也不該另設它的劇本)
+      let mockMergeDone = false;
       for (let i = 0; i < tickets.length; i++) {
         const t = tickets[i];
         const tScript = script.tickets[i];
         if (!tScript) {
-          // script 比 tickets 短 — 沒劇本的 ticket 跳過(fail-soft 留給 spec 自己驗)
+          if (t.mode === "merge") {
+            await sleep(30);
+            const fakeHash = `mockmerge${Date.now().toString(16).padStart(8, "0")}`;
+            const fullHash = (fakeHash + "0".repeat(40)).slice(0, 40);
+            await mutateTicket(projectPath, pipelineId, t.id ?? `t${i}`, (curT) => ({
+              ...curT,
+              status: "done",
+              startedAt: Date.now(),
+              endedAt: Date.now(),
+              commits: [
+                {
+                  hash: fullHash,
+                  subject: `merge: pipeline → base`,
+                  ts: Date.now(),
+                },
+              ],
+            }));
+            mockMergeDone = true;
+            break;
+          }
+          // 其他 mode 沒劇本就跳過(fail-soft 留給 spec 自己驗)
           break;
         }
 
@@ -818,15 +841,25 @@ async function startMockRunner(opts: {
       }
 
       // 收尾 pipeline state
-      const finalState = pausedMid ? "paused" : (script.finalState ?? "ready");
+      // mock merge ticket 跑完一律標 merged,不看 script.finalState(它是給原 ticket 流程用的)
+      const finalState = pausedMid
+        ? "paused"
+        : mockMergeDone
+          ? "merged"
+          : (script.finalState ?? "ready");
       const final = (await pipelineDir.readPipeline(projectPath, pipelineId)) as {
+        tickets?: Array<{ mode?: string; commits?: Array<{ hash?: string }> }>;
         [k: string]: unknown;
       } | null;
       if (final) {
-        await pipelineDir.writePipeline(projectPath, pipelineId, {
-          ...final,
-          state: finalState,
-        });
+        const next: Record<string, unknown> = { ...final, state: finalState };
+        // 補 mergeCommit 給前端 / spec 驗(從剛剛 mock merge ticket 抓 hash)
+        if (mockMergeDone) {
+          const mergeTicket = (final.tickets ?? []).find((t) => t.mode === "merge");
+          const hash = mergeTicket?.commits?.[0]?.hash;
+          if (hash) next.mergeCommit = { hash, mergedAt: Date.now() };
+        }
+        await pipelineDir.writePipeline(projectPath, pipelineId, next);
       }
 
       const name = pipeline.name || pipelineId;
