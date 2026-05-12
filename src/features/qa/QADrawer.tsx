@@ -26,11 +26,6 @@ export function QADrawer({
   onClose: () => void;
 }) {
   const transcriptRef = useRef<HTMLDivElement>(null);
-  // turns 增加時自動 scroll 到底,turns.length 是觸發訊號(effect 內讀 ref 不算 dep)
-  // biome-ignore lint/correctness/useExhaustiveDependencies: turns.length is the intentional trigger
-  useEffect(() => {
-    transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight });
-  }, [draft?.turns.length]);
 
   // View override:user 顯式選擇要看哪個視圖,蓋過 draft.complete 自動切的邏輯。
   // - "chat" :user 在 SpecReview 點「繼續討論」,即使 draft.complete=true 也回 chat
@@ -46,6 +41,18 @@ export function QADrawer({
   const showReview =
     specComplete &&
     (viewOverride === "review" || (draft?.complete === true && viewOverride !== "chat"));
+
+  // turns 增加 / 切回 chat 視圖時自動 scroll 到底。
+  // showReview=true 期間 transcriptRef 沒掛(SpecReview 渲染);切回 chat 後新 ref 掛上才 scroll
+  // biome-ignore lint/correctness/useExhaustiveDependencies: turns.length / showReview 是觸發訊號
+  useEffect(() => {
+    if (showReview) return;
+    // 等 React commit 把 chat DOM 掛上去 + 內容 layout 完
+    const id = requestAnimationFrame(() => {
+      transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [draft?.turns.length, showReview]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
