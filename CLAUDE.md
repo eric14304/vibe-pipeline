@@ -11,7 +11,7 @@
 - **`subAgent` 拆 `executor` + `critic`**:兩個獨立 TaskClass,critic 可挑便宜 model(sonnet+medium)省 token 5-10x;userConfig 自動 migrate(舊 subAgent → executor,critic 走 default)
 - **Client-side folder browser**:新 `GET /api/projects/browse?path=` endpoint,瀏覽器內導覽 host 上目錄;Tailscale 遠端開 project 走這個(native picker 跑在 host user 看不到 dialog)
 - **`vbpl` CLI 落地**:`cli/` 內,reuse `server/lib/*` 直接讀寫 fs(no HTTP)。4 nouns(project/pipeline/ticket/config)+ `--json` mode。`bun run vbpl <noun> <verb>`。約定見 [`vibe-pipeline-cli` SKILL](.claude/skills/vibe-pipeline-cli/SKILL.md)
-- **Auto-merge 改機械式**:`autoMerge=true` 觸發時 backend 直接 `git merge --no-ff`(不 spawn AI),clean 毫秒級 done / 衝突 emit `merge_blocked` notif 等 user 主動 AI 處理。Manual merge 維持現狀(AI 全套)。心智:auto = 便利,manual = 借 AI 一把
+- **Auto-merge 二段式**:`autoMerge=true` 觸發時 backend 先 `git merge --no-ff`(機械式,~90% clean case 毫秒級 done);**撞衝突 → 自動 fallback 到 spawn AI 全套**(同 manual merge 路徑,衝突場景跟過去一樣慢但無人值守)。dirty / git_error 等非 AI 能解的失敗才 emit `merge_blocked` 等 user。心智:autoMerge 是「全自動」承諾;速度收益留在 clean 場景
 - **`pipelineDir.init` 改 idempotent**:`.vibe-pipeline/` partial init 殘骸自動補齊不報錯;`.gitignore` 自動補 `pipelines/`(原本漏)
 - **UX 收斂**:Pipeline 執行紀錄從 TicketDrawer 拆到 pipeline-level OverflowMenu;Inbox strip 整塊觸碰 + 滾輪 preview popover;QA reopen + viewOverride 雙向
 

@@ -640,12 +640,14 @@ async function maybeAutoMerge(opts: {
   }
 
   try {
-    // 2026-05-13 改:auto-merge 走 backend-only git merge(不 spawn AI)。
-    // - clean → 秒結束,寫 state=merged + mergeCommit + emit pipeline_merged
-    // - conflict → git merge --abort,emit merge_blocked notif,user 自己決定是否手動 AI 解
-    // - 其他失敗(dirty / git_error)→ 寫 lastAutoMergeError + merge_blocked
+    // 2026-05-13 改:auto-merge 二段式。
+    // 1. backend-only git merge(autoMergeNoAI)→ clean 秒結束、寫 state=merged
+    // 2. 撞衝突 → 自動 fallback 到 triggerMerge(spawn AI runner 全套),同 manual merge 路徑
+    //    心智:autoMerge=true 是「全自動」承諾,user 不想自己決定燒 token;
+    //    速度收益保留在 clean 場景(~90%),衝突場景跟過去一樣慢但無人值守
+    // 其他失敗(dirty / git_error)→ 不 fallback AI(那不是 AI 能解的),emit merge_blocked 等 user
     // dynamic import 拆循環依賴
-    const { autoMergeNoAI } = await import("../pipelineMerge");
+    const { autoMergeNoAI, triggerMerge } = await import("../pipelineMerge");
     const r = await autoMergeNoAI({
       projectPath,
       projectHash,
@@ -653,7 +655,6 @@ async function maybeAutoMerge(opts: {
       hasGit: true,
     });
     if (r.ok) {
-      // 成功:emit pipeline_merged(autoMergeNoAI 已寫 state=merged + mergeCommit)
       const sub = "mergeCommit" in r && r.mergeCommit
         ? `merge commit ${r.mergeCommit.hash.slice(0, 7)}`
         : "已最新(無 commit 可合)";
@@ -663,27 +664,60 @@ async function maybeAutoMerge(opts: {
         sub,
         pipelineId,
       });
-    } else {
-      // 失敗:寫 lastAutoMergeError + emit merge_blocked
-      const cur = (await pipelineDir.readPipeline(projectPath, pipelineId)) as {
-        [k: string]: unknown;
-      } | null;
-      if (cur) {
-        await pipelineDir.writePipeline(projectPath, pipelineId, {
-          ...cur,
-          lastAutoMergeError: r.error,
-        });
-      }
-      const conflictSummary = r.reason === "conflict" && "conflictFiles" in r && r.conflictFiles
-        ? `${r.conflictFiles.length} 衝突檔,需手動 AI 解`
-        : r.error;
+      return;
+    }
+
+    // 失敗分流:conflict → 自動升級走 AI;其他 → emit merge_blocked 等 user
+    if (r.reason === "conflict") {
+      const fileCount = "conflictFiles" in r ? r.conflictFiles.length : 0;
       notifs.emit(projectPath, {
-        type: "merge_blocked",
-        title: `${name} 自動合併失敗`,
-        sub: conflictSummary,
+        type: "pipeline_auto_merge_started",
+        title: `${name} 撞衝突,升級走 AI 合併`,
+        sub: `${fileCount} 衝突檔,backend 已 abort merge,改 spawn AI`,
         pipelineId,
       });
+      const ai = await triggerMerge({
+        projectPath,
+        projectHash,
+        pipelineId,
+        hasGit: true,
+      });
+      if (!ai.ok) {
+        const cur = (await pipelineDir.readPipeline(projectPath, pipelineId)) as {
+          [k: string]: unknown;
+        } | null;
+        if (cur) {
+          await pipelineDir.writePipeline(projectPath, pipelineId, {
+            ...cur,
+            lastAutoMergeError: ai.error,
+          });
+        }
+        notifs.emit(projectPath, {
+          type: "merge_blocked",
+          title: `${name} 自動合併升級 AI 也失敗`,
+          sub: ai.error,
+          pipelineId,
+        });
+      }
+      return;
     }
+
+    // dirty / git_error / not_found / running — 不適合 AI 自動解,emit merge_blocked
+    const cur = (await pipelineDir.readPipeline(projectPath, pipelineId)) as {
+      [k: string]: unknown;
+    } | null;
+    if (cur) {
+      await pipelineDir.writePipeline(projectPath, pipelineId, {
+        ...cur,
+        lastAutoMergeError: r.error,
+      });
+    }
+    notifs.emit(projectPath, {
+      type: "merge_blocked",
+      title: `${name} 自動合併失敗`,
+      sub: r.error,
+      pipelineId,
+    });
   } catch (e) {
     console.error(`[autoMerge ${pipelineId}] failed:`, e);
   }
