@@ -137,9 +137,14 @@ export async function appendTurn(
   });
   // 高水位 merge:不讓 AI 因為這輪沒寫某欄位就讓既有值掉光。
   d.spec = mergeSpec(d.spec, reply.spec ?? null);
-  // Auto-complete:5 欄位齊就 force complete=true,不等 AI 主動 set。
+  // Auto-complete:5 欄位齊就 force complete=true,當 AI 漏記時的安全網。
+  // 但 reopen 場景(前一輪 complete=true、user 退回 chat 又送訊息)需要尊重 AI 的 complete=false,
+  // 否則 user 一送訊息就被搶回最終預覽,卡在 loop。判斷:wasComplete=true 且 AI 明確回 false → 信 AI。
   // (AI 常多問一輪「確認送出?」,frontend SpecReview 才是真正的 user confirm step。)
-  d.complete = reply.complete || specAllFieldsValid(d.spec);
+  const wasComplete = d.complete;
+  d.complete =
+    reply.complete === true ||
+    (!wasComplete && reply.complete !== false && specAllFieldsValid(d.spec));
   // splitInto: 只在 complete=true 那輪採信 AI 提案(coerceSpec 已過 length>=2 + 每元素 complete 驗)
   // 之後 turn 若 AI 又出 splitInto 也採新值;沒出就維持上一輪結果
   if (d.complete && Array.isArray(reply.splitInto) && reply.splitInto.length >= 2) {

@@ -77,7 +77,8 @@ export async function runTurn({
         "2. user 上一句**就是字面值** \"建立 ticket\" → 這輪 complete=true,spec 不變,message 簡短「建立中…」,options=[]。\n" +
         "3. user 上一句是 \"我要再調整\" 或語意等同(想改 X / 加 Y / 調 Z 之類) → 這輪 complete **保持 false**,**不准自己腦補加欄位**,問 user 具體要改哪裡 / 改成什麼。等下次再確認。\n" +
         "4. user 上一句是 \"從頭重來\" → complete=false,spec 砍回 null 或只留 title,重新開始收斂。\n" +
-        "5. 任何時候 spec 5/5 但 user 還沒明示「建立 ticket」字面 → complete 一律 false。" +
+        "5. 任何時候 spec 5/5 但 user 還沒明示「建立 ticket」字面 → complete 一律 false。\n" +
+        "6. **reopen 規則**:若前一輪 AI 自己回過 complete=true(對話歷史可見)但 user 這輪又送來訊息(不是字面 \"建立 ticket\"),代表 user 從最終預覽退回 chat 想繼續討論 → complete **必須改回 false**,把 user 這句當需求補充 / 修正處理,spec 該動就動。" +
         (pipelineContext ? "\n\n" + pipelineContext : "") +
         (progressHint ? "\n\n" + progressHint : "");
 
