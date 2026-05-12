@@ -186,6 +186,8 @@ export async function createPipeline(hash: string, req: Request): Promise<Respon
     ...body,
     id,
     autoMerge,
+    // createdAt 取 body 值(允許 import 帶舊時間)或 Date.now()
+    createdAt: typeof body.createdAt === "number" ? body.createdAt : Date.now(),
     tickets: Array.isArray(body.tickets) ? body.tickets : [],
   };
   await pipelineDir.writePipeline(project.path, id, data);

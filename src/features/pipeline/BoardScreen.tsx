@@ -250,9 +250,15 @@ export function BoardScreen({
         .listPipelines(project.hash)
         .then((arr) => {
           if (cancelled) return;
-          const sorted = [...((arr as Pipeline[]) ?? [])].sort((a, b) =>
-            a.id < b.id ? 1 : a.id > b.id ? -1 : 0
-          );
+          // 按 createdAt 倒序(新建在上)。backend listPipelines 已 sort 過,
+          // 這裡保險再排一次,避免 backend 改邏輯時 UI 順序漂走。
+          // 沒 createdAt(極舊資料)→ fallback 用 id 內嵌 hex timestamp
+          const tsOf = (p: Pipeline): number => {
+            if (typeof p.createdAt === "number") return p.createdAt;
+            const tsHex = (p.id ?? "").split("-")[0];
+            return tsHex && /^[0-9a-f]+$/i.test(tsHex) ? parseInt(tsHex, 16) : 0;
+          };
+          const sorted = [...((arr as Pipeline[]) ?? [])].sort((a, b) => tsOf(b) - tsOf(a));
           setPipelines(sorted);
           if (sorted.length > 0) setActiveId((id) => id || sorted[0].id);
         })

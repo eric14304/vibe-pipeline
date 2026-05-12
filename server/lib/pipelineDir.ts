@@ -195,24 +195,25 @@ export function generatePipelineId(name: string): string {
 }
 
 export async function listPipelines(projectPath: string): Promise<unknown[]> {
-  // 按 id 倒序回(id 開頭是 hex timestamp,等同建立時間新→舊)。
-  // UI 把最新建的 pipeline 列在上面,user 不用滾到底找剛建的那條
-  return readJsonDir(join(rootPath(projectPath), "pipelines"));
-}
-
-async function readJsonDir(dir: string): Promise<unknown[]> {
+  const dir = join(rootPath(projectPath), "pipelines");
   if (!existsSync(dir)) return [];
-  const files = readdirSync(dir)
-    .filter((f) => f.endsWith(".json"))
-    // filename 開頭 = id(hex timestamp),反向排 = 新→舊
-    .sort((a, b) => b.localeCompare(a));
-  const out: unknown[] = [];
-  for (const f of files) {
-    const text = await Bun.file(join(dir, f)).text();
+  const out: Array<Record<string, unknown>> = [];
+  for (const f of readdirSync(dir)) {
+    if (!f.endsWith(".json")) continue;
     try {
-      out.push(JSON.parse(text));
+      const obj = JSON.parse(await Bun.file(join(dir, f)).text()) as Record<string, unknown>;
+      // backfill createdAt:既有 pipeline 沒此欄位 → 用 id 內嵌的 hex timestamp(generatePipelineId 格式)
+      if (typeof obj.createdAt !== "number") {
+        const idStr = typeof obj.id === "string" ? obj.id : "";
+        const tsHex = idStr.split("-")[0];
+        const ts = tsHex && /^[0-9a-f]+$/i.test(tsHex) ? parseInt(tsHex, 16) : 0;
+        obj.createdAt = Number.isFinite(ts) ? ts : 0;
+      }
+      out.push(obj);
     } catch {}
   }
+  // 倒序排,UI 最新建的在最上面;舊資料 backfill 後也走同邏輯
+  out.sort((a, b) => (b.createdAt as number) - (a.createdAt as number));
   return out;
 }
 
