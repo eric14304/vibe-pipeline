@@ -109,9 +109,23 @@ cli/
 - 預期 `--json` 行為 → 跑 `bun run vbpl <noun> <verb> --json | jq .` 驗
 - 跨平台:Windows / macOS / Linux 都該過,path / spawn 都要小心(`node:path` + Bun.spawn array form)
 
+## 打包成 binary(2026-05-13 落地)
+
+`bun build --compile --minify` 把 CLI + Bun runtime + 全 deps 打成單檔 executable。三個 script 在 package.json:
+
+```
+bun run cli:build         # Windows x64    → dist-cli/vbpl.exe(~121 MB)
+bun run cli:build:mac     # macOS arm64    → dist-cli/vbpl-mac
+bun run cli:build:linux   # Linux x64      → dist-cli/vbpl-linux
+```
+
+`dist-cli/` 已 gitignore。要散發給其他人:跑 build → 把 binary 複製到對方 PATH 上(e.g. `C:\Users\<u>\bin\`、`/usr/local/bin/`)。
+
+注意:binary 大(~121 MB)因為 bundle 整個 Bun runtime。若要更小看 `--target=bun-windows-x64-baseline` 等 baseline target。
+
 ## 還沒做
 
-- 跨平台打包(`bun build --compile` → 單一 binary,user 不裝 Bun 就能跑;當前需 `bun run vbpl ...`)
 - TUI / interactive mode(`vbpl repl` 之類)— 看 user 反應再加
 - shell completion(bash / zsh / pwsh)— 同上,有需求再做
 - log streaming(`vbpl pipeline log <id> --follow`)— 現在 log 是 one-shot dump,要 tail -f 等效得加 fs.watch / inotify
+- CI release(`gh release` 自動 build + upload artifact),目前 user 自己 build 自己用
