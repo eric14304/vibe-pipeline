@@ -32,12 +32,20 @@ export function QADrawer({
     transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight });
   }, [draft?.turns.length]);
 
-  // user 在 SpecReview 點「繼續討論」→ 暫時 force 回 chat 模式即使 draft.complete=true。
-  // user 下個 turn 送出時清掉(由 backend 決定是否再進 review 階段);切 draft 也清掉
-  const [forceChat, setForceChat] = useState(false);
+  // View override:user 顯式選擇要看哪個視圖,蓋過 draft.complete 自動切的邏輯。
+  // - "chat" :user 在 SpecReview 點「繼續討論」,即使 draft.complete=true 也回 chat
+  // - "review":user 在 chat 點「回最終預覽」,即使 draft.complete=false 也跳預覽(spec 仍須 5/5)
+  // - null :跟 draft.complete 自動切
+  // 切 draft(draftId 變)清掉
+  const [viewOverride, setViewOverride] = useState<"chat" | "review" | null>(null);
   useEffect(() => {
-    setForceChat(false);
+    setViewOverride(null);
   }, [draft?.draftId]);
+  const specComplete = isSpecComplete(draft?.spec ?? null);
+  // 最終 review 視圖條件:spec 5/5 齊,且(override="review" 或 draft.complete=true 且未 override="chat")
+  const showReview =
+    specComplete &&
+    (viewOverride === "review" || (draft?.complete === true && viewOverride !== "chat"));
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -92,7 +100,7 @@ export function QADrawer({
           <SpecChecklist spec={draft?.spec ?? null} />
         </div>
 
-        {draft?.complete && isSpecComplete(draft?.spec ?? null) && !forceChat ? (
+        {showReview ? (
           <div className="drawer-body qadr-body qadr-spec-body">
             <SpecReview
               spec={draft!.spec as TicketSpec}
@@ -100,13 +108,13 @@ export function QADrawer({
               busy={busy}
               onCancel={onCancel}
               onFinalize={onFinalize}
-              onResumeChat={() => setForceChat(true)}
+              onResumeChat={() => setViewOverride("chat")}
             />
           </div>
         ) : (
           <>
-            {/* 退回 chat 期間,spec 已齊 → 顯示「回最終預覽」橫條讓 user 隨時切回確認 */}
-            {forceChat && isSpecComplete(draft?.spec ?? null) && (
+            {/* spec 5/5 齊但 user 在 chat(被 override 或 backend complete=false)→ 顯示「回最終預覽」橫條 */}
+            {specComplete && !showReview && (
               <div
                 style={{
                   padding: "8px 16px",
@@ -124,7 +132,7 @@ export function QADrawer({
                   type="button"
                   className="btn"
                   style={{ marginLeft: "auto", padding: "4px 10px", fontSize: 12 }}
-                  onClick={() => setForceChat(false)}
+                  onClick={() => setViewOverride("review")}
                   disabled={busy}
                 >
                   → 回最終預覽
