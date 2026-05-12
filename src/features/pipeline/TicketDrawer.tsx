@@ -239,10 +239,10 @@ export function TicketDrawer({
         </div>
 
         <div className="drawer-body tdrw-body">
-          <Section label="goal">
+          <Section label="目標">
             <ReadOnlyValue value={spec.goal} />
           </Section>
-          <Section label="acceptance">
+          <Section label="驗收">
             {Array.isArray(spec.acceptance) && spec.acceptance.length > 0 ? (
               <ul className="tdrw-list">
                 {spec.acceptance.map((a) => (
@@ -263,7 +263,7 @@ export function TicketDrawer({
             )}
           </Section>
           {ticket.iter && (
-            <Section label="iter 輪次">
+            <Section label="迭代輪次">
               <div
                 className="mono"
                 style={{
@@ -272,7 +272,7 @@ export function TicketDrawer({
                   marginBottom: ticket.iter.rounds && ticket.iter.rounds.length > 0 ? 10 : 0,
                 }}
               >
-                iter {ticket.iter.current} · {ticket.iter.verdicts.length} verdict
+                第 {ticket.iter.current} 輪 · {ticket.iter.verdicts.length} 次審核
               </div>
               {ticket.iter.rounds && ticket.iter.rounds.length > 0 && (
                 <IterRounds rounds={ticket.iter.rounds} />
@@ -280,17 +280,17 @@ export function TicketDrawer({
             </Section>
           )}
           {ticket.commits && ticket.commits.length > 0 && (
-            <Section label="commits">
+            <Section label="commit 紀錄">
               <Commits commits={ticket.commits} />
             </Section>
           )}
           {ticket.liveLog && (
-            <Section label="liveLog">
+            <Section label="即時日誌">
               <pre className="tdrw-prompt">{ticket.liveLog}</pre>
             </Section>
           )}
           {ticket.reason && (
-            <Section label="reason">
+            <Section label="原因說明">
               <ReadOnlyValue value={ticket.reason} />
             </Section>
           )}
@@ -423,7 +423,7 @@ function IterRounds({ rounds }: { rounds: IterRound[] }) {
             )}
             {r.criticFeedback && (
               <div className="tdrw-iter-round-block">
-                <div className="tdrw-iter-round-label">審核 feedback</div>
+                <div className="tdrw-iter-round-label">審核 回饋</div>
                 <div className="tdrw-text">{r.criticFeedback}</div>
               </div>
             )}
