@@ -179,7 +179,27 @@ export async function autoMergeNoAI(opts: {
   // 看當前 base 已經包含 pipeline branch 沒(已 merge 過 / no-op)
   const ahead = await spawnGit(["rev-list", "--count", `${baseBranch}..${pipelineBranch}`], projectPath);
   if (ahead.ok && ahead.out === "0") {
-    // pipeline branch 沒任何 commit 在 base 之外 — 不該到這步通常,fallback handle
+    // pipeline branch 沒任何 commit 在 base 之外 — git 層已 merge 完,把 pipeline state 補成 merged
+    // 同時清掉殘存的 failed/paused merge ticket(那是之前 AI 嘗試失敗留的,不該繼續觸發 banner 顯「重試」)
+    const cur = (await pipelineDir.readPipeline(projectPath, pipelineId)) as
+      | (Record<string, unknown> & { tickets?: Array<Record<string, unknown> & { mode?: string; status?: string }> })
+      | null;
+    if (cur && cur.state !== "merged") {
+      const tickets = (cur.tickets ?? []).map((t) => {
+        if (t.mode === "merge" &&
+          (t.status === "failed" || t.status === "failed_iter_limit" || t.status === "failed_transient" || t.status === "paused")
+        ) {
+          return { ...t, status: "done" };
+        }
+        return t;
+      });
+      await pipelineDir.writePipeline(projectPath, pipelineId, {
+        ...cur,
+        tickets,
+        state: "merged",
+        lastAutoMergeError: undefined,
+      });
+    }
     return { ok: true, alreadyMerged: true };
   }
 
