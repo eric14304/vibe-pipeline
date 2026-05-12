@@ -154,16 +154,22 @@ async function writeJson(path: string, data: unknown): Promise<void> {
   }
 }
 
+// idempotent:`.vibe-pipeline/` 已存在但內容缺(早期 partial init 失敗留的殘骸)→ 補齊;
+// 全齊 → 也視為成功(no-op),不再 throw 'already_initialized'。
+// 只在 path 存在但不是 dir(被檔案佔住等)時 throw
 export async function init(projectPath: string): Promise<void> {
-  if (hasInit(projectPath)) {
-    throw new Error("already_initialized");
-  }
   const root = rootPath(projectPath);
+  if (existsSync(root) && !statSync(root).isDirectory()) {
+    throw new Error(".vibe-pipeline path is not a directory");
+  }
   mkdirSync(root, { recursive: true });
   mkdirSync(join(root, "pipelines"), { recursive: true });
   mkdirSync(join(root, ".runtime"), { recursive: true });
 
-  await writeJson(join(root, "config.json"), DEFAULT_CONFIG);
+  const cfg = join(root, "config.json");
+  if (!existsSync(cfg)) {
+    await writeJson(cfg, DEFAULT_CONFIG);
+  }
   await ensureGitignoreEntry(projectPath, RUNTIME_GITIGNORE_ENTRY);
 }
 
