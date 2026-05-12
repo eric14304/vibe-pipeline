@@ -243,6 +243,73 @@
   line-height: 1;
 }
 
+/* SyncJob 進度狀態:跟 button 用同套 chip 殼,顏色 / 行為依 state 切。
+   busy(merging / ai_running):同 queued 色,disabled 不可點;
+   conflict_await:橘色強調,user 要回應;
+   failed:紅;done:綠。 */
+.sync-chip.sync-chip-busy {
+  cursor: default;
+  color: var(--queued);
+}
+.sync-chip.sync-chip-conflict {
+  border-color: var(--accent, #d4956d);
+  background: color-mix(in srgb, var(--accent, #d4956d) 14%, transparent);
+  color: var(--accent, #d4956d);
+}
+.sync-chip.sync-chip-failed {
+  border-color: var(--failed);
+  background: color-mix(in srgb, var(--failed) 14%, transparent);
+  color: var(--failed);
+}
+.sync-chip.sync-chip-done {
+  border-color: var(--done);
+  background: color-mix(in srgb, var(--done) 14%, transparent);
+  color: var(--done);
+}
+.sync-chip-action {
+  margin-left: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 5px;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.sync-chip-action:hover {
+  background: color-mix(in srgb, currentColor 18%, transparent);
+}
+.sync-chip-action.sync-chip-primary {
+  background: currentColor;
+  color: var(--bg);
+}
+.sync-chip-action.sync-chip-primary:hover {
+  filter: brightness(1.1);
+}
+
+/* ─── Modal(SyncConflictModal 等共用基礎)─── */
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 60;
+  background: color-mix(in srgb, #000 60%, transparent);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.modal-card {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  max-width: 520px; width: 100%;
+  padding: 20px 22px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+}
+.modal-title { font-size: 16px; font-weight: 700; margin-bottom: 8px; color: var(--fg); }
+.modal-body { color: var(--fg); font-size: 14px; line-height: 1.55; }
+.modal-actions {
+  margin-top: 18px;
+  display: flex; gap: 10px; justify-content: flex-end;
+}
+
 /* ─── body grid ─── */
 .board-body {
   flex: 1; min-height: 0;

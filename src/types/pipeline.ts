@@ -11,4 +11,6 @@ export type {
   IterRound,
   Verdict,
   CommitRef,
+  SyncJob,
+  SyncJobState,
 } from "../../shared/types";
