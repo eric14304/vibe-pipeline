@@ -96,7 +96,16 @@ async function pipelineCreate(args: ParsedArgs): Promise<void> {
   const id = pipelineDir.generatePipelineId(name);
   const defaults = await pipelineDir.getResolvedDefaults(proj.path);
   const baseBranch = typeof args.flags["base-branch"] === "string" ? args.flags["base-branch"] : defaults.base_branch || "main";
-  const autoMerge = args.flags["auto-merge"] === true || args.flags["auto-merge"] === "true";
+  // auto-merge:flag 顯式給就用 flag,沒給 fallback project config defaults.auto_merge(對齊 web UI 行為)
+  // --auto-merge 或 --auto-merge=true → on;--no-auto-merge 或 --auto-merge=false → off;省略 → 看 defaults
+  let autoMerge: boolean;
+  if (args.flags["auto-merge"] === true || args.flags["auto-merge"] === "true") {
+    autoMerge = true;
+  } else if (args.flags["auto-merge"] === "false" || args.flags["no-auto-merge"] === true) {
+    autoMerge = false;
+  } else {
+    autoMerge = defaults.auto_merge;
+  }
   const branch = `pipeline/${name.toLowerCase().replace(/[^a-z0-9-_]+/g, "-").replace(/^-+|-+$/g, "")}`;
 
   const pipeline: Pipeline = {
