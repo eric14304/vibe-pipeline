@@ -420,12 +420,18 @@ function IterRounds({ rounds }: { rounds: IterRound[] }) {
                 <div className="tdrw-text">{r.executorSummary}</div>
               </div>
             )}
-            {r.criticFeedback && (
-              <div className="tdrw-iter-round-block">
-                <div className="tdrw-iter-round-label">審核 回饋</div>
+            {/* 審核 block 永遠顯,空 feedback 顯 placeholder(PASS 時 runner prompt 允許省略 feedback,
+                若 UI 整段隱掉,user 會誤以為審核沒跑) */}
+            <div className="tdrw-iter-round-block">
+              <div className="tdrw-iter-round-label">審核 回饋</div>
+              {r.criticFeedback ? (
                 <div className="tdrw-text">{r.criticFeedback}</div>
-              </div>
-            )}
+              ) : (
+                <div className="tdrw-text" style={{ color: "var(--fg-faint)", fontStyle: "italic" }}>
+                  ({r.criticVerdict === "PASS" ? "通過,無補充意見" : "(無 feedback)"})
+                </div>
+              )}
+            </div>
           </div>
         );
       })}
