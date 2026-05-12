@@ -6,6 +6,7 @@ import * as test from "./routes/test";
 import * as auth from "./routes/auth";
 import * as projectStore from "./lib/projectStore";
 import * as orchestrator from "./lib/runner/orchestrator";
+import * as syncJob from "./lib/runner/syncJob";
 import * as testMode from "./lib/testMode";
 import { authGuard, guardResponse } from "./lib/auth/middleware";
 import { initFCM } from "./lib/fcm";
@@ -165,6 +166,17 @@ async function handle(req: Request): Promise<Response> {
       return projects.syncStatus(hash, syncStatusMatch[1]);
     }
 
+    const syncSubMatch = rest.match(
+      /^\/pipelines\/([a-z0-9_-]+)\/sync\/(ai|cancel|dismiss)$/
+    );
+    if (syncSubMatch && method === "POST") {
+      const id = syncSubMatch[1];
+      const sub = syncSubMatch[2];
+      if (sub === "ai") return projects.syncConfirmAi(hash, id);
+      if (sub === "cancel") return projects.syncCancel(hash, id);
+      if (sub === "dismiss") return projects.syncDismiss(hash, id);
+    }
+
     const worktreeRevealMatch = rest.match(
       /^\/pipelines\/([a-z0-9_-]+)\/worktree\/reveal$/
     );
@@ -307,6 +319,7 @@ void initFCM();
       if (!p.hasInit) continue;
       try {
         await orchestrator.recoverStale(p.path);
+        await syncJob.recoverStaleSync(p.path);
       } catch (e) {
         console.error(`[recover] ${p.path} failed:`, e);
       }

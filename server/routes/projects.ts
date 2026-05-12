@@ -4,11 +4,11 @@ import * as projectStore from "../lib/projectStore";
 import * as pipelineDir from "../lib/pipelineDir";
 import * as git from "../lib/git";
 import * as orchestrator from "../lib/runner/orchestrator";
+import * as syncJob from "../lib/runner/syncJob";
 import * as worktree from "../lib/git/worktree";
 import * as runLog from "../lib/runner/runLog";
 import * as notifs from "../lib/notifs/store";
 import { triggerMerge } from "../lib/pipelineMerge";
-import { syncTicketPrompt } from "../lib/runner/syncTicketPrompt";
 import { pickFolder, revealFolder } from "../lib/dialog";
 import { projectHash } from "../lib/hash";
 import { isExistingDirectory } from "../lib/fs";
@@ -407,9 +407,12 @@ export async function syncStatus(hash: string, pipelineId: string): Promise<Resp
   return ok({ behind, baseBranch });
 }
 
-// POST AI sync:append synthetic sync ticket → spawn runner
-// 前置:state ∈ {ready, paused, planning} 才允許,running/stopping/queued/merged 擋
-// behindCount === 0 → 直接 200 nothing-to-do(不 spawn runner)
+// POST /sync:嘗試直接 git merge(<1s,大多狀況不用 AI)
+// - 沒落後 → 立即 done
+// - clean merge → 立即 done
+// - 衝突 → 寫 syncJob.state=conflict_await,前端跳 modal 讓 user 決定要不要 AI 解
+// - merge 失敗(非衝突)→ syncJob.failed
+// 前置:state ∈ {ready, paused, planning, failed} 才允許,running/stopping/queued/merged 擋
 export async function syncPipeline(hash: string, pipelineId: string): Promise<Response> {
   const project = await projectStore.findByHash(hash);
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);
@@ -426,47 +429,64 @@ export async function syncPipeline(hash: string, pipelineId: string): Promise<Re
   if (!pipeline) return err("not_found", `Pipeline not found: ${pipelineId}`, 404);
   if (pipeline.state === "queued") return err("invalid_path", "Pipeline 在排隊,等開跑後 pause 才能 sync", 409);
 
-  const baseBranch = pipeline.baseBranch || "main";
-  const branch = pipeline.branch || `pipeline/${pipeline.name || pipelineId}`;
-  const behind = await worktree.behindBaseCount(project.path, pipelineId, baseBranch);
-  if (behind === null) return err("invalid_path", "worktree 不存在,先跑 pipeline 一次再 sync", 400);
-  if (behind === 0) return ok({ ok: true, behind: 0, nothingToDo: true });
-
-  const wt = worktree.worktreePath(project.path, pipelineId);
-  const prompt = syncTicketPrompt({
-    worktreePath: wt,
-    branch,
-    baseBranch,
-    behindCount: behind,
-  });
-  const appendRes = await pipelineDir.appendSyncTicket({
-    projectPath: project.path,
-    pipelineId,
-    prompt,
-    behindCount: behind,
-  });
-  if (!appendRes.ok) return err("invalid_path", appendRes.error, 409);
-
-  const startRes = await orchestrator.start({
+  const res = await syncJob.startSync({
     projectPath: project.path,
     projectHash: hash,
     pipelineId,
   });
-  if (!startRes.ok) {
-    // append 了但 spawn 失敗 → 拔掉避免之後干擾
-    const cur = (await pipelineDir.readPipeline(project.path, pipelineId)) as {
-      tickets?: Array<{ id?: string; mode?: string }>;
-      [k: string]: unknown;
-    } | null;
-    if (cur?.tickets) {
-      const filtered = cur.tickets.filter(
-        (t) => t.mode !== "sync" || t.id !== appendRes.ticket.id
-      );
-      await pipelineDir.writePipeline(project.path, pipelineId, { ...cur, tickets: filtered });
-    }
-    return err("invalid_path", `append OK but spawn failed: ${startRes.error}`, 500);
+  if (!res.ok) return err("invalid_path", res.error, 409);
+  return ok({
+    ok: true,
+    state: res.state,
+    behind: res.behind,
+    conflictFiles: res.conflictFiles,
+  });
+}
+
+// POST /sync/ai:user 在 conflict_await 狀態確認讓 AI 解衝突
+export async function syncConfirmAi(hash: string, pipelineId: string): Promise<Response> {
+  const project = await projectStore.findByHash(hash);
+  if (!project) return err("not_found", `Project not found: ${hash}`, 404);
+  const res = await syncJob.confirmAi({
+    projectPath: project.path,
+    projectHash: hash,
+    pipelineId,
+  });
+  if (!res.ok) return err("invalid_path", res.error, 409);
+  return ok({ ok: true });
+}
+
+// POST /sync/cancel:取消 sync(conflict_await 階段 = 不解了 / ai_running 階段 = 殺 AI)
+export async function syncCancel(hash: string, pipelineId: string): Promise<Response> {
+  const project = await projectStore.findByHash(hash);
+  if (!project) return err("not_found", `Project not found: ${hash}`, 404);
+  const res = await syncJob.cancelSync({
+    projectPath: project.path,
+    projectHash: hash,
+    pipelineId,
+  });
+  if (!res.ok) return err("invalid_path", res.error, 409);
+  return ok({ ok: true });
+}
+
+// POST /sync/dismiss:user 看完 done / failed 狀態後 dismiss(把 syncJob 從 pipeline.json 拿掉)
+// 不負責清 git 狀態(done 已經乾淨;failed 已經 abort 過)
+export async function syncDismiss(hash: string, pipelineId: string): Promise<Response> {
+  const project = await projectStore.findByHash(hash);
+  if (!project) return err("not_found", `Project not found: ${hash}`, 404);
+  const p = (await pipelineDir.readPipeline(project.path, pipelineId)) as {
+    syncJob?: { state?: string };
+    [k: string]: unknown;
+  } | null;
+  if (!p) return err("not_found", `Pipeline not found: ${pipelineId}`, 404);
+  if (!p.syncJob) return ok({ ok: true });
+  if (p.syncJob.state === "ai_running" || p.syncJob.state === "merging") {
+    return err("invalid_path", "Sync 還在跑,先 cancel", 409);
   }
-  return ok({ ok: true, behind, ticketId: appendRes.ticket.id });
+  const { syncJob: _drop, ...rest } = p;
+  void _drop;
+  await pipelineDir.writePipeline(project.path, pipelineId, rest);
+  return ok({ ok: true });
 }
 
 export async function listNotifs(hash: string): Promise<Response> {

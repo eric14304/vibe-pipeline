@@ -15,9 +15,39 @@ type RunningProcess = {
   pipelineId: string;
   proc: Bun.Subprocess | null; // mock 模式為 null
   startedAt: number;
+  // kind 區分 ticket runner 主 agent 跟 sync AI(衝突解)。
+  // isRunning() / runningCount() 都把兩種視為 busy,擋 /run /merge /sync 等操作。
+  // 但 watchdog crash recovery 行為不同:ticket 標 paused;sync 走 git merge --abort + syncJob.state="failed"
+  kind: "ticket" | "sync";
 };
 
 const running = new Map<string, RunningProcess>(); // key: <projectHash>:<pipelineId>
+
+// 暴露給 syncJob.ts 註冊 / 卸載 sync 的 running entry。
+// 共用 running map 讓 isRunning() / runningCount() / max_parallel 自動把 sync 算成 busy。
+export function registerSyncRunning(
+  projectHash: string,
+  pipelineId: string,
+  proc: Bun.Subprocess
+): void {
+  running.set(key(projectHash, pipelineId), {
+    pipelineId,
+    proc,
+    startedAt: Date.now(),
+    kind: "sync",
+  });
+}
+
+export function unregisterRunning(projectHash: string, pipelineId: string): void {
+  running.delete(key(projectHash, pipelineId));
+}
+
+export function runningKind(
+  projectHash: string,
+  pipelineId: string
+): "ticket" | "sync" | null {
+  return running.get(key(projectHash, pipelineId))?.kind ?? null;
+}
 
 // === Liveness watchdog ===
 // Bun.Subprocess.exited 通常會在 child 結束時 fire,但 Windows 偶發
@@ -64,10 +94,35 @@ async function watchdogTick(): Promise<void> {
         const p = (await pipelineDir.readPipeline(project.path, entry.pipelineId)) as {
           state?: string;
           name?: string;
+          syncJob?: { state?: string };
           [k: string]: unknown;
         } | null;
-        if (p && (p.state === "running" || p.state === "stopping")) {
-          // running:runner 直接死;stopping:user 按 pause 等主 agent 自己退,但主 agent 已死無法自我標 paused
+        if (entry.kind === "sync") {
+          // sync AI 死了 → git merge --abort + 標 syncJob.failed
+          try {
+            await worktree.mergeAbort(project.path, entry.pipelineId);
+          } catch (e) {
+            console.error(`[watchdog ${entry.pipelineId}] sync abort failed:`, e);
+          }
+          if (p && p.syncJob && p.syncJob.state === "ai_running") {
+            await pipelineDir.writePipeline(project.path, entry.pipelineId, {
+              ...p,
+              syncJob: {
+                ...p.syncJob,
+                state: "failed",
+                endedAt: Date.now(),
+                reason: reason,
+              },
+            });
+            notifs.emit(project.path, {
+              type: "sync_failed",
+              title: `${p.name || entry.pipelineId} 同步 AI 異常結束`,
+              sub: reason,
+              pipelineId: entry.pipelineId,
+            });
+          }
+        } else if (p && (p.state === "running" || p.state === "stopping")) {
+          // ticket runner:running 直接死 / stopping user 按 pause 但主 agent 已死無法自我標 paused
           // 兩種都收斂成 paused,保留 worktree 進度
           await pipelineDir.writePipeline(project.path, entry.pipelineId, {
             ...p,
@@ -84,7 +139,9 @@ async function watchdogTick(): Promise<void> {
         console.error(`[watchdog ${entry.pipelineId}] cleanup failed:`, e);
       }
       running.delete(k);
-      ticketWatcher.stop({ projectHash, pipelineId: entry.pipelineId });
+      if (entry.kind === "ticket") {
+        ticketWatcher.stop({ projectHash, pipelineId: entry.pipelineId });
+      }
       // 釋 slot,dispatcher 接棒
       dispatch(project.path, projectHash).catch((e) =>
         console.error(`[watchdog ${entry.pipelineId}] dispatch failed:`, e)
@@ -421,7 +478,7 @@ async function spawnDirect(opts: {
     return { ok: false, error: `spawn ${runnerCfg.adapter.name} failed: ${String(e)}` };
   }
 
-  running.set(k, { pipelineId, proc, startedAt: Date.now() });
+  running.set(k, { pipelineId, proc, startedAt: Date.now(), kind: "ticket" });
 
   notifs.emit(projectPath, {
     type: "pipeline_started",
@@ -669,7 +726,7 @@ async function startMockRunner(opts: {
   } | null;
   if (!pipeline) return { ok: false, error: "pipeline not found in mock" };
 
-  running.set(k, { pipelineId, proc: null, startedAt: Date.now() });
+  running.set(k, { pipelineId, proc: null, startedAt: Date.now(), kind: "ticket" });
 
   notifs.emit(projectPath, {
     type: "pipeline_started",
