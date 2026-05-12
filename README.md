@@ -12,16 +12,14 @@
 
 ```bash
 bun install
-bun run dev:all       # vite (5173) + bun server (3001) 同時跑
+
+# 開兩個 terminal 分開跑(推薦):
+bun run dev           # 前端 Vite (5173)
+bun run server        # 後端 Bun (3001,不 watch)
 # 開 http://127.0.0.1:5173/board
 ```
 
-或分開跑:
-
-```bash
-bun run dev           # 前端
-bun run server        # 後端
-```
+`bun run dev:all` 可一次起兩個,但內部用 `server:watch` — **不要在跑 AI merge 時用**(熱重載會殺掉 runner 子程,merge 中斷)。日常開發如不會觸發 merge 才用 `dev:all`,否則分開跑保險。
 
 打包 CLI 成單檔 binary:
 
