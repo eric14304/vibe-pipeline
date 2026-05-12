@@ -421,9 +421,14 @@ export function FocusColumn({
             />
           )}
 
+          {/* + ticket:只在 noTickets / 接續 QA 時當主動作(primary 橘底)。
+              有 ticket 時 RunButton 才是主動作(開始運行 / 繼續 / 重試),這顆降次要 */}
           <button
             type="button"
-            className="btn btn-primary focus-add-ticket"
+            className={
+              "btn focus-add-ticket" +
+              (pipeline.tickets.length === 0 || hasActiveDraft ? " btn-primary" : "")
+            }
             onClick={() => onAddTicket?.(pipeline.id)}
           >
             <PlusIcon /> {hasActiveDraft ? "接續 QA" : "ticket"}
