@@ -10,7 +10,8 @@ import {
 import { currentBranch } from "./git";
 
 const DIR = ".vibe-pipeline";
-const RUNTIME_GITIGNORE_ENTRY = `${DIR}/.runtime/`;
+// pipelines/*.json + .runtime/ 都是 runtime data,不該 commit;config.json 才 git tracked
+const GITIGNORE_ENTRIES = [`${DIR}/.runtime/`, `${DIR}/pipelines/`];
 
 export function rootPath(projectPath: string): string {
   return join(projectPath, DIR);
@@ -170,7 +171,9 @@ export async function init(projectPath: string): Promise<void> {
   if (!existsSync(cfg)) {
     await writeJson(cfg, DEFAULT_CONFIG);
   }
-  await ensureGitignoreEntry(projectPath, RUNTIME_GITIGNORE_ENTRY);
+  for (const entry of GITIGNORE_ENTRIES) {
+    await ensureGitignoreEntry(projectPath, entry);
+  }
 }
 
 async function ensureGitignoreEntry(projectPath: string, entry: string): Promise<void> {
