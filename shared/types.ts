@@ -272,6 +272,41 @@ export type Pipeline = {
   autoMerge?: boolean;
   // 上一次自動 merge 嘗試失敗的訊息(preflight 失敗 / runner FAIL 都可寫)。重觸發時清掉
   lastAutoMergeError?: string;
+  // Sync 狀態(把 base merge 進 worktree)。不在 tickets[] 內,純 pipeline-level state。
+  // 不存在或 state="idle" → 沒在 sync。其他狀態 → UI 顯示對應提示 + 鎖定操作
+  syncJob?: SyncJob;
+};
+
+// Sync 流程的 state machine。
+// idle      → 沒在 sync(等同 syncJob undefined)
+// merging   → 純 git merge 進行中(<1s,user 看不太到)
+// conflict_await → git merge 失敗,有衝突;等 user 決定要不要 AI 解
+// ai_running    → 衝突,user 確認讓 AI 解,正在跑
+// failed    → 失敗(merge / AI 都可能進此狀態)。worktree 已 git merge --abort,可重試
+// done      → 成功(畫面短暫顯示後回 idle)
+export type SyncJobState =
+  | "merging"
+  | "conflict_await"
+  | "ai_running"
+  | "failed"
+  | "done";
+
+export type SyncJob = {
+  state: SyncJobState;
+  startedAt: number;
+  endedAt?: number;
+  // 啟動時 worktree 落後 base 幾個 commit
+  behindCount: number;
+  // conflict_await / failed 時填:衝突檔案列表(相對 worktree path)
+  conflictFiles?: string[];
+  // ai_running 階段:spawn 出去的 child PID(server 重啟 / watchdog 用)
+  aiPid?: number;
+  // ai_running:live log 最後一行(像 ticket.liveLog)
+  liveLog?: string;
+  // failed 時填:失敗原因
+  reason?: string;
+  // done 時填:merge commit hash
+  mergeCommit?: { hash: string; subject: string; ts: number };
 };
 
 // ─── Run log(.runtime/logs/<pipelineId>-<ts>.log 解析結果) ───
@@ -356,6 +391,10 @@ export type NotifEventType =
   | "pipeline_blocked_budget"
   | "runner_stall"
   | "runner_crash"
+  | "sync_started"
+  | "sync_conflict"
+  | "sync_succeeded"
+  | "sync_failed"
   // P3(SKILL / 跨 pipeline / 排程)
   | "skill_candidate"
   | "cross_pipeline_pattern"
@@ -407,6 +446,10 @@ export const NOTIF_EVENTS: Record<NotifEventType, NotifEventMeta> = {
   pipeline_blocked_budget: { sev: "block", phase: "P2", label: "Pipeline 被預算上限擋下" },
   runner_stall: { sev: "block", phase: "P2", label: "Runner 卡住" },
   runner_crash: { sev: "block", phase: "P2", label: "Runner crash" },
+  sync_started: { sev: "muted", phase: "P2", label: "同步已啟動" },
+  sync_conflict: { sev: "block", phase: "P2", label: "同步遇衝突,等 user 決定" },
+  sync_succeeded: { sev: "info", phase: "P2", label: "同步完成" },
+  sync_failed: { sev: "block", phase: "P2", label: "同步失敗" },
 
   skill_candidate: { sev: "info", phase: "P3", label: "新 SKILL 候選" },
   cross_pipeline_pattern: { sev: "info", phase: "P3", label: "跨 pipeline 模式偵測" },
