@@ -16,5 +16,14 @@ export default defineConfig({
       "/api": { target: apiTarget, changeOrigin: false },
     },
   },
-  preview: { port: 4173, host: "0.0.0.0", strictPort: true, allowedHosts: true },
+  preview: {
+    port: 4173,
+    host: "0.0.0.0",
+    strictPort: true,
+    allowedHosts: true,
+    // 跟 dev server 一樣 proxy /api → backend(bun run start 用 preview 提供前端時生效)
+    proxy: {
+      "/api": { target: apiTarget, changeOrigin: false },
+    },
+  },
 });

@@ -10,6 +10,7 @@
     "dev:all": "concurrently -n vite,bun -c blue,yellow \"bun run dev\" \"bun run server:watch\"",
     "build": "tsc -b && vite build",
     "preview": "vite preview --port 4173",
+    "start": "concurrently -n preview,bun -c green,yellow \"bun run preview\" \"bun run server\"",
     "lint": "biome lint",
     "lint:fix": "biome lint --write",
     "test:e2e": "playwright test --config=tests/e2e/playwright.config.ts",

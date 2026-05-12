@@ -13,13 +13,22 @@
 ```bash
 bun install
 
-# 開兩個 terminal 分開跑(推薦):
-bun run dev           # 前端 Vite (5173)
+# 直接用(production-like,不 watch):
+bun run build         # 一次:tsc + vite build → dist/
+bun run start         # 跑 preview (4173) + backend (3001) 兩件
+# 開 http://127.0.0.1:4173/board
+```
+
+開發改 code:
+
+```bash
+# 開兩個 terminal:
+bun run dev           # 前端 Vite HMR (5173)
 bun run server        # 後端 Bun (3001,不 watch)
 # 開 http://127.0.0.1:5173/board
 ```
 
-`bun run dev:all` 可一次起兩個,但內部用 `server:watch` — **不要在跑 AI merge 時用**(熱重載會殺掉 runner 子程,merge 中斷)。日常開發如不會觸發 merge 才用 `dev:all`,否則分開跑保險。
+`bun run dev:all` 一次起 dev + server:watch,但 **AI merge 進行時別用** — 熱重載會殺掉 runner 子程。日常 dev 不觸發 merge 才用,否則分開跑保險。
 
 打包 CLI 成單檔 binary:
 
@@ -152,11 +161,13 @@ Phase 1-5 全套已落地(CRUD + QA + Runner + Worktree + Merge/Sync + Auto + Ta
 
 | 指令 | 用途 |
 |---|---|
-| `bun run dev` | Vite 前端(5173) |
+| `bun run dev` | Vite 前端 HMR(5173,dev 用) |
 | `bun run server` | Bun 後端(3001,不 watch) |
 | `bun run server:watch` | 後端熱重載(self-merge 期間別用 — `bun --watch` reload 會殺掉 spawn 出去的 runner 子程) |
-| `bun run dev:all` | 同時跑兩個 |
-| `bun run build` | `tsc -b && vite build` |
+| `bun run dev:all` | dev + server:watch 同時跑(AI merge 時別用) |
+| `bun run build` | `tsc -b && vite build` → `dist/` |
+| `bun run preview` | 提供 `dist/`(4173) |
+| `bun run start` | preview + server,production-like 直接用 |
 | `bun run lint` | Biome lint |
 | `bun run test:e2e` | Playwright mock 模式(CI 預設) |
 | `bun run test:e2e:real` | Playwright real 模式(燒 token,opt-in) |
