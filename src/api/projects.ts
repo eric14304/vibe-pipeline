@@ -25,6 +25,7 @@ export type BrowseResult = {
   parent: string | null;
   sep: string;
   home: string;
+  drives: string[]; // Windows 才有,POSIX 空陣列
   entries: Array<{ name: string; isDir: boolean }>;
 };
 

@@ -91,12 +91,27 @@ export async function browseFolder(req: Request): Promise<Response> {
     return p;
   })();
 
+  // Windows:列可用磁碟給 user 切(C:\ 沒辦法 ↑ 到別的磁碟)
+  // POSIX:'/' 是唯一 root,不需要
+  const drives: string[] = [];
+  if (process.platform === "win32") {
+    for (const letter of "ABCDEFGHIJKLMNOPQRSTUVWXYZ") {
+      const root = letter + ":\\";
+      try {
+        if (existsSync(root)) drives.push(root);
+      } catch {
+        // ignore
+      }
+    }
+  }
+
   return ok({
     path: target,
     parent,
     sep,
     entries,
     home: homedir(),
+    drives,
   });
 }
 

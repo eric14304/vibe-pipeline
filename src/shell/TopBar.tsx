@@ -391,6 +391,7 @@ export function TopBar({
                   gap: 8,
                   marginBottom: 8,
                   flexWrap: "wrap",
+                  alignItems: "center",
                 }}
               >
                 <button
@@ -411,6 +412,45 @@ export function TopBar({
                 >
                   🏠 home
                 </button>
+                {(browseData?.drives.length ?? 0) > 0 && (
+                  <>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        color: "var(--fg-faint)",
+                        marginLeft: 4,
+                      }}
+                    >
+                      磁碟:
+                    </span>
+                    {browseData!.drives.map((d) => {
+                      const active = browseData?.path.toUpperCase().startsWith(d.toUpperCase());
+                      return (
+                        <button
+                          key={d}
+                          type="button"
+                          className="btn"
+                          onClick={() => void loadBrowse(d)}
+                          disabled={browseLoading}
+                          style={{
+                            padding: "4px 10px",
+                            fontFamily: "var(--font-mono)",
+                            fontSize: 12,
+                            ...(active
+                              ? {
+                                  borderColor: "var(--accent)",
+                                  color: "var(--accent)",
+                                }
+                              : {}),
+                          }}
+                          title={`切到 ${d}`}
+                        >
+                          {d.replace("\\", "")}
+                        </button>
+                      );
+                    })}
+                  </>
+                )}
               </div>
               <div
                 style={{
