@@ -84,9 +84,9 @@ export function TicketDrawer({
         <div className="drawer-head">
           <div className="drawer-crumb">
             <span className="mono">{pipelineName}</span>
-            <span className="sep">/</span>
+            <span className="sep" style={{ color: "var(--fg-faint)" }}>›</span>
             <span className="mono" style={{ color: "var(--fg-mute)" }}>
-              ⎇ {pipelineBranch}
+              Ticket #{String(ticket.n).padStart(2, "0")}
             </span>
             <span className="drawer-crumb-spacer" />
             <button type="button"
@@ -101,7 +101,6 @@ export function TicketDrawer({
             </button>
           </div>
           <div className="drawer-titlerow">
-            <span className="tdrw-num mono">{String(ticket.n).padStart(2, "0")}</span>
             <div className="drawer-title">{ticket.title}</div>
           </div>
           <div className="drawer-meta mono">

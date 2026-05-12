@@ -40,9 +40,9 @@ export function PipelineHistoryDrawer({
         <div className="drawer-head">
           <div className="drawer-crumb">
             <span className="mono">{pipelineName}</span>
-            <span className="sep">/</span>
+            <span className="sep" style={{ color: "var(--fg-faint)" }}>›</span>
             <span className="mono" style={{ color: "var(--fg-mute)" }}>
-              ⎇ {pipelineBranch}
+              執行紀錄
             </span>
             <span className="drawer-crumb-spacer" />
             <button
@@ -61,7 +61,7 @@ export function PipelineHistoryDrawer({
             <div className="drawer-title">執行紀錄</div>
           </div>
           <div className="drawer-meta mono" style={{ color: "var(--fg-mute)" }}>
-            pipeline 跑過的所有 runner spawn(主 agent session log)
+            {pipelineBranch} · pipeline 跑過的所有 runner spawn(主 agent session log)
           </div>
         </div>
         <div className="drawer-body">
