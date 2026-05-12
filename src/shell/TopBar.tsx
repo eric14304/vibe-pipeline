@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import { Logo } from "../ui/Logo";
 import { CheckIconSm, ChevronIcon, FolderIcon, MoonIcon, PlusIcon, SunIcon } from "../ui/icons";
@@ -25,6 +26,9 @@ export function TopBar({
   const [error, setError] = useState<string | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const overflowRef = useRef<HTMLDivElement>(null);
+  // 手動路徑 modal — remote(Tailscale)用,native picker 在 host 上跳 user 看不到,改 user 自己打 path
+  const [pathDialogOpen, setPathDialogOpen] = useState(false);
+  const [pathInput, setPathInput] = useState("");
   // theme 來源:URL ?theme= override → localStorage → light
   // toggle 寫 localStorage 並同步 <html> class(useTheme hook 也會跑,雙保險;localStorage 觸發不了 React 重 render,所以這裡也手動 setIsDark)
   const [searchParams] = useSearchParams();
@@ -137,6 +141,29 @@ export function TopBar({
     }
   }
 
+  async function openByPath(path: string) {
+    const trimmed = path.trim();
+    if (!trimmed) {
+      setError("路徑不能空");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const project = await api.openProject(trimmed);
+      const list = await api.listRecent();
+      setRecents(list);
+      setHash(project.hash);
+      setPathDialogOpen(false);
+      setPathInput("");
+      setOpen(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="topbar">
       <div className="topbar-left">
@@ -197,6 +224,27 @@ export function TopBar({
                 <span>{busy ? "開啟中…" : "選擇其他資料夾…"}</span>
                 <span className="kbd mono" style={{ marginLeft: "auto" }}>
                   {isMac() ? "⌘O" : "Ctrl+O"}
+                </span>
+              </button>
+              <button
+                type="button"
+                className="proj-menu-item proj-menu-item-action"
+                onClick={() => {
+                  setOpen(false);
+                  setPathInput("");
+                  setError(null);
+                  setPathDialogOpen(true);
+                }}
+                disabled={busy}
+                title="遠端(Tailscale)無法用 native picker,改手動打 host 上的絕對路徑"
+              >
+                <FolderIcon />
+                <span>手動輸入路徑…</span>
+                <span
+                  className="mono"
+                  style={{ marginLeft: "auto", fontSize: 10, color: "var(--fg-faint)" }}
+                >
+                  Tailscale
                 </span>
               </button>
               {error && (
@@ -290,6 +338,83 @@ export function TopBar({
           </div>
         </div>
       </div>
+      {pathDialogOpen && createPortal(
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="modal-backdrop"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !busy) {
+              setPathDialogOpen(false);
+              setError(null);
+            }
+          }}
+        >
+          <div className="modal-card">
+            <div className="modal-title">開啟專案(輸入路徑)</div>
+            <div className="modal-body">
+              <p style={{ margin: "6px 0", fontSize: 13, color: "var(--fg-mute)" }}>
+                輸入 host 上的絕對路徑(遠端 Tailscale 連入時用,native 檔案總管只在 host 開)。
+              </p>
+              <input
+                autoFocus
+                className="qadr-input"
+                placeholder={isMac() ? "/Users/you/projects/foo" : "D:\\code\\foo"}
+                value={pathInput}
+                onChange={(e) => setPathInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void openByPath(pathInput);
+                  } else if (e.key === "Escape") {
+                    if (!busy) {
+                      setPathDialogOpen(false);
+                      setError(null);
+                    }
+                  }
+                }}
+                disabled={busy}
+                style={{ width: "100%", marginTop: 8 }}
+              />
+              {error && (
+                <div
+                  style={{
+                    marginTop: 10,
+                    fontSize: 12,
+                    color: "var(--failed)",
+                    wordBreak: "break-word",
+                  }}
+                >
+                  {error}
+                </div>
+              )}
+            </div>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  if (busy) return;
+                  setPathDialogOpen(false);
+                  setError(null);
+                }}
+                disabled={busy}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => void openByPath(pathInput)}
+                disabled={busy || !pathInput.trim()}
+              >
+                {busy ? "開啟中…" : "開啟"}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
