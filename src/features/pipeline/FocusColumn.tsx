@@ -854,7 +854,8 @@ function OverflowMenu({
             <MenuItem
               icon={<span style={{ color: pipeline.autoMerge ? "var(--done)" : "var(--fg-faint)" }}>{pipeline.autoMerge ? "●" : "○"}</span>}
               label="自動合併"
-              hint={pipeline.autoMerge ? "on" : "off"}
+              hint={lockedByState ? "running 中,暫不可改" : pipeline.autoMerge ? "on" : "off"}
+              disabled={lockedByState}
               onClick={() => {
                 onToggleAutoMerge(pipeline.id, !pipeline.autoMerge);
               }}
