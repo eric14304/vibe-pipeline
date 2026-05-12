@@ -640,16 +640,31 @@ async function maybeAutoMerge(opts: {
   }
 
   try {
+    // 2026-05-13 改:auto-merge 走 backend-only git merge(不 spawn AI)。
+    // - clean → 秒結束,寫 state=merged + mergeCommit + emit pipeline_merged
+    // - conflict → git merge --abort,emit merge_blocked notif,user 自己決定是否手動 AI 解
+    // - 其他失敗(dirty / git_error)→ 寫 lastAutoMergeError + merge_blocked
     // dynamic import 拆循環依賴
-    const { triggerMerge } = await import("../pipelineMerge");
-    const r = await triggerMerge({
+    const { autoMergeNoAI } = await import("../pipelineMerge");
+    const r = await autoMergeNoAI({
       projectPath,
       projectHash,
       pipelineId,
-      hasGit: true, // ready 時必然有 git(否則跑不到這一刻)
+      hasGit: true,
     });
-    if (!r.ok) {
-      // 把錯誤回寫進 pipeline,前端可顯示 + emit merge_blocked
+    if (r.ok) {
+      // 成功:emit pipeline_merged(autoMergeNoAI 已寫 state=merged + mergeCommit)
+      const sub = "mergeCommit" in r && r.mergeCommit
+        ? `merge commit ${r.mergeCommit.hash.slice(0, 7)}`
+        : "已最新(無 commit 可合)";
+      notifs.emit(projectPath, {
+        type: "pipeline_merged",
+        title: `${name} 自動合併完成`,
+        sub,
+        pipelineId,
+      });
+    } else {
+      // 失敗:寫 lastAutoMergeError + emit merge_blocked
       const cur = (await pipelineDir.readPipeline(projectPath, pipelineId)) as {
         [k: string]: unknown;
       } | null;
@@ -659,10 +674,13 @@ async function maybeAutoMerge(opts: {
           lastAutoMergeError: r.error,
         });
       }
+      const conflictSummary = r.reason === "conflict" && "conflictFiles" in r && r.conflictFiles
+        ? `${r.conflictFiles.length} 衝突檔,需手動 AI 解`
+        : r.error;
       notifs.emit(projectPath, {
         type: "merge_blocked",
         title: `${name} 自動合併失敗`,
-        sub: r.error,
+        sub: conflictSummary,
         pipelineId,
       });
     }

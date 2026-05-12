@@ -116,3 +116,130 @@ export async function triggerMerge(opts: {
   }
   return { ok: true, ticketId: appendRes.ticket.id as string, reused: appendRes.reused };
 }
+
+// ─────────────────────────────────────────────────────────────────────
+// Backend-only auto merge(2026-05-13)— autoMerge=true 場景走這條,不 spawn AI。
+// 純 git CLI:checkout base → merge --no-ff pipelineBranch。
+// clean → 寫 pipeline.state="merged" + mergeCommit;
+// conflict → git merge --abort + 回 conflictFiles,**不自動派 AI 解**(user 看 notif 主動觸發 manual AI merge)
+// 心智:autoMerge 是「便利開關」,風險(燒 token 解衝突)決策回到 user
+
+export type AutoMergeResult =
+  | { ok: true; mergeCommit: { hash: string; subject: string; ts: number }; behindCount: number }
+  | { ok: true; alreadyMerged: true }
+  | { ok: false; reason: "no_git" | "not_found" | "running" | "working_tree_dirty"; error: string }
+  | { ok: false; reason: "conflict"; error: string; conflictFiles: string[] }
+  | { ok: false; reason: "git_error"; error: string };
+
+async function spawnGit(args: string[], cwd: string): Promise<{ ok: boolean; out: string; err: string }> {
+  const proc = Bun.spawn(["git", ...args], { cwd, stdout: "pipe", stderr: "pipe" });
+  const [out, err] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ]);
+  await proc.exited;
+  return { ok: proc.exitCode === 0, out: out.trim(), err: err.trim() };
+}
+
+export async function autoMergeNoAI(opts: {
+  projectPath: string;
+  projectHash: string;
+  pipelineId: string;
+  hasGit: boolean;
+}): Promise<AutoMergeResult> {
+  const { projectPath, projectHash, pipelineId, hasGit } = opts;
+
+  if (!hasGit) return { ok: false, reason: "no_git", error: "Project 沒 .git/" };
+  if (orchestrator.isRunning(projectHash, pipelineId)) {
+    return { ok: false, reason: "running", error: "Pipeline 在跑,先 pause 才能 merge" };
+  }
+
+  const dirty = await git.workingTreeStatus(projectPath);
+  if (!dirty.clean) {
+    return {
+      ok: false,
+      reason: "working_tree_dirty",
+      error:
+        `main repo 有 ${dirty.modified} 個 modified + ${dirty.untracked} 個 untracked,` +
+        `先 commit 或 stash 再讓 auto-merge 推進(避免 merge 動到 user 沒存的工作)。`,
+    };
+  }
+
+  const pipeline = (await pipelineDir.readPipeline(projectPath, pipelineId)) as {
+    name?: string;
+    branch?: string;
+    baseBranch?: string;
+    [k: string]: unknown;
+  } | null;
+  if (!pipeline) return { ok: false, reason: "not_found", error: `Pipeline not found: ${pipelineId}` };
+
+  const pipelineBranch = pipeline.branch || `pipeline/${pipeline.name || pipelineId}`;
+  const baseBranch = pipeline.baseBranch || "main";
+
+  // 看當前 base 已經包含 pipeline branch 沒(已 merge 過 / no-op)
+  const ahead = await spawnGit(["rev-list", "--count", `${baseBranch}..${pipelineBranch}`], projectPath);
+  if (ahead.ok && ahead.out === "0") {
+    // pipeline branch 沒任何 commit 在 base 之外 — 不該到這步通常,fallback handle
+    return { ok: true, alreadyMerged: true };
+  }
+
+  // 1. checkout base
+  const co = await spawnGit(["checkout", baseBranch], projectPath);
+  if (!co.ok) {
+    return { ok: false, reason: "git_error", error: `checkout ${baseBranch} 失敗:${co.err || co.out}` };
+  }
+
+  // 2. merge --no-ff(走 fixed 策略,同 AI merge ticket)
+  const msg = `Merge pipeline/${pipeline.name || pipelineId} into ${baseBranch} (auto)`;
+  const mergeRes = await spawnGit(
+    ["merge", "--no-ff", "-m", msg, pipelineBranch],
+    projectPath
+  );
+
+  if (mergeRes.ok) {
+    const headRes = await spawnGit(["rev-parse", "HEAD"], projectPath);
+    const subjRes = await spawnGit(["log", "-1", "--format=%s"], projectPath);
+    const ts = Date.now();
+    const mergeCommit = {
+      hash: headRes.out.trim(),
+      subject: subjRes.out.trim() || msg,
+      ts,
+    };
+    // 寫 pipeline state=merged + mergeCommit + mergedAt
+    const cur = (await pipelineDir.readPipeline(projectPath, pipelineId)) as Record<string, unknown> | null;
+    if (cur) {
+      await pipelineDir.writePipeline(projectPath, pipelineId, {
+        ...cur,
+        state: "merged",
+        mergedAt: ts,
+        mergeCommit,
+        lastAutoMergeError: undefined,
+      });
+    }
+    const aheadNum = Number(ahead.out) || 0;
+    return { ok: true, mergeCommit, behindCount: aheadNum };
+  }
+
+  // merge 失敗:看是不是衝突
+  const status = await spawnGit(["status", "--porcelain"], projectPath);
+  const conflictFiles = status.ok
+    ? status.out
+        .split(/\r?\n/)
+        .filter((l) => /^(UU|AA|DD|AU|UA|DU|UD)\s/.test(l))
+        .map((l) => l.replace(/^..\s+/, ""))
+    : [];
+
+  // abort 把 working tree 回原狀(unstaged conflicts 不會 leak)
+  await spawnGit(["merge", "--abort"], projectPath);
+
+  if (conflictFiles.length > 0) {
+    return {
+      ok: false,
+      reason: "conflict",
+      error: `${conflictFiles.length} 個檔案衝突,auto-merge 不自動 AI 解;user 可手動點「AI 合併」走完整 AI 流程`,
+      conflictFiles,
+    };
+  }
+
+  return { ok: false, reason: "git_error", error: mergeRes.err || mergeRes.out || "merge failed" };
+}
