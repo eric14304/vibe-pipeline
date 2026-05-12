@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { BellIcon, ChevronRightIcon, CloseIcon, InboxEmptyIcon } from "../../ui/icons";
 // strip 改 bell + 數字 badge 一顆按鈕(取代原本 ChevronLeft 展開鈕 + 獨立 count box 兩件)。
 import { SEV_COLOR } from "../../data/notifications";
@@ -50,18 +51,54 @@ function InboxStrip({
   onExpand: () => void;
   onItemClick: (id: string, pipelineId?: string) => void;
 }) {
-  // 一律 flat:items 已 newest-first,直接拿前 N 顯示;不再分 block/info/muted 三段層級
-  // sev 走 pip 顏色 + unread 走 ring(實心/外圈),不再「大 icon vs pip」雙視覺
+  // strip 整塊當一個觸碰區。dots 是視覺索引,但不再個別當 button(太小難點)。
+  // hover 進入 → 進 preview mode,顯第一則(idx=0);滾輪改 idx;點擊跳該則。
+  // 滑出 strip → preview popover 消失,idx 清空
   const SHOW = 12;
   const visible = items.slice(0, SHOW);
   const overflow = Math.max(0, items.length - SHOW);
 
+  const [previewIdx, setPreviewIdx] = useState<number | null>(null);
+  const stripRef = useRef<HTMLDivElement>(null);
+
+  // wheel 換 preview 項。preventDefault 不讓頁面跟著捲(passive: false)
+  useEffect(() => {
+    const el = stripRef.current;
+    if (!el) return;
+    function onWheel(e: WheelEvent) {
+      if (visible.length === 0) return;
+      e.preventDefault();
+      const dir = e.deltaY > 0 ? 1 : -1;
+      setPreviewIdx((prev) => {
+        const cur = prev ?? 0;
+        const next = cur + dir;
+        if (next < 0) return 0;
+        if (next >= visible.length) return visible.length - 1;
+        return next;
+      });
+    }
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [visible.length]);
+
+  const previewItem = previewIdx !== null ? visible[previewIdx] : null;
+
   return (
-    <div className="inbox-strip">
+    <div
+      className="inbox-strip"
+      ref={stripRef}
+      onMouseEnter={() => {
+        if (visible.length > 0) setPreviewIdx(0);
+      }}
+      onMouseLeave={() => setPreviewIdx(null)}
+    >
       <button
         type="button"
         className={"inbox-strip-bell" + (unreadCount > 0 ? " has-unread" : "")}
-        onClick={onExpand}
+        onClick={(e) => {
+          e.stopPropagation();
+          onExpand();
+        }}
         title={unreadCount > 0 ? `展開 inbox(${unreadCount} 未讀)` : "展開 inbox"}
         aria-label={unreadCount > 0 ? `展開 inbox,${unreadCount} 未讀` : "展開 inbox"}
       >
@@ -74,30 +111,70 @@ function InboxStrip({
       </button>
       <div className="inbox-strip-divider"></div>
 
-      <div className="inbox-strip-pips">
-        {visible.map((it) => (
-          <button type="button"
+      {/* dots 區整塊當一個觸碰區:click 跳當前 preview 項,沒 preview 就展開 inbox */}
+      <button
+        type="button"
+        className="inbox-strip-pips"
+        onClick={() => {
+          if (previewItem) {
+            onItemClick(previewItem.id, previewItem.pipelineId);
+          } else if (visible.length > 0) {
+            // 沒 hover 進來就點(touch 或鍵盤)→ 跳第一則
+            onItemClick(visible[0].id, visible[0].pipelineId);
+          } else {
+            onExpand();
+          }
+        }}
+        title={
+          previewItem
+            ? "點擊跳該 pipeline · 滾輪切換"
+            : visible.length > 0
+            ? "hover 預覽 · 滾輪切換 · 點擊跳"
+            : "展開 inbox"
+        }
+        aria-label="通知列表"
+      >
+        {visible.map((it, i) => (
+          <span
             key={it.id}
             className={
               "inbox-strip-pip" +
               (it.unread ? " is-unread" : "") +
-              " is-" + it.sev
+              " is-" + it.sev +
+              (i === previewIdx ? " is-preview" : "")
             }
             style={{ ["--strip-color" as string]: SEV_COLOR[it.sev] } as React.CSSProperties}
-            onClick={() => onItemClick(it.id, it.pipelineId)}
-            title={it.title + " · " + it.ts}
-            aria-label={it.title}
+            aria-hidden="true"
           />
         ))}
         {overflow > 0 && (
-          <span className="inbox-strip-overflow mono" title={`還有 ${overflow} 條`}>
+          <span className="inbox-strip-overflow mono" aria-label={`還有 ${overflow} 條`}>
             +{overflow}
           </span>
         )}
-      </div>
+      </button>
 
       <div className="inbox-strip-spacer"></div>
       <div className="inbox-strip-label">INBOX</div>
+
+      {previewItem && (
+        <div
+          className="inbox-strip-preview"
+          style={{ ["--preview-color" as string]: SEV_COLOR[previewItem.sev] } as React.CSSProperties}
+        >
+          <div className="inbox-strip-preview-head">
+            <span className={"inbox-strip-preview-dot is-" + previewItem.sev} />
+            <span className="inbox-strip-preview-title">{previewItem.title}</span>
+          </div>
+          {previewItem.sub && (
+            <div className="inbox-strip-preview-sub">{previewItem.sub}</div>
+          )}
+          <div className="inbox-strip-preview-meta mono">
+            {previewItem.ts} · {previewIdx! + 1}/{visible.length}
+            {previewItem.unread ? " · 未讀" : ""}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
