@@ -1,0 +1,60 @@
+// CLI HTTP client — 只 mutate 操作(spawn / kill 子程)走這個,
+// 讓 backend server 養 child process,CLI 死了 child 不會孤兒。
+// read 操作仍走 fs(reuse server/lib/*)直接讀 .vibe-pipeline/ 內容。
+//
+// base URL 解析優先序:
+//   1. VBPL_API_BASE env var(user 自訂 e.g. tailscale IP)
+//   2. http://127.0.0.1:3001(預設,跟 dev backend 對齊)
+
+import { fail } from "./output";
+
+const DEFAULT_BASE = "http://127.0.0.1:3001";
+
+export function apiBase(): string {
+  return process.env["VBPL_API_BASE"] || DEFAULT_BASE;
+}
+
+// 先確認 backend 活著,沒活就 helpful error。所有 mutate 呼叫前都走這個。
+export async function requireBackend(): Promise<void> {
+  const url = `${apiBase()}/api/health`;
+  try {
+    const res = await fetch(url, { method: "GET" });
+    if (!res.ok) {
+      fail("NO_BACKEND", `Backend health check 失敗(${res.status}):${url}`);
+    }
+    const j = (await res.json()) as { ok?: boolean };
+    if (!j.ok) {
+      fail("NO_BACKEND", `Backend health 回非 ok:${url}`);
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    fail(
+      "NO_BACKEND",
+      `Backend 沒起 或 不在 ${apiBase()}。先跑 'bun run server'(或設 VBPL_API_BASE)。原始錯誤:${msg}`,
+    );
+  }
+}
+
+type ApiResult<T> = { ok: true; data: T } | { ok: false; error: { code?: string; message: string } };
+
+export async function post<T = unknown>(path: string, body?: unknown): Promise<T> {
+  await requireBackend();
+  const url = `${apiBase()}${path}`;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: body != null ? { "content-type": "application/json; charset=utf-8" } : {},
+      body: body != null ? JSON.stringify(body) : undefined,
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    fail("IO_ERROR", `POST ${path} 連線失敗:${msg}`);
+  }
+  const j = (await res.json()) as ApiResult<T>;
+  if (!j.ok) {
+    const code = j.error?.code?.toUpperCase() || "IO_ERROR";
+    fail(code, j.error?.message || `${path} 失敗(${res.status})`);
+  }
+  return j.data;
+}

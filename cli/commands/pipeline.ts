@@ -2,10 +2,8 @@ import * as pipelineDir from "../../server/lib/pipelineDir";
 import * as orchestrator from "../../server/lib/runner/orchestrator";
 import * as runLog from "../../server/lib/runner/runLog";
 import * as syncJob from "../../server/lib/runner/syncJob";
-import { triggerMerge } from "../../server/lib/pipelineMerge";
-import * as git from "../../server/lib/git";
-import * as projectStore from "../../server/lib/projectStore";
 import { resolveProject, requireInit } from "../lib/project";
+import { post } from "../lib/api";
 import type { ParsedArgs } from "../lib/args";
 import { fail, isJsonMode, okJson, print, printLines, table } from "../lib/output";
 import type { Pipeline } from "../../shared/types";
@@ -138,19 +136,17 @@ async function pipelineDelete(args: ParsedArgs): Promise<void> {
   print(`Deleted pipeline: ${id}`);
 }
 
+// 走 backend HTTP — spawn child(claude/codex runner)必須讓 backend 養。
+// CLI 自己 spawn 會在 CLI 退出時失去 child 控制權(orchestrator running map 蒸發,watchdog / pause / stop 都失效)
 async function pipelineRun(args: ParsedArgs): Promise<void> {
   const proj = await resolveProject(args.flags);
   await requireInit(proj.path);
   const id = args.positional[0];
   if (!id) fail("INVALID_ARGS", "Usage: vbpl pipeline run <id>");
 
-  const result = await orchestrator.start({
-    projectPath: proj.path,
-    projectHash: proj.hash,
-    pipelineId: id,
-  });
-
-  if (!result.ok) fail("IO_ERROR", result.error);
+  const result = await post<{ ok: true; queued?: boolean; position?: number | null }>(
+    `/api/projects/${proj.hash}/pipelines/${id}/run`
+  );
 
   if (isJsonMode()) {
     okJson({ started: true, pipelineId: id, queued: result.queued ?? false, position: result.position ?? null });
@@ -169,13 +165,7 @@ async function pipelineStop(args: ParsedArgs): Promise<void> {
   const id = args.positional[0];
   if (!id) fail("INVALID_ARGS", "Usage: vbpl pipeline stop <id>");
 
-  const result = await orchestrator.stop({
-    projectPath: proj.path,
-    projectHash: proj.hash,
-    pipelineId: id,
-  });
-
-  if (!result.ok) fail("IO_ERROR", result.error);
+  await post(`/api/projects/${proj.hash}/pipelines/${id}/pause`);
 
   if (isJsonMode()) {
     okJson({ stopping: true, pipelineId: id });
@@ -257,31 +247,16 @@ async function pipelineLog(args: ParsedArgs): Promise<void> {
   }
 }
 
-// AI merge:把 pipeline branch merge 回 base。等效 web UI 的 ReadyBanner「AI 合併」按鈕。
-// 跟 web 一樣 spawn 後立刻返回,實際 merge 由 runner 主 agent 跑(可在 vbpl pipeline log 看進度)
+// AI merge:走 backend POST /merge,backend spawn runner 主 agent。CLI 立刻返回。
 async function pipelineMerge(args: ParsedArgs): Promise<void> {
   const proj = await resolveProject(args.flags);
   await requireInit(proj.path);
   const id = args.positional[0];
   if (!id) fail("INVALID_ARGS", "Usage: vbpl pipeline merge <id>");
 
-  const projRec = await projectStore.findByHash(proj.hash);
-  const hasGit = projRec?.hasGit ?? git.hasGit(proj.path);
-
-  const res = await triggerMerge({
-    projectPath: proj.path,
-    projectHash: proj.hash,
-    pipelineId: id,
-    hasGit,
-  });
-  if (!res.ok) {
-    const code = res.reason === "not_found" ? "NOT_FOUND"
-      : res.reason === "running" ? "STATE_GUARD"
-      : res.reason === "no_git" ? "NOT_INITIALIZED"
-      : res.reason === "working_tree_dirty" ? "STATE_GUARD"
-      : "IO_ERROR";
-    fail(code, res.error);
-  }
+  const res = await post<{ ok: true; ticketId: string; reused?: boolean }>(
+    `/api/projects/${proj.hash}/pipelines/${id}/merge`
+  );
 
   if (isJsonMode()) {
     okJson({ started: true, pipelineId: id, mergeTicketId: res.ticketId, reused: res.reused });
@@ -307,15 +282,15 @@ async function pipelineSync(args: ParsedArgs): Promise<void> {
   const wantDismiss = args.flags["dismiss"] === true;
 
   if (wantAi) {
-    const res = await syncJob.confirmAi({ projectPath: proj.path, projectHash: proj.hash, pipelineId: id });
-    if (!res.ok) fail("STATE_GUARD", res.error);
+    // spawn AI child → 必須走 HTTP 讓 backend 養 child
+    await post(`/api/projects/${proj.hash}/pipelines/${id}/sync/ai`);
     if (isJsonMode()) { okJson({ confirmed: true }); return; }
     print(`AI conflict resolution started for ${id}. Watch: vbpl pipeline status ${id}`);
     return;
   }
   if (wantCancel) {
-    const res = await syncJob.cancelSync({ projectPath: proj.path, projectHash: proj.hash, pipelineId: id });
-    if (!res.ok) fail("STATE_GUARD", res.error);
+    // 可能要 kill 已 spawn AI → 必須走 HTTP
+    await post(`/api/projects/${proj.hash}/pipelines/${id}/sync/cancel`);
     if (isJsonMode()) { okJson({ cancelled: true }); return; }
     print(`Sync cancelled. worktree restored via git merge --abort.`);
     return;
