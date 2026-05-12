@@ -676,6 +676,31 @@ async function maybeAutoMerge(opts: {
         sub: `${fileCount} 衝突檔,backend 已 abort merge,改 spawn AI`,
         pipelineId,
       });
+      // FCM push:user 可能不在 UI(autoMerge 場景就是要無人值守);告知 AI 接手了
+      void (async () => {
+        try {
+          const tokenStore = await import("../push/tokenStore");
+          const { fanoutPush } = await import("../fcm");
+          const records = await tokenStore.listTokens();
+          if (records.length === 0) return;
+          const dead = await fanoutPush(
+            records.map((rec) => rec.token),
+            {
+              notification: {
+                title: `🤖 ${name} AI 接手解衝突`,
+                body: `自動合併撞 ${fileCount} 個衝突檔,AI 開始處理`,
+              },
+              data: {
+                workUnitId: pipelineId,
+                url: `/board?project=${projectHash}&pipeline=${pipelineId}`,
+              },
+            }
+          );
+          if (dead.length > 0) await tokenStore.removeDeadTokens(dead);
+        } catch (e) {
+          console.error(`[autoMerge ${pipelineId}] push failed:`, e);
+        }
+      })();
       const ai = await triggerMerge({
         projectPath,
         projectHash,
