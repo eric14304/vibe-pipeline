@@ -14,7 +14,8 @@
     "lint:fix": "biome lint --write",
     "test:e2e": "playwright test --config=tests/e2e/playwright.config.ts",
     "test:e2e:real": "playwright test --config=tests/e2e/playwright.real.config.ts",
-    "icons": "bun run scripts/gen-icons.ts"
+    "icons": "bun run scripts/gen-icons.ts",
+    "vbpl": "bun run cli/vbpl.ts"
   },
   "dependencies": {
     "firebase": "^12.13.0",
