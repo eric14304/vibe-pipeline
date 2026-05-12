@@ -3,9 +3,10 @@ import { createTempProject, cleanupTempProject, gitIn, type TempProject } from "
 import { resetMocks, setRunnerScript, type RunnerScript } from "../helpers/mock-control";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { API_BASE } from "../helpers/api-base";
 
 let proj: TempProject;
-const API = "http://127.0.0.1:3001/api";
+const API = API_BASE;
 
 test.beforeEach(async () => {
   await resetMocks();

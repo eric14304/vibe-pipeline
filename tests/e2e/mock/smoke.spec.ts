@@ -1,10 +1,11 @@
 import { test, expect } from "@playwright/test";
+import { API_BASE } from "../helpers/api-base";
 
 // Phase 1 smoke:確認 playwright + vite + bun server 啟得起來、route 通、frontend 渲染。
 // 沒寫 backend mock 注入,純 boot test。Phase 2 才做 fixture project + mock script。
 
 test("backend health 回應 ok", async ({ request }) => {
-  const res = await request.get("http://127.0.0.1:3001/api/health");
+  const res = await request.get(`${API_BASE}/health`);
   expect(res.ok()).toBe(true);
   const body = await res.json();
   expect(body.ok).toBe(true);

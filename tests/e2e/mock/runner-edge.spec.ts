@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { createTempProject, cleanupTempProject, type TempProject } from "../helpers/temp-project";
 import { resetMocks, setRunnerScript, type RunnerScript } from "../helpers/mock-control";
+import { API_BASE } from "../helpers/api-base";
 
 let proj: TempProject;
 
@@ -72,11 +73,11 @@ test("running 中按 Run → 後端 state guard 擋(409 / 4xx)", async ({ page, 
   await page.goto(`/board?project=${proj.hash}`);
 
   // 第一次 Run
-  const res1 = await request.post(`http://127.0.0.1:3001/api/projects/${proj.hash}/pipelines/p-edge/run`);
+  const res1 = await request.post(`${API_BASE}/projects/${proj.hash}/pipelines/p-edge/run`);
   expect(res1.ok()).toBe(true);
 
   // 第二次立即 Run → 應該被 guard 擋
-  const res2 = await request.post(`http://127.0.0.1:3001/api/projects/${proj.hash}/pipelines/p-edge/run`);
+  const res2 = await request.post(`${API_BASE}/projects/${proj.hash}/pipelines/p-edge/run`);
   expect(res2.ok()).toBe(false);
   const body = await res2.json();
   expect(body.error.message).toMatch(/已在 running|已在跑/);
@@ -91,7 +92,7 @@ test("merged pipeline 不准 Run → state guard 擋", async ({ request }) => {
       },
     ],
   });
-  const res = await request.post(`http://127.0.0.1:3001/api/projects/${proj.hash}/pipelines/p-edge/run`);
+  const res = await request.post(`${API_BASE}/projects/${proj.hash}/pipelines/p-edge/run`);
   expect(res.ok()).toBe(false);
   const body = await res.json();
   expect(body.error.message).toMatch(/merge/);
@@ -102,7 +103,7 @@ test("沒劇本就跑 mock runner → 回 error 不 spawn", async ({ request }) 
     pipelines: [pipelineWith([{ id: "t-x", title: "no-script" }])],
   });
   // 故意不 setRunnerScript
-  const res = await request.post(`http://127.0.0.1:3001/api/projects/${proj.hash}/pipelines/p-edge/run`);
+  const res = await request.post(`${API_BASE}/projects/${proj.hash}/pipelines/p-edge/run`);
   expect(res.ok()).toBe(false);
   const body = await res.json();
   expect(body.error.message).toMatch(/no script/);

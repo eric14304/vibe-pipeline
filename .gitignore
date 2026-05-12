@@ -8,6 +8,8 @@ playwright-report/
 playwright-report-real/
 test-results/
 playwright/.cache/
+.playwright-browsers/
+.tmp/
 
 # vibe-pipeline runtime (session drafts etc, regenerated)
 .vibe-pipeline/.runtime/

@@ -87,6 +87,10 @@ async function handle(req: Request): Promise<Response> {
     if (pathname === "/api/__test/script/runner" && method === "POST")
       return test.setRunnerScript(req);
     if (pathname === "/api/__test/reset" && method === "POST") return test.reset();
+    if (pathname === "/api/__test/fcm/calls" && method === "GET") return test.fcmCalls();
+    if (pathname === "/api/__test/fcm/reset" && method === "POST") return test.fcmReset();
+    if (pathname === "/api/__test/push/file-content" && method === "GET")
+      return test.pushFileContent();
     if (pathname === "/api/__test/auth/reset" && method === "POST") return test.authReset();
     if (pathname === "/api/__test/auth/seed-secret" && method === "POST")
       return test.authSeedSecret(req);
@@ -107,7 +111,7 @@ async function handle(req: Request): Promise<Response> {
   if (pathname === "/api/push/register" && method === "POST") {
     return push.register(req);
   }
-  if (pathname === "/api/push/unregister" && method === "DELETE") {
+  if (pathname === "/api/push/unregister" && (method === "DELETE" || method === "POST")) {
     return push.unregister(req);
   }
   if (pathname === "/api/push/tokens" && method === "GET") {

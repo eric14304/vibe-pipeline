@@ -2,13 +2,14 @@ import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
+import { API_BASE } from "./api-base";
 
 export type TempProject = {
   path: string;
   hash: string;
 };
 
-const API = "http://127.0.0.1:3001/api";
+const API = API_BASE;
 
 // Run git deterministically:設 user.name/email + -b baseBranch,避免吃 user 全域 git config 出 surprise。
 export function gitIn(cwd: string, args: string[]): { ok: boolean; out: string; err: string } {

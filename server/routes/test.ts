@@ -6,6 +6,8 @@ import { join } from "node:path";
 import * as projectStore from "../lib/projectStore";
 import * as testMode from "../lib/testMode";
 import { readAuth, writeAuth } from "../lib/auth/storage";
+import { fakeFcmCalls, resetFakeFcmCalls } from "../lib/fcm";
+import { vibeHome } from "../lib/paths";
 import type { QAReply } from "../lib/qa/schema";
 import type { RunnerScript } from "../lib/testMode";
 
@@ -84,7 +86,27 @@ export async function setRunnerScript(req: Request): Promise<Response> {
 // 不動 fs(每 spec 自己用獨立 tmpdir,不靠 reset)。
 export async function reset(): Promise<Response> {
   testMode.resetMocks();
+  resetFakeFcmCalls();
   return ok({});
+}
+
+// GET /api/__test/fcm/calls
+export function fcmCalls(): Response {
+  return Response.json({ calls: fakeFcmCalls });
+}
+
+// POST /api/__test/fcm/reset
+export function fcmReset(): Response {
+  resetFakeFcmCalls();
+  return Response.json({ ok: true });
+}
+
+// GET /api/__test/push/file-content
+export async function pushFileContent(): Promise<Response> {
+  const filename = "device_tokens.json";
+  const path = join(vibeHome(), ".vibe-pipeline", filename);
+  const content = existsSync(path) ? await Bun.file(path).text() : "";
+  return ok({ filename, content });
 }
 
 // POST /api/__test/auth/reset
