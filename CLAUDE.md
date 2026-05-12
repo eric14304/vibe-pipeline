@@ -2,9 +2,16 @@
 
 多 AI agent(執行AI + 審核AI)的 ticket / pipeline 編排器。Web 應用為主介面,將來配 `vp` CLI。每張 ticket 由 執行AI 跑、審核AI 審,iterative 模式自動迴圈到 審核AI pass;pipeline 是 ticket 的有序組合,每條跑在獨立 git branch,完成後 merge 回 base。
 
-## 當前狀態(2026-05-11)
+## 當前狀態(2026-05-13)
 
-**Phase 1-5 全套已落地**。六條 pipeline 已 merge 進 main(phase3 / phase4 / refactor / perf-claude-cli / codex-cli / phase5)。self-dogfood 自我重構穩定運作,**手機可透過 Tailscale HTTPS + TOTP auth + FCM Web Push 遠端控制 + 收 ticket 通知**。
+**Phase 1-5 全套已落地 + 後續打磨**。六條 pipeline 已 merge 進 main(phase3 / phase4 / refactor / perf-claude-cli / codex-cli / phase5),chore pipeline 補完 e2e mock。self-dogfood 自我重構穩定運作,**手機可透過 Tailscale HTTPS + TOTP auth + FCM Web Push 遠端控制 + 收 ticket 通知**。
+
+**2026-05-13 大改動**(打磨期):
+- **Sync 重構(Plan C)**:`Pipeline.syncJob` 寄生欄位取代舊 `mode=sync` ticket;git-first → 衝突才 AI;新 4 endpoints `/sync` `/sync/ai` `/sync/cancel` `/sync/dismiss`。細節 → [`refs/sync-redesign-2026-05-13.md`](.claude/skills/vibe-pipeline/refs/sync-redesign-2026-05-13.md)
+- **`subAgent` 拆 `executor` + `critic`**:兩個獨立 TaskClass,critic 可挑便宜 model(sonnet+medium)省 token 5-10x;userConfig 自動 migrate(舊 subAgent → executor,critic 走 default)
+- **Client-side folder browser**:新 `GET /api/projects/browse?path=` endpoint,瀏覽器內導覽 host 上目錄;Tailscale 遠端開 project 走這個(native picker 跑在 host user 看不到 dialog)
+- **`pipelineDir.init` 改 idempotent**:`.vibe-pipeline/` partial init 殘骸自動補齊不報錯;`.gitignore` 自動補 `pipelines/`(原本漏)
+- **UX 收斂**:Pipeline 執行紀錄從 TicketDrawer 拆到 pipeline-level OverflowMenu;Inbox strip 整塊觸碰 + 滾輪 preview popover;QA reopen + viewOverride 雙向
 
 | Phase | 一句話 |
 |---|---|
@@ -20,13 +27,13 @@
 - Bun local server + browser(前端 Vite 5173 / 後端 Bun 3001 / `/api/*` 透過 Vite proxy)
 - Runner 主 agent 工具白名單只准 Edit/Write 改 pipeline.json + worktree 外 tmp(commit message)+ Bash 跑 read-only + git add/commit;source code 改動 100% 透過 Task 派 sub-agent
 - Theme 偏好走 localStorage(URL `?theme=` 仍 override);非 backend config
-- 跨 provider sub-agent:claude main → codex sub via codex-rescue plugin(`subAgent.provider===codex` 時 orchestrator 自動加 `--dangerously-skip-permissions`)
+- 跨 provider sub-agent:claude main → codex sub via Bash 直呼 codex CLI(2026-05 砍掉 codex-rescue plugin path);主 agent 永遠帶 `--dangerously-skip-permissions`
+- Sub-agent 拆 executor / critic 兩個 TaskClass(2026-05-13):executor 真改 code 用高 capability,critic 讀 diff 判 PASS/FAIL 用便宜 model;`syncJob` 衝突解走 executor cfg
 - Auth 設計:loopback IP 永遠 bypass,只非 loopback 連線強制 TOTP;本機 dev 完全不受影響
 
 **還沒做(下個 iteration)**
 - Transient retry 真正觸發測試(沒自然 fixture,需 fault injection;低優先,留 production 真踩到再補)
 - Budget tracker UI(backend cost_limit_usd 已落地會擋 /run + 發 budget notif,UI 顯示「目前累積」之類的 dashboard 缺)
-- Phase 5 e2e mock 覆蓋(autoMerge / splitInto / sync / prune worktree / userConfig 等新功能);TOTP auth.spec 已有 happy path,FCM / RWD 還沒 mock
 - self-dogfood 不靠手動 merge 的方案 → merge worktree isolation,規模 ~150 行,看 [refs/merge-isolation-2026-05-11.md](.claude/skills/vibe-pipeline/refs/merge-isolation-2026-05-11.md);99% user 不踩,當前不投入
 - runner spawn 的 `--setting-sources` 還沒砍(留給 Task sub-agent 讀 user/project CLAUDE.md);若日後把 sub-agent context 全 push 進 prompt,可拿 ~13% 額外 cache 改善
 - **CLI(`vbpl` 暫定名)**:命名已 brainstorm 過,實作未啟動。長遠目標是讓 user 不開 browser 也能管 pipeline / ticket
@@ -217,6 +224,7 @@ vibe-pipeline/
 | [`state-matrix-2026-05-10.md`](.claude/skills/vibe-pipeline/refs/state-matrix-2026-05-10.md) | Pipeline state × condition → UI behavior 決策表(改 button / banner 前對齊) |
 | [`merge-isolation-2026-05-11.md`](.claude/skills/vibe-pipeline/refs/merge-isolation-2026-05-11.md) | self-dogfood AI merge 撞 vite/bun watch 的研究紀錄;結論不做(99% user 不踩),phase 5+ 多人 self-dogfood 才回頭做 |
 | [`claude-cli-spawn-perf-2026-05-11.md`](.claude/skills/vibe-pipeline/refs/claude-cli-spawn-perf-2026-05-11.md) | claude CLI spawn 加速 — QA/split/runner 三處 flag 改動量測(QA/split 省 80-90% cost)+ 風險 + 衍生 |
+| [`sync-redesign-2026-05-13.md`](.claude/skills/vibe-pipeline/refs/sync-redesign-2026-05-13.md) | Sync 重構(Plan C)— 從 mode=sync ticket 拆成 pipeline.syncJob;state machine + 4 endpoints + AI 衝突解 prompt 設計 + 「靠 git 判定不靠 AI stdout」雷紀錄 |
 
 **Archive(已落地或一次性閱讀)**:`refs/archive/` 下:`integration-plan-v1` / `integration-plan-v2-qa`(phase 1/2 計畫,均已落地)/ `vibe-kanban` / `symphony` / `composio-ao`(競品對照,設計初期一次性參考)。需要再翻時還在 git 裡。
 
@@ -268,6 +276,9 @@ routes:
 17. **mobile drawer / 全螢幕用 `100dvh` 不要 `100vh`** — `100vh` 在 Android Chrome 算上 nav bar 區域,底部 input 被遮。需要 `viewport-fit=cover`(已在 index.html 設)+ CSS 用 `100dvh`(留 `100vh` 當 fallback)+ drawer-stage z-index ≥ 50(高過 `.board-mobile-tabs` 的 40)。
 18. **跨 provider sub-agent 需要 `--dangerously-skip-permissions`** — claude 主 agent 派 `Task({ subagent_type: "codex-rescue" })` 時,sub-agent 內部 Bash 跑 `node codex-companion.mjs` 在 `defaultMode: auto` 下會被 permission_denials 擋,主 agent 還會幻覺成功訊息。`orchestrator.ts` 偵測 `subAgent.provider===codex || merge.provider===codex` 自動加 flag。
 19. **改 SKILL 結構記得同步 [AGENTS.md](AGENTS.md)** — claude CLI 自動讀 SKILL.md,codex 等其他 AI 只讀 AGENTS.md(指向 CLAUDE.md + SKILL pointer 清單)。新增 / 重命名 / 刪除 SKILL 兩處都要改。
+20. **AI sync 成功判定靠 git 狀態,不靠 AI stdout firstLine** — `syncJob.ts:waitAndFinish` 第一版用 `stdout.split("\n")[0].startsWith("PASS")` 判成功,AI 常把 `PASS\nSYNC_DONE` 寫在中段(`tsc passed.\n\nPASS\nSYNC_DONE`),firstLine 不匹配 → 誤判失敗 → backend `git merge --abort`(merge 已 commit,abort 是 no-op)→ 最終 worktree 已同步但 UI 顯失敗。改用 git ground truth:`!MERGE_HEAD && !conflictMarkers && behindBaseCount===0` 三條都成立才 PASS。任何「AI 回傳成功訊號」型判定都要記得 backend 自己驗 git / 檔案系統實際狀態,別信 AI 自然語言。
+21. **HTML `title` 屬性 `\n` 在 Chrome / Firefox 多數版本被當空白** — multi-line tooltip 擠成一行(Firefox 較新版本會換行)。要正規 multi-line hover 必須自寫 Tooltip component;當前 sync chip / drawer 等仍用 `title` 屬性接受這視覺差。
+22. **QA forceChat 不能在送訊息時清** — race condition:user 送訊息瞬間清 forceChat,backend 處理中 frontend poll 看到 disk 上仍 `draft.complete=true`(舊狀態)→ SpecReview 又跳出。改 `viewOverride: 'chat' | 'review' | null` 雙向 sticky,user 用「→ 回最終預覽」按鈕主動切。對應 backend 也修兩處:claudeCli systemPrompt 加 reopen 規則(rule 6) + draftStore auto-complete 改成只在 `!wasComplete && reply.complete !== false && 5/5` 時 fire。
 
 ## 手機遠端使用方式
 

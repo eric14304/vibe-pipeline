@@ -47,8 +47,15 @@ Firebase web SDK + Service Worker。
 - 保留純 semantic 符號(分支 ⎇、play ▶、sync ⇣、unit ⏱ ↺ $)
 
 **已串 backend 的部分**(Phase 5 後新增)
-- `/api/user/config` GET/PUT — SettingsPopover AI 任務 tab
+- `/api/user/config` GET/PUT — SettingsPopover AI 任務 tab(2026-05-13 拆 executor / critic,6 row)
 - `/api/auth/*` — setup / login / sessions / reset / status
+- `/api/projects/browse?path=` — TopBar「選擇其他資料夾…」走 browse modal(Tailscale 用)
+- `/api/projects/:h/pipelines/:id/sync` + `/sync/{ai,cancel,dismiss}` — `SyncStatusBar` / `SyncConflictModal`(FocusColumn 內)走新 syncJob contract
+
+**重要 UX 慣例變更**(2026-05-13)
+- **Pipeline 執行紀錄拆出 TicketDrawer** → 改在 pipeline header OverflowMenu「執行紀錄」開 `PipelineHistoryDrawer`(scope 對齊:pipeline-level data 不該塞 ticket-level drawer 底)
+- **Inbox strip 整塊觸碰** → 個別 dot 不再各自 button(太小難點),整塊變單一 `<button>`;hover 進入 + 滾輪切換 preview;preview popover portal 到 body(`.inbox-col` 有 `overflow:hidden`)
+- **QA `viewOverride`** → `'chat' | 'review' | null`,雙向蓋過 `draft.complete` 自動切;user 在 SpecReview 「繼續討論」 / chat 「→ 回最終預覽」對應切換。**不要在送訊息時清 override**(會撞 race condition,backend 還沒寫回 disk 時 SpecReview 又跳出)
 - `/api/push/*` — config / register / unregister / tokens / test
 
 **還沒做**
@@ -88,6 +95,18 @@ EmptyShell (src/shell/EmptyShell.tsx)    ← Init 用
 ```
 
 `<TicketDrawer>` 與 `<QADrawer>` 自帶 `.drawer-stage` / `qa-drawer-backdrop`,不走 AppShell(它們是覆蓋型 overlay,自己處理背景)。
+
+## Portal 慣例(2026-05-13 起)
+
+任何「視覺上要全螢幕中央 / 浮在所有 UI 上」的元件 — `SyncConflictModal`、`PipelineHistoryDrawer`、Inbox preview popover、TopBar 手動路徑 / browse modal — **一律用 `createPortal` 渲染到 `document.body`**。
+
+理由:祖先若有 `overflow: hidden`(`.inbox-col`、各 drawer panel)或 `transform: ...`(focus-head)會把 `position: fixed` 子元素 clip 在區域內;就近渲染肉眼看似置中但實際被切。Portal 出 body 才真正脫離祖先 stacking / clipping。
+
+樣式統一(`board.css`):
+- `.modal-backdrop` `position: fixed; inset: 0; z-index: 1000; background: color-mix(in srgb, #000 72%, transparent); display: flex; align-items: center; justify-content: center`
+- `.modal-card` 內含 `.modal-title` / `.modal-body` / `.modal-actions`
+
+寫新 modal / popover 前 → 直接用這套 class + `createPortal`,別自己刻 backdrop。
 
 ## src/ 內各層約定
 
