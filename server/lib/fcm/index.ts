@@ -22,10 +22,16 @@ export type FcmPayload = {
   data?: Record<string, string>;
 };
 
+export const fakeFcmCalls: Array<{ tokens: string[]; payload: object; ts: number }> = [];
+
 let ready = false;
 let initStarted = false;
 let initPromise: Promise<boolean> | null = null;
 let admin: FirebaseAppApi | null = null;
+
+function isMockMode(): boolean {
+  return process.env.VP_TEST_MODE === "mock";
+}
 
 function loadServiceAccount(): Record<string, unknown> | null {
   const json = process.env.FCM_SERVICE_ACCOUNT_JSON?.trim();
@@ -43,6 +49,11 @@ function loadServiceAccount(): Record<string, unknown> | null {
 }
 
 export function initFCM(): Promise<boolean> {
+  if (isMockMode()) {
+    initStarted = true;
+    ready = true;
+    return Promise.resolve(true);
+  }
   if (initPromise) return initPromise;
   initStarted = true;
   initPromise = (async () => {
@@ -71,10 +82,24 @@ export function initFCM(): Promise<boolean> {
 }
 
 export function isFCMReady(): boolean {
+  if (isMockMode()) return true;
   return ready;
 }
 
 export async function fanoutPush(tokens: string[], payload: FcmPayload): Promise<string[]> {
+  if (isMockMode()) {
+    const normalizedTokens = Array.from(new Set(tokens.map((t) => t.trim()).filter(Boolean)));
+    fakeFcmCalls.push({
+      tokens: normalizedTokens,
+      payload: {
+        notification: payload.notification ? { ...payload.notification } : undefined,
+        data: payload.data ? { ...payload.data } : undefined,
+      },
+      ts: Date.now(),
+    });
+    return [];
+  }
+
   if (!initStarted) await initFCM();
   if (!ready || !admin) return [];
 
@@ -96,4 +121,8 @@ export async function fanoutPush(tokens: string[], payload: FcmPayload): Promise
     });
   }
   return deadTokens;
+}
+
+export function resetFakeFcmCalls(): void {
+  fakeFcmCalls.length = 0;
 }

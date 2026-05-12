@@ -1,0 +1,151 @@
+import { expect, test, type Locator, type Page } from "@playwright/test";
+import { createTempProject, cleanupTempProject, type TempProject } from "../helpers/temp-project";
+import { resetMocks, setQAScript, type QAReply } from "../helpers/mock-control";
+
+const VIEWPORTS = [
+  { name: "mobile 375", width: 375, height: 812, mobile: true },
+  { name: "tablet 768", width: 768, height: 1024, mobile: false },
+  { name: "desktop 1440", width: 1440, height: 900, mobile: false },
+] as const;
+
+const COMPLETE_REPLY: QAReply = {
+  message: "整理好了",
+  options: [],
+  complete: true,
+  spec: {
+    title: "RWD QA ticket",
+    goal: "驗證 QA drawer 在各 breakpoint 可操作",
+    acceptance: ["drawer 可開啟", "送出後可預覽"],
+    prompt: "建立一張用來驗證 RWD 的 ticket",
+    mode: "step",
+  },
+};
+
+function seedPipelines() {
+  return [
+    {
+      id: "pipe-rwd-a",
+      name: "rwd-alpha",
+      branch: "pipeline/rwd-alpha",
+      baseBranch: "main",
+      state: "planning",
+      tickets: [
+        {
+          id: "rwd-t-1",
+          n: 1,
+          title: "RWD ticket alpha",
+          goal: "驗證 TicketDrawer",
+          acceptance: ["TicketDrawer visible", "TicketDrawer close works"],
+          prompt: "檢查 ticket drawer RWD",
+          mode: "step",
+          status: "ready",
+        },
+      ],
+    },
+    {
+      id: "pipe-rwd-b",
+      name: "rwd-beta",
+      branch: "pipeline/rwd-beta",
+      baseBranch: "main",
+      state: "planning",
+      tickets: [
+        {
+          id: "rwd-t-2",
+          n: 1,
+          title: "RWD ticket beta",
+          goal: "驗證 Board",
+          acceptance: ["Board visible"],
+          prompt: "檢查 board RWD",
+          mode: "step",
+          status: "ready",
+        },
+      ],
+    },
+  ];
+}
+
+async function expectNoViewportOverflow(page: Page) {
+  const metrics = await page.evaluate(() => ({
+    bodyScrollWidth: document.body.scrollWidth,
+    docScrollWidth: document.documentElement.scrollWidth,
+    innerWidth: window.innerWidth,
+  }));
+  expect(metrics.bodyScrollWidth).toBeLessThanOrEqual(metrics.innerWidth + 1);
+  expect(metrics.docScrollWidth).toBeLessThanOrEqual(metrics.innerWidth + 1);
+}
+
+async function expectDrawerFullWidthOnMobile(page: Page, drawer: Locator) {
+  await expect.poll(async () => (await drawer.boundingBox())?.x ?? Number.POSITIVE_INFINITY)
+    .toBeLessThanOrEqual(1);
+  const box = await drawer.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.width).toBeGreaterThanOrEqual(374);
+  expect(box!.width).toBeLessThanOrEqual(376);
+}
+
+for (const vp of VIEWPORTS) {
+  test.describe(`RWD ${vp.name}`, () => {
+    test.use({ viewport: { width: vp.width, height: vp.height } });
+
+    let proj: TempProject | null = null;
+
+    test.beforeEach(async () => {
+      await resetMocks();
+      proj = await createTempProject({ pipelines: seedPipelines() });
+      await setQAScript(proj.hash, [COMPLETE_REPLY]);
+    });
+
+    test.afterEach(() => {
+      if (proj) cleanupTempProject(proj);
+      proj = null;
+    });
+
+    test("TopBar / Rail / Board / TicketDrawer / QADrawer 可見且可操作", async ({ page }) => {
+      expect(proj).not.toBeNull();
+      await page.goto(`/board?project=${proj!.hash}`);
+
+      await expect(page.locator(".topbar")).toBeVisible();
+      await page.locator(".proj-trigger").click();
+      await expect(page.locator(".proj-menu")).toBeVisible();
+      await page.keyboard.press("Escape");
+      await page.locator(".topbar-theme-toggle").click();
+      await expect(page.locator("html.light")).toHaveCount(0);
+
+      await expect(page.locator(".focus")).toBeVisible();
+      await expect(page.locator(".focus-title", { hasText: "rwd-beta" })).toBeVisible();
+      await expect(page.locator(".ticket-title", { hasText: "RWD ticket beta" })).toBeVisible();
+      await expectNoViewportOverflow(page);
+
+      if (vp.mobile) {
+        await expect(page.locator(".rail")).not.toBeVisible();
+        await page.getByRole("tab", { name: "Pipeline" }).click();
+        await expect(page.locator(".rail")).toBeVisible();
+        await expect(page.locator(".focus")).not.toBeVisible();
+        await page.locator(".rail-item", { hasText: "rwd-alpha" }).click();
+        await expect(page.locator(".focus")).toBeVisible();
+        await expect(page.locator(".rail")).not.toBeVisible();
+        await expect(page.locator(".focus-title", { hasText: "rwd-alpha" })).toBeVisible();
+      } else {
+        await expect(page.locator(".rail")).toBeVisible();
+        await page.locator(".rail-item", { hasText: "rwd-alpha" }).click();
+        await expect(page.locator(".focus-title", { hasText: "rwd-alpha" })).toBeVisible();
+      }
+
+      await page.locator(".ticket", { hasText: "RWD ticket alpha" }).click();
+      const ticketDrawer = page.locator(".tdrw-drawer");
+      await expect(ticketDrawer).toBeVisible();
+      await expect(ticketDrawer.locator(".tdrw-section-label", { hasText: "goal" })).toBeVisible();
+      if (vp.mobile) await expectDrawerFullWidthOnMobile(page, ticketDrawer);
+      await page.locator(".tdrw-drawer .create-x").click();
+      await expect(ticketDrawer).not.toBeVisible();
+
+      await page.locator(".focus-add-ticket").click();
+      const qaDrawer = page.locator(".qadr-drawer");
+      await expect(qaDrawer).toBeVisible();
+      if (vp.mobile) await expectDrawerFullWidthOnMobile(page, qaDrawer);
+      await expect(page.locator(".qadr-option").first()).toBeVisible();
+      await page.locator(".qadr-option").first().click();
+      await expect(page.locator("button", { hasText: "送出建立 ticket" })).toBeVisible();
+    });
+  });
+}

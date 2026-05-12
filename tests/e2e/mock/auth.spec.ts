@@ -1,5 +1,6 @@
 import { test, expect, request as pwRequest } from "@playwright/test";
 import { resetMocks } from "../helpers/mock-control";
+import { API_ORIGIN } from "../helpers/api-base";
 
 // TOTP auth e2e mock spec — 3 scenario(Setup happy path / Cookie 過期 / Loopback bypass)。
 //
@@ -10,7 +11,7 @@ import { resetMocks } from "../helpers/mock-control";
 //
 // 三個都用 NODE_ENV/VP_TEST_MODE gate,production build 永遠走真路徑。
 
-const API = "http://127.0.0.1:3003";
+const API = API_ORIGIN;
 const REMOTE_IP = "100.64.0.1"; // 模擬 Tailscale 端,非 loopback,會被 authGuard 攔
 const LOOPBACK_IP = "127.0.0.1";
 

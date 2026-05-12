@@ -6,8 +6,11 @@ import { join } from "node:path";
 import * as projectStore from "../lib/projectStore";
 import * as testMode from "../lib/testMode";
 import { readAuth, writeAuth } from "../lib/auth/storage";
+import { fakeFcmCalls, resetFakeFcmCalls } from "../lib/fcm";
+import { vibeHome } from "../lib/paths";
 import type { QAReply } from "../lib/qa/schema";
 import type { RunnerScript } from "../lib/testMode";
+import type { TicketSpec } from "../../shared/types";
 
 function ok(data: unknown): Response {
   return Response.json({ ok: true, data });
@@ -79,12 +82,47 @@ export async function setRunnerScript(req: Request): Promise<Response> {
   return ok({ ticketCount: body.script.tickets.length });
 }
 
+// POST /api/__test/script/split
+// body: { hash: string, specs: TicketSpec[] }
+// 設定 inline AI 拆分 mock 結果:specs.length>=2 → 拆成 N 張;length 1 → nothingToSplit
+export async function setSplitScript(req: Request): Promise<Response> {
+  const body = (await req.json().catch(() => ({}))) as {
+    hash?: string;
+    specs?: TicketSpec[];
+  };
+  if (!body.hash || !Array.isArray(body.specs)) {
+    return err("bad_request", "hash + specs[] required");
+  }
+  testMode.setSplitScript(body.hash, body.specs);
+  return ok({ count: body.specs.length });
+}
+
 // POST /api/__test/reset
 // 清所有 in-memory mock state(QA / runner script)。
 // 不動 fs(每 spec 自己用獨立 tmpdir,不靠 reset)。
 export async function reset(): Promise<Response> {
   testMode.resetMocks();
+  resetFakeFcmCalls();
   return ok({});
+}
+
+// GET /api/__test/fcm/calls
+export function fcmCalls(): Response {
+  return Response.json({ calls: fakeFcmCalls });
+}
+
+// POST /api/__test/fcm/reset
+export function fcmReset(): Response {
+  resetFakeFcmCalls();
+  return Response.json({ ok: true });
+}
+
+// GET /api/__test/push/file-content
+export async function pushFileContent(): Promise<Response> {
+  const filename = "device_tokens.json";
+  const path = join(vibeHome(), ".vibe-pipeline", filename);
+  const content = existsSync(path) ? await Bun.file(path).text() : "";
+  return ok({ filename, content });
 }
 
 // POST /api/__test/auth/reset

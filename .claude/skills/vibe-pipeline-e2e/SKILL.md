@@ -134,6 +134,7 @@ E2E 用 Playwright 跑真瀏覽器 + 真 backend,**不靠 unit test 取代**。p
 |  | 點 notif → 跳該 pipeline + 該 ticket drawer 開啟 |  |
 |  | sev block 沉降 muted(收合 strip) |  |
 |  | log/notif GC(per-pipeline 留 10 / project 留 500) |  |
+| **FCM Push** | token register → list / ticket done fanout → fake FCM call / unregister → gone | `fcm.spec.ts` |
 | **TopBar / theme** | recents dropdown 切 project | `topbar.spec.ts` |
 |  | folder picker via menu |  |
 |  | ⌘O / Ctrl+O shortcut |  |

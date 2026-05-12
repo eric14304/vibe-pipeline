@@ -142,7 +142,7 @@ vibe-pipeline/
 │       │   ├── cookie.ts      parseCookie / findSession / vp_auth cookie(HttpOnly + SameSite=Strict + 7d)
 │       │   └── pending.ts     in-memory setup_token map(setup-init → setup-verify 中間 5min 過期)
 │       ├── push/
-│       │   └── tokenStore.ts  ~/.vibe-pipeline/push-tokens.json(register / list / removeDead)
+│       │   └── tokenStore.ts  ~/.vibe-pipeline/device_tokens.json(register / list / removeDead)
 │       ├── fcm/
 │       │   └── index.ts       firebase-admin init + fanoutPush + dead token 偵測
 │       ├── fcm.ts             (legacy 同上 path,index.ts 是新版,index 優先)
@@ -189,7 +189,7 @@ vibe-pipeline/
 ├── state.json                 { lastProject, recentProjects: [{path, lastOpenedAt}] }
 ├── config.json                user-level model defaults(per-task-class qa/runner/subAgent/merge/split → provider/model/effort)
 ├── auth.json                  TOTP secret 雜湊 + sessions[](Phase 5)
-├── push-tokens.json           FCM device tokens(Phase 5)
+├── device_tokens.json         FCM device tokens(Phase 5)
 └── worktrees/<projHash>/<pipelineId>/   git worktree per pipeline (Phase 3 落地),平行執行用
 
 <target-repo>/.vibe-pipeline/  每個 user target repo 內,由 init 建

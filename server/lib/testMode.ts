@@ -89,9 +89,28 @@ export function getRunnerScript(
   return runnerScripts.get(runnerKey(projectHash, pipelineId)) ?? null;
 }
 
+// ─── Split mock ───────────────────────────────────────────────────────
+// per projectHash 一筆 splitInto[]。inline ticket split(routes/qa.ts:splitTicket)
+// 在 mock 模式不 spawn claude,直接吐預定義 splitInto。
+// 注意:長度 1 → backend 視為 nothingToSplit;長度 >= 2 → 拆。
+// 長度 0(empty list)→ 模擬「沒設劇本」場景,沿用「不拆」fallback([spec])。
+
+import type { TicketSpec } from "../../shared/types";
+
+const splitScripts = new Map<string, TicketSpec[]>();
+
+export function setSplitScript(projectHash: string, specs: TicketSpec[]): void {
+  splitScripts.set(projectHash, [...specs]);
+}
+
+export function getSplitScript(projectHash: string): TicketSpec[] | null {
+  return splitScripts.get(projectHash) ?? null;
+}
+
 // ─── Reset ────────────────────────────────────────────────────────────
 
 export function resetMocks(): void {
   qaScripts.clear();
   runnerScripts.clear();
+  splitScripts.clear();
 }

@@ -4,6 +4,7 @@ import { resetMocks } from "../helpers/mock-control";
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { TEST_API_BASE } from "../helpers/api-base";
 
 let proj: TempProject;
 
@@ -42,7 +43,7 @@ test("hasGit=false 時 board 仍 render(fixture project 都有 git;這裡用無 
     JSON.stringify({ defaults: {} })
   );
 
-  const res = await request.post("http://127.0.0.1:3003/api/__test/register-project", {
+  const res = await request.post(`${TEST_API_BASE}/register-project`, {
     data: { path: dir, ensureInit: true },
   });
   const body = await res.json();

@@ -7,6 +7,7 @@ import * as pipelineDir from "../pipelineDir";
 import * as notifs from "../notifs/store";
 import { fanoutPush } from "../fcm";
 import * as tokenStore from "../push/tokenStore";
+import * as testMode from "../testMode";
 import type { NotifEventType } from "../../../shared/types";
 
 type Active = { unwatch: () => void };
@@ -99,74 +100,96 @@ export async function start(opts: {
   const file = pipelineDir.pipelineFile(opts.projectPath, opts.pipelineId);
   let last = await snapshot(opts.projectPath, opts.pipelineId);
   let debounce: ReturnType<typeof setTimeout> | null = null;
+  let poll: ReturnType<typeof setInterval> | null = null;
+  let checking = false;
+
+  const checkForChanges = async () => {
+    if (checking) return;
+    checking = true;
+    try {
+      const cur = await snapshot(opts.projectPath, opts.pipelineId);
+      const p = (await pipelineDir.readPipeline(
+        opts.projectPath,
+        opts.pipelineId
+      )) as PipelineLite | null;
+      const tickets = (p?.tickets ?? []) as TicketLite[];
+      for (const [tid, status] of cur.ticketStatuses) {
+        const prev = last.ticketStatuses.get(tid);
+        if (prev === status) continue;
+        const ev = statusToEvent(status);
+        if (!ev) continue;
+        const t = tickets.find((x) => x.id === tid);
+        const titlePart = t?.title || tid;
+        const numPart = t?.n != null ? `#${t.n} ` : "";
+        notifs.emit(opts.projectPath, {
+          type: ev,
+          title: `${numPart}${titlePart}: ${status}`,
+          pipelineId: opts.pipelineId,
+        });
+        if (status === "done") {
+          pushAsync({
+            title: "✅ Ticket 完成",
+            body: titlePart,
+            projectHash: opts.projectHash,
+            pipelineId: opts.pipelineId,
+            ticketId: tid,
+          });
+        } else if (
+          status === "failed" ||
+          status === "failed_iter_limit" ||
+          status === "failed_transient"
+        ) {
+          pushAsync({
+            title: "❌ Ticket 失敗",
+            body: titlePart,
+            projectHash: opts.projectHash,
+            pipelineId: opts.pipelineId,
+            ticketId: tid,
+          });
+        }
+      }
+      if (last.state !== "paused" && cur.state === "paused") {
+        const current = currentTicket(tickets);
+        const title = currentTicketTitle(tickets);
+        pushAsync({
+          title: "⏳ 需要你的回應",
+          body: `${p?.name || opts.pipelineId}${title ? ` ${title}` : ""}`,
+          projectHash: opts.projectHash,
+          pipelineId: opts.pipelineId,
+          ticketId: current?.id || opts.pipelineId,
+        });
+      }
+      last = cur;
+    } catch (e) {
+      console.error(`[ticketWatcher ${opts.pipelineId}] error:`, e);
+    } finally {
+      checking = false;
+    }
+  };
+
+  if (testMode.isTestMode()) {
+    poll = setInterval(() => void checkForChanges(), 200);
+  }
 
   let w: FSWatcher;
   try {
     w = watch(file, () => {
       if (debounce) clearTimeout(debounce);
-      debounce = setTimeout(async () => {
-        try {
-          const cur = await snapshot(opts.projectPath, opts.pipelineId);
-          const p = (await pipelineDir.readPipeline(
-            opts.projectPath,
-            opts.pipelineId
-          )) as PipelineLite | null;
-          const tickets = (p?.tickets ?? []) as TicketLite[];
-          for (const [tid, status] of cur.ticketStatuses) {
-            const prev = last.ticketStatuses.get(tid);
-            if (prev === status) continue;
-            const ev = statusToEvent(status);
-            if (!ev) continue;
-            const t = tickets.find((x) => x.id === tid);
-            const titlePart = t?.title || tid;
-            const numPart = t?.n != null ? `#${t.n} ` : "";
-            notifs.emit(opts.projectPath, {
-              type: ev,
-              title: `${numPart}${titlePart}: ${status}`,
-              pipelineId: opts.pipelineId,
-            });
-            if (status === "done") {
-              pushAsync({
-                title: "✅ Ticket 完成",
-                body: titlePart,
-                projectHash: opts.projectHash,
-                pipelineId: opts.pipelineId,
-                ticketId: tid,
-              });
-            } else if (
-              status === "failed" ||
-              status === "failed_iter_limit" ||
-              status === "failed_transient"
-            ) {
-              pushAsync({
-                title: "❌ Ticket 失敗",
-                body: titlePart,
-                projectHash: opts.projectHash,
-                pipelineId: opts.pipelineId,
-                ticketId: tid,
-              });
-            }
-          }
-          if (last.state !== "paused" && cur.state === "paused") {
-            const current = currentTicket(tickets);
-            const title = currentTicketTitle(tickets);
-            pushAsync({
-              title: "⏳ 需要你的回應",
-              body: `${p?.name || opts.pipelineId}${title ? ` ${title}` : ""}`,
-              projectHash: opts.projectHash,
-              pipelineId: opts.pipelineId,
-              ticketId: current?.id || opts.pipelineId,
-            });
-          }
-          last = cur;
-        } catch (e) {
-          console.error(`[ticketWatcher ${opts.pipelineId}] error:`, e);
-        }
-      }, 200);
+      debounce = setTimeout(() => void checkForChanges(), 200);
+    });
+    w.on("error", (e) => {
+      console.error(`[ticketWatcher ${opts.pipelineId}] watch error:`, e);
+      if (!testMode.isTestMode()) {
+        stop({ projectHash: opts.projectHash, pipelineId: opts.pipelineId });
+      }
     });
   } catch (e) {
     console.error(`[ticketWatcher ${opts.pipelineId}] watch failed:`, e);
-    return;
+    if (!testMode.isTestMode()) {
+      if (poll) clearInterval(poll);
+      return;
+    }
+    w = { close() {} } as FSWatcher;
   }
 
   watchers.set(k, {
@@ -175,6 +198,7 @@ export async function start(opts: {
         w.close();
       } catch {}
       if (debounce) clearTimeout(debounce);
+      if (poll) clearInterval(poll);
     },
   });
 }

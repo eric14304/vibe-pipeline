@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { createTempProject, cleanupTempProject, type TempProject } from "../helpers/temp-project";
 import { resetMocks } from "../helpers/mock-control";
+import { API_BASE } from "../helpers/api-base";
 
 // Phase 2 驗證:fixture project + mock 控制端點通。
 // 建一個 temp project,seed 一條 pipeline,進 board 看 Rail 顯示得到。
@@ -28,7 +29,7 @@ test.afterEach(async () => {
 });
 
 test("temp project 註冊後 health 報 testMode=true", async ({ request }) => {
-  const res = await request.get("http://127.0.0.1:3003/api/health");
+  const res = await request.get(`${API_BASE}/health`);
   const body = await res.json();
   expect(body.data.testMode).toBe(true);
 });
