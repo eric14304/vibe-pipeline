@@ -105,6 +105,32 @@ export function QADrawer({
           </div>
         ) : (
           <>
+            {/* 退回 chat 期間,spec 已齊 → 顯示「回最終預覽」橫條讓 user 隨時切回確認 */}
+            {forceChat && isSpecComplete(draft?.spec ?? null) && (
+              <div
+                style={{
+                  padding: "8px 16px",
+                  background: "color-mix(in srgb, var(--accent, #d4956d) 12%, transparent)",
+                  borderBottom: "1px solid var(--line)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  fontSize: 12,
+                  color: "var(--fg-mute)",
+                }}
+              >
+                <span>spec 已備齊,聊完想送出時:</span>
+                <button
+                  type="button"
+                  className="btn"
+                  style={{ marginLeft: "auto", padding: "4px 10px", fontSize: 12 }}
+                  onClick={() => setForceChat(false)}
+                  disabled={busy}
+                >
+                  → 回最終預覽
+                </button>
+              </div>
+            )}
             <div className="drawer-body qadr-body" ref={transcriptRef}>
               {!draft && busy && (
                 <div className="qadr-loading mono">
@@ -167,8 +193,9 @@ export function QADrawer({
                     optionsMode={last.mode}
                     busy={busy}
                     onSend={(msg) => {
-                      // 送新訊息 → 清掉 forceChat,讓 backend 下個 AI 回覆決定要不要再進 review
-                      setForceChat(false);
+                      // 不要在送訊息時清 forceChat — 那會在 backend 還沒處理完前讓 SpecReview
+                      // 用 disk 上 stale 的 complete=true 又跳出來。
+                      // user 想離開 chat 回最終預覽走專屬按鈕(SpecComplete 時顯出)。
                       onSendTurn(msg);
                     }}
                     onCancel={onCancel}
