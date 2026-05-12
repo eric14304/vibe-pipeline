@@ -32,6 +32,13 @@ export function QADrawer({
     transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight });
   }, [draft?.turns.length]);
 
+  // user 在 SpecReview 點「繼續討論」→ 暫時 force 回 chat 模式即使 draft.complete=true。
+  // user 下個 turn 送出時清掉(由 backend 決定是否再進 review 階段);切 draft 也清掉
+  const [forceChat, setForceChat] = useState(false);
+  useEffect(() => {
+    setForceChat(false);
+  }, [draft?.draftId]);
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -85,7 +92,7 @@ export function QADrawer({
           <SpecChecklist spec={draft?.spec ?? null} />
         </div>
 
-        {draft?.complete && isSpecComplete(draft?.spec ?? null) ? (
+        {draft?.complete && isSpecComplete(draft?.spec ?? null) && !forceChat ? (
           <div className="drawer-body qadr-body qadr-spec-body">
             <SpecReview
               spec={draft!.spec as TicketSpec}
@@ -93,6 +100,7 @@ export function QADrawer({
               busy={busy}
               onCancel={onCancel}
               onFinalize={onFinalize}
+              onResumeChat={() => setForceChat(true)}
             />
           </div>
         ) : (
@@ -158,7 +166,11 @@ export function QADrawer({
                     options={last.options}
                     optionsMode={last.mode}
                     busy={busy}
-                    onSend={onSendTurn}
+                    onSend={(msg) => {
+                      // 送新訊息 → 清掉 forceChat,讓 backend 下個 AI 回覆決定要不要再進 review
+                      setForceChat(false);
+                      onSendTurn(msg);
+                    }}
                     onCancel={onCancel}
                   />
                 );
@@ -436,12 +448,16 @@ function SpecReview({
   busy,
   onCancel,
   onFinalize,
+  onResumeChat,
 }: {
   spec: TicketSpec;
   splitInto?: TicketSpec[];
   busy: boolean;
   onCancel: () => void;
   onFinalize: (edits?: Partial<TicketSpec>, splitInto?: TicketSpec[]) => void;
+  // user 想退回 chat 跟 AI 再聊聊(改主意 / 補細節)。frontend 端 force 切視圖,
+  // 不送 backend(下個 turn 自然會更新 spec/complete)
+  onResumeChat?: () => void;
 }) {
   const [edited, setEdited] = useState<TicketSpec>(spec);
   // 預設「拆」(若 AI 提案了);user 可 toggle 改成保留 1 張
@@ -574,6 +590,17 @@ function SpecReview({
         <button type="button" className="btn" onClick={onCancel} disabled={busy}>
           取消 draft
         </button>
+        {onResumeChat && (
+          <button
+            type="button"
+            className="btn"
+            onClick={onResumeChat}
+            disabled={busy}
+            title="退回對話跟 AI 補充 / 修正細節,送出新訊息後 AI 會再整理 spec"
+          >
+            ← 繼續討論
+          </button>
+        )}
         <span style={{ flex: 1 }} />
         <button type="button" className="btn btn-primary" onClick={() => onFinalize(edited, useSplit ? splitInto : undefined)} disabled={busy}>
           {busy ? (
