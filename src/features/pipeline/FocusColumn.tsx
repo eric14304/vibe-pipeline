@@ -1202,8 +1202,8 @@ export function ReadyBanner({
           {isMerged
             ? `已合併入 ${baseBranch}`
             : failedMerge
-            ? `AI 合併失敗 — 點下方重試或先處理 working tree`
-            : `所有 ticket 都 ✓ — 可以 AI 合併進 ${baseBranch}`}
+            ? `合併失敗 — 點下方重試或先處理 working tree`
+            : `所有 ticket 都 ✓ — 可以合併進 ${baseBranch}`}
         </div>
         <div className="banner-desc mono">
           {pipeline.branch} → {baseBranch} · {commitCount} commit{commitCount === 1 ? "" : "s"}
@@ -1216,25 +1216,25 @@ export function ReadyBanner({
             const isRetry = !!failedMerge;
             const ok = await confirm({
               title: isRetry
-                ? `重試 AI 合併 ${pipeline.branch} → ${baseBranch}?`
-                : `AI 合併 ${pipeline.branch} → ${baseBranch}?`,
+                ? `重試合併 ${pipeline.branch} → ${baseBranch}?`
+                : `合併 ${pipeline.branch} → ${baseBranch}?`,
               description:
-                `策略:merge --no-ff(保留 ticket commit + 加 merge commit)\n\n` +
+                `策略:先試純 git merge --no-ff(無 AI、毫秒級);撞衝突才 fallback 走 AI 全套(spawn runner + sub-agent 解 + 驗證)。\n\n` +
                 (isRetry
-                  ? `會 reset 失敗的 merge ticket 重跑(prompt 會用最新 strategy 重灌)。\n` +
+                  ? `會清掉舊 lastAutoMergeError + 重跑流程。\n` +
                     `若是 working tree 髒導致失敗,先 commit / stash 再重試,不然又 FAIL。`
-                  : `會 append 一張 merge ticket 進 pipeline 由 runner 派 sub-agent 處理(checkout / merge / 解衝突 / 跑驗證 / commit)。`),
-              confirmLabel: isRetry ? "重試合併" : `AI 合併入 ${baseBranch}`,
+                  : `clean case 90% 場景秒結束,不燒 token。`),
+              confirmLabel: isRetry ? "重試合併" : `合併入 ${baseBranch}`,
             });
             if (ok) onMerge(pipeline.id);
           }}
           title={
             failedMerge
-              ? "重試 AI 合併"
-              : `AI 合併 ${pipeline.branch} into ${baseBranch}`
+              ? "重試合併(先試 git,撞衝突 fallback AI)"
+              : `合併 ${pipeline.branch} → ${baseBranch}(先試 git,撞衝突 fallback AI)`
           }
         >
-          <MergeIcon /> {failedMerge ? "重試 AI 合併" : `AI 合併入 ${baseBranch}`}
+          <MergeIcon /> {failedMerge ? "重試合併" : `合併入 ${baseBranch}`}
         </button>
       )}
     </div>

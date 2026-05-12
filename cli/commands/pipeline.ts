@@ -254,16 +254,28 @@ async function pipelineMerge(args: ParsedArgs): Promise<void> {
   const id = args.positional[0];
   if (!id) fail("INVALID_ARGS", "Usage: vbpl pipeline merge <id>");
 
-  const res = await post<{ ok: true; ticketId: string; reused?: boolean }>(
-    `/api/projects/${proj.hash}/pipelines/${id}/merge`
-  );
+  // 2026-05-13 後 backend 二段式:mechanical → mergeCommit;衝突 fallback ai → ticketId
+  type MergeResp =
+    | { ok: true; mode: "mechanical"; mergeCommit?: { hash: string; subject: string; ts: number }; alreadyMerged?: boolean }
+    | { ok: true; mode: "ai"; ticketId: string; conflictFiles?: string[] };
+  const res = await post<MergeResp>(`/api/projects/${proj.hash}/pipelines/${id}/merge`);
 
   if (isJsonMode()) {
-    okJson({ started: true, pipelineId: id, mergeTicketId: res.ticketId, reused: res.reused });
+    okJson({ ...res, pipelineId: id });
     return;
   }
-  print(`AI merge started: pipeline=${id}, ticket=${res.ticketId}${res.reused ? " (reused)" : ""}`);
-  print(`Watch progress: vbpl pipeline log ${id}`);
+  if (res.mode === "mechanical") {
+    if (res.alreadyMerged) {
+      print(`Already merged (no-op): ${id}`);
+    } else {
+      print(`✓ Merged (mechanical, no AI): ${id}`);
+      if (res.mergeCommit) print(`  commit: ${res.mergeCommit.hash.slice(0, 7)} - ${res.mergeCommit.subject}`);
+    }
+  } else {
+    const n = res.conflictFiles?.length ?? 0;
+    print(`⚠ Conflict (${n} files), AI 接手:ticket=${res.ticketId}`);
+    print(`Watch progress: vbpl pipeline log ${id}`);
+  }
 }
 
 // Sync:把 base branch merge 進 pipeline worktree。

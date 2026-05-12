@@ -140,10 +140,15 @@ export function pausePipeline(hash: string, id: string): Promise<{ ok: true }> {
   return call<{ ok: true }>(`/api/projects/${hash}/pipelines/${id}/pause`, { method: "POST" });
 }
 
-// AI 合併:後端 append 一張 mode=merge ticket + 觸發 runner;立即 return,不等合併完。
-// 前端靠 polling pipeline 看 ticket 進度 + 最終 pipeline.state=merged。
-export function mergePipeline(hash: string, id: string): Promise<{ ok: true; ticketId: string }> {
-  return call<{ ok: true; ticketId: string }>(
+// 合併:2026-05-13 後二段式
+//   mode="mechanical" → 純 git merge --no-ff,clean 立即完成(寫 mergeCommit / alreadyMerged)
+//   mode="ai"         → 撞衝突,自動 fallback spawn AI runner;前端 polling 看 ticket 進度
+export type MergeResult =
+  | { ok: true; mode: "mechanical"; mergeCommit?: { hash: string; subject: string; ts: number }; alreadyMerged?: boolean }
+  | { ok: true; mode: "ai"; ticketId: string; conflictFiles?: string[] };
+
+export function mergePipeline(hash: string, id: string): Promise<MergeResult> {
+  return call<MergeResult>(
     `/api/projects/${hash}/pipelines/${id}/merge`,
     { method: "POST" }
   );

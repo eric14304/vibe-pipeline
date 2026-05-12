@@ -785,13 +785,18 @@ export function BoardScreen({
             }}
             onMerge={async (pid) => {
               if (!project) return;
-              // merge 流程本身已含「AI 解衝突」+ 「事後 auto-rebase worktree」,pre-sync 多餘,直接走
+              // 2026-05-13 後 backend 二段式:先試純 git merge,衝突才 fallback AI
               try {
-                await api.mergePipeline(project.hash, pid);
+                const r = await api.mergePipeline(project.hash, pid);
                 setReloadKey((k) => k + 1);
-                setActionError("✓ AI 合併已啟動,runner 接手中…");
+                if (r.mode === "mechanical") {
+                  setActionError(r.alreadyMerged ? "✓ 已合併過" : `✓ 合併完成(純 git,無 AI)`);
+                } else {
+                  const n = r.conflictFiles?.length ?? 0;
+                  setActionError(`⚠ 撞 ${n} 衝突檔,AI 接手中…`);
+                }
               } catch (e) {
-                setActionError(`觸發 AI 合併失敗: ${e instanceof Error ? e.message : String(e)}`);
+                setActionError(`觸發合併失敗: ${e instanceof Error ? e.message : String(e)}`);
               }
             }}
             onSync={async (pid) => {
