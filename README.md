@@ -69,18 +69,29 @@ flowchart TB
   cli -->|"spawn / kill 操作<br/>POST /api/* 避免子程孤兒"| routes
 ```
 
-每個 task class 的 AI 配置(model + reasoning effort 各自可選):
+每個 task class 各自挑 provider(claude / codex)+ model + reasoning effort,從 Settings 改或 `vbpl config set <key> <value>`。六個 class 在 pipeline 生命週期上各自登場:
 
-| Task class | 預設 | 用途 |
-|---|---|---|
-| `qa` | sonnet-4-6 / low | 跟 user 對話收斂 ticket 規格 |
-| `split` | sonnet-4-6 / low | One-shot 判「這該拆 N 張」 |
-| `runner` | opus-4-7 / medium | Pipeline 主 agent(編排 ticket) |
-| `executor` | opus-4-7 / high | 寫 / 改 code |
-| `critic` | sonnet-4-6 / medium | 讀 diff,PASS / FAIL / PARTIAL |
-| `merge` | opus-4-7 / high | 衝突解 |
+```mermaid
+flowchart LR
+  user([user 點 + ticket]) --> qa[qa<br/>對話收斂規格]
+  qa --> split{範圍跨多件?}
+  split -- 是 --> splitAI[split<br/>One-shot 拆 N 張]
+  split -- 否 --> ticket[ticket 建立]
+  splitAI --> ticket
+  ticket --> userRun([user 點 開始])
+  userRun --> runner[runner<br/>Pipeline 主 agent]
+  runner -->|每張 ticket 派| executor[executor<br/>真改 code]
+  executor --> critic[critic<br/>讀 diff 判 PASS/FAIL]
+  critic -->|FAIL| runner
+  critic -->|PASS| nextTicket{還有 ticket?}
+  nextTicket -- 有 --> runner
+  nextTicket -- 無 --> mergePath{衝突?}
+  mergePath -- 純 git merge OK --> done([pipeline merged])
+  mergePath -- 撞衝突 --> merge[merge<br/>AI 解衝突]
+  merge --> done
+```
 
-從 Settings 可逐項切 provider(claude / codex)+ model。
+工廠預設見 `shared/types.ts:DEFAULT_USER_CONFIG`(新建 user 第一次起 server 時寫進 `~/.vibe-pipeline/config.json`)。看當前生效值跑 `vbpl config list`。
 
 ---
 
