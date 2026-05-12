@@ -266,33 +266,36 @@
   background: color-mix(in srgb, var(--done) 14%, transparent);
   color: var(--done);
 }
-.sync-chip-action {
+/* sync-chip 內的 icon-only 動作按鈕。icon 用 currentColor 著色,跟 chip 殼色語意一致 */
+.sync-chip-icon {
   margin-left: 6px;
-  padding: 2px 8px;
-  font-size: 11px;
-  font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px;
+  padding: 0;
   border-radius: 5px;
   border: 1px solid currentColor;
   background: transparent;
   color: inherit;
   cursor: pointer;
+  transition: background 100ms, filter 100ms;
 }
-.sync-chip-action:hover {
+.sync-chip-icon svg {
+  width: 13px; height: 13px;
+}
+.sync-chip-icon:hover {
   background: color-mix(in srgb, currentColor 18%, transparent);
 }
-/* primary 按鈕用各 state 對應色當底,文字一律 white(深色底 + 白字最穩);
-   不用 currentColor 是因為 color/background 同 rule 內 currentColor 解析到 final color → bg/fg 同色變空白 */
-.sync-chip.sync-chip-conflict .sync-chip-action.sync-chip-primary {
+.sync-chip.sync-chip-conflict .sync-chip-icon.sync-chip-primary {
   background: var(--accent, #d4956d);
   color: #fff;
   border-color: var(--accent, #d4956d);
 }
-.sync-chip.sync-chip-failed .sync-chip-action.sync-chip-primary {
+.sync-chip.sync-chip-failed .sync-chip-icon.sync-chip-primary {
   background: var(--failed);
   color: #fff;
   border-color: var(--failed);
 }
-.sync-chip-action.sync-chip-primary:hover {
+.sync-chip-icon.sync-chip-primary:hover {
   filter: brightness(1.1);
 }
 

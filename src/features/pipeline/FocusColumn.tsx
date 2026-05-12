@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { CheckCircleIcon, FolderIcon, MergeIcon, PlusIcon, ProhibitIcon, RefreshIcon, TrashIcon } from "../../ui/icons";
+import { CheckCircleIcon, CheckIconSm, CloseIcon, FolderIcon, MergeIcon, PlusIcon, ProhibitIcon, RefreshIcon, TrashIcon } from "../../ui/icons";
 import { STATE_COLOR, STATE_LABEL, fmtElapsed, fmtDuration, normalizeVerdict } from "../../data/pipelines";
 import { MODE_LABELS } from "../../api/qa";
 import { useConfirm } from "../../ui/ConfirmDialog";
@@ -544,11 +544,23 @@ function SyncStatusBar({
       <span className="sync-chip sync-chip-conflict" title="git merge 撞到衝突,等使用者決定要不要讓 AI 解">
         <span className="sync-chip-arrow" aria-hidden>!</span>
         遇衝突({n} 檔)
-        <button type="button" className="sync-chip-action sync-chip-primary" onClick={onConfirmAi}>
-          AI 解
+        <button
+          type="button"
+          className="sync-chip-icon sync-chip-primary"
+          onClick={onConfirmAi}
+          title="讓 AI 解"
+          aria-label="讓 AI 解"
+        >
+          <CheckIconSm />
         </button>
-        <button type="button" className="sync-chip-action" onClick={onCancel}>
-          跳過
+        <button
+          type="button"
+          className="sync-chip-icon"
+          onClick={onCancel}
+          title="跳過(abort merge)"
+          aria-label="跳過"
+        >
+          <CloseIcon />
         </button>
       </span>
     );
@@ -563,8 +575,14 @@ function SyncStatusBar({
           <span /><span /><span />
         </span>
         {" "}AI 解衝突 · {fmtElapsed(elapsedSec)}
-        <button type="button" className="sync-chip-action" onClick={onCancel}>
-          取消
+        <button
+          type="button"
+          className="sync-chip-icon"
+          onClick={onCancel}
+          title="取消"
+          aria-label="取消"
+        >
+          <CloseIcon />
         </button>
       </span>
     );
@@ -578,11 +596,23 @@ function SyncStatusBar({
       >
         <span className="sync-chip-arrow" aria-hidden>✕</span>
         同步失敗
-        <button type="button" className="sync-chip-action sync-chip-primary" onClick={onStart}>
-          重試
+        <button
+          type="button"
+          className="sync-chip-icon sync-chip-primary"
+          onClick={onStart}
+          title="重試"
+          aria-label="重試"
+        >
+          <RefreshIcon />
         </button>
-        <button type="button" className="sync-chip-action" onClick={onDismiss}>
-          關
+        <button
+          type="button"
+          className="sync-chip-icon"
+          onClick={onDismiss}
+          title="關"
+          aria-label="關"
+        >
+          <CloseIcon />
         </button>
       </span>
     );
@@ -593,8 +623,14 @@ function SyncStatusBar({
     <span className="sync-chip sync-chip-done" title="同步完成">
       <span className="sync-chip-arrow" aria-hidden>✓</span>
       已同步
-      <button type="button" className="sync-chip-action" onClick={onDismiss}>
-        關
+      <button
+        type="button"
+        className="sync-chip-icon"
+        onClick={onDismiss}
+        title="關"
+        aria-label="關"
+      >
+        <CloseIcon />
       </button>
     </span>
   );
