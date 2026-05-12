@@ -793,13 +793,50 @@ export function BoardScreen({
               try {
                 const r = await api.syncPipeline(project.hash, pid);
                 setReloadKey((k) => k + 1);
-                if (r.nothingToDo) {
-                  setActionError("✓ worktree 已是最新,沒事可同步");
+                if (r.state === "done") {
+                  setActionError(
+                    r.behind && r.behind > 0
+                      ? "✓ 同步完成(git merge 直接成功,無需 AI)"
+                      : "✓ worktree 已是最新,無需同步"
+                  );
+                } else if (r.state === "conflict_await") {
+                  setActionError(`⚠ git merge 撞到 ${r.conflictFiles?.length ?? 0} 個衝突,modal 已跳出等決定`);
+                } else if (r.state === "failed") {
+                  setActionError("✕ 同步失敗,看 pipeline 上的提示");
                 } else {
-                  setActionError(`✓ AI 同步已啟動(落後 ${r.behind} commit),runner 接手中…`);
+                  setActionError("同步啟動中…");
                 }
               } catch (e) {
-                setActionError(`觸發 AI 同步失敗: ${e instanceof Error ? e.message : String(e)}`);
+                setActionError(`觸發同步失敗: ${e instanceof Error ? e.message : String(e)}`);
+              }
+            }}
+            onSyncConfirmAi={async (pid) => {
+              if (!project) return;
+              try {
+                await api.syncConfirmAi(project.hash, pid);
+                setReloadKey((k) => k + 1);
+                setActionError("✓ AI 解衝突已啟動");
+              } catch (e) {
+                setActionError(`啟動 AI 解衝突失敗: ${e instanceof Error ? e.message : String(e)}`);
+              }
+            }}
+            onSyncCancel={async (pid) => {
+              if (!project) return;
+              try {
+                await api.syncCancel(project.hash, pid);
+                setReloadKey((k) => k + 1);
+                setActionError("✓ 已取消同步,worktree 已回原狀");
+              } catch (e) {
+                setActionError(`取消同步失敗: ${e instanceof Error ? e.message : String(e)}`);
+              }
+            }}
+            onSyncDismiss={async (pid) => {
+              if (!project) return;
+              try {
+                await api.syncDismiss(project.hash, pid);
+                setReloadKey((k) => k + 1);
+              } catch (e) {
+                setActionError(`清掉同步狀態失敗: ${e instanceof Error ? e.message : String(e)}`);
               }
             }}
             onToggleAutoMerge={async (pid, nextValue) => {

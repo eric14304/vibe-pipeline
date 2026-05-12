@@ -298,6 +298,7 @@ function Composer({
 }) {
   const [text, setText] = useState("");
   const [picked, setPicked] = useState<Set<number>>(new Set());
+  const taRef = useRef<HTMLTextAreaElement>(null);
 
   // reset multi selection when options change (new AI turn)
   // biome-ignore lint/correctness/useExhaustiveDependencies: options is the intentional trigger; setPicked is stable
@@ -310,6 +311,8 @@ function Composer({
     if (!v || busy) return;
     onSend(v);
     setText("");
+    // 送出後重置 textarea 高度(setText 後 onChange 不會 fire,要手動)
+    if (taRef.current) taRef.current.style.height = "auto";
   }
 
   function toggleMulti(i: number) {
@@ -377,14 +380,23 @@ function Composer({
         </>
       )}
       <div className="qadr-composer-row">
-        <input
-          className="qadr-input"
-          type="text"
+        <textarea
+          ref={taRef}
+          className="qadr-input qadr-input-multiline"
           value={text}
           placeholder="或自己打一句…"
-          onChange={(e) => setText(e.target.value)}
+          rows={1}
+          onChange={(e) => {
+            setText(e.target.value);
+            // auto-grow:resize 到內容高度,max 8 行(超過 scroll)
+            const ta = e.target;
+            ta.style.height = "auto";
+            const max = parseFloat(getComputedStyle(ta).lineHeight) * 8;
+            ta.style.height = Math.min(ta.scrollHeight, max) + "px";
+          }}
           onKeyDown={(e) => {
-            if (e.key === "Enter") {
+            // Enter 送出,Shift+Enter 換行
+            if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
               e.preventDefault();
               send(text);
             }
@@ -402,6 +414,9 @@ function Composer({
             <path d="M5 12h14M13 5l7 7-7 7" />
           </svg>
         </button>
+      </div>
+      <div className="qadr-composer-hint mono">
+        Enter 送出 · Shift+Enter 換行
       </div>
       <button
         className="qadr-cancel-link"

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { CheckCircleIcon, FolderIcon, MergeIcon, PlusIcon, ProhibitIcon, RefreshIcon, TrashIcon } from "../../ui/icons";
+import { createPortal } from "react-dom";
+import { CheckCircleIcon, CheckIconSm, CloseIcon, FolderIcon, MergeIcon, PlusIcon, ProhibitIcon, RefreshIcon, TrashIcon } from "../../ui/icons";
 import { STATE_COLOR, STATE_LABEL, fmtElapsed, fmtDuration, normalizeVerdict } from "../../data/pipelines";
 import { MODE_LABELS } from "../../api/qa";
 import { useConfirm } from "../../ui/ConfirmDialog";
@@ -17,6 +18,7 @@ export function RunButton({
   lastRun,
   spawning = false,
   queuePosition,
+  syncActive = false,
 }: {
   pipeline: Pipeline;
   onRun?: (id: string) => void;
@@ -26,10 +28,24 @@ export function RunButton({
   // 避開「點下去看似沒反應」的視覺空窗(POST 回來到第一個 ticket 真跑可能 0-7s)
   spawning?: boolean;
   queuePosition?: number;
+  // syncJob.state ∈ {merging, conflict_await, ai_running} → RunButton 一律 disabled,避免撞 worktree
+  syncActive?: boolean;
 }) {
   const s = pipeline.state;
   const noTickets = pipeline.tickets.length === 0;
   const lastDur = lastRun?.durationMs ? fmtDuration(lastRun.durationMs) : null;
+
+  // sync 進行中:RunButton 完全鎖,顯示「同步中」覆蓋,避免 user 誤觸發 runner 撞 worktree
+  if (syncActive) {
+    return (
+      <button type="button" className="btn" disabled title="同步進行中,等同步收尾才能跑 ticket">
+        <span className="qadr-thinking-dots" style={{ display: "inline-flex", verticalAlign: "middle" }}>
+          <span /><span /><span />
+        </span>{" "}
+        同步中
+      </button>
+    );
+  }
 
   // spawning 期間統一顯「啟動中…」覆蓋掉原本的「開始/繼續/重試」狀態
   if (
@@ -140,6 +156,9 @@ export function FocusColumn({
   onPruneWorktree,
   onMerge,
   onSync,
+  onSyncConfirmAi,
+  onSyncCancel,
+  onSyncDismiss,
   onToggleAutoMerge,
   existingNames = [],
   onTicketClick,
@@ -160,6 +179,9 @@ export function FocusColumn({
   onPruneWorktree?: (pipelineId: string) => void;
   onMerge?: (pipelineId: string) => void;
   onSync?: (pipelineId: string) => void;
+  onSyncConfirmAi?: (pipelineId: string) => void;
+  onSyncCancel?: (pipelineId: string) => void;
+  onSyncDismiss?: (pipelineId: string) => void;
   onToggleAutoMerge?: (pipelineId: string, next: boolean) => void;
   existingNames?: string[];
   onTicketClick?: (ticket: Ticket) => void;
@@ -246,8 +268,10 @@ export function FocusColumn({
   const lastRun = runs[0] ?? null;
   const stateColor = STATE_COLOR[pipeline.state];
   const stateLabel = STATE_LABEL[pipeline.state];
-  const done = pipeline.tickets.filter((t) => t.status === "done").length;
-  const total = pipeline.tickets.length;
+  // mode=sync 是舊 synthetic ticket(已換 pipeline.syncJob),不計入 done/total
+  const realTickets = pipeline.tickets.filter((t) => t.mode !== "sync");
+  const done = realTickets.filter((t) => t.status === "done").length;
+  const total = realTickets.length;
   const allDone = done === total && pipeline.state === "ready";
   // 看是否有失敗 / paused 的 merge ticket(讓 banner 顯重試,不靠 RunButton 的繼續)
   const failedMergeTicket = pipeline.tickets.find(
@@ -273,10 +297,16 @@ export function FocusColumn({
     t.status === "failed_iter_limit" ||
     t.status === "failed_transient"
   );
+  const syncActive =
+    !!pipeline.syncJob &&
+    (pipeline.syncJob.state === "merging" ||
+      pipeline.syncJob.state === "conflict_await" ||
+      pipeline.syncJob.state === "ai_running");
   const lockedByState =
     pipeline.state === "running" ||
     pipeline.state === "stopping" ||
-    pipeline.state === "queued";
+    pipeline.state === "queued" ||
+    syncActive;
 
   // Spawning state:點 開始/繼續/重試 後到 polling 看到 state 跳出 [planning/paused/failed]。
   // 解掉「點下去看似沒反應」的視覺空窗(POST 回 → state.json 寫入 → polling 抓到 ≤ 1.5s + claude 啟動 0~5s)。
@@ -362,21 +392,26 @@ export function FocusColumn({
               onClose={() => setDiffOpen(false)}
             />
           )}
-          {behind !== null && behind > 0 && (
-            <button
-              type="button"
-              className="sync-chip"
-              title={
-                lockedByState
-                  ? `落後 ${pipeline.baseBranch || "base"} ${behind} commit(pipeline 在跑,等 pause/ready 才能 sync)`
-                  : `落後 ${pipeline.baseBranch || "base"} ${behind} commit · 點擊讓 AI 把 base 同步進 worktree`
-              }
-              disabled={lockedByState}
-              onClick={() => onSync?.(pipeline.id)}
-            >
-              <span className="sync-chip-arrow" aria-hidden>⇣</span>
-              落後 {behind} · 同步
-            </button>
+          <SyncStatusBar
+            pipeline={pipeline}
+            behindFallback={behind}
+            pipelineBusy={
+              pipeline.state === "running" ||
+              pipeline.state === "stopping" ||
+              pipeline.state === "queued"
+            }
+            tick={tick}
+            onStart={() => onSync?.(pipeline.id)}
+            onConfirmAi={() => onSyncConfirmAi?.(pipeline.id)}
+            onCancel={() => onSyncCancel?.(pipeline.id)}
+            onDismiss={() => onSyncDismiss?.(pipeline.id)}
+          />
+          {pipeline.syncJob?.state === "conflict_await" && (
+            <SyncConflictModal
+              pipeline={pipeline}
+              onConfirmAi={() => onSyncConfirmAi?.(pipeline.id)}
+              onCancel={() => onSyncCancel?.(pipeline.id)}
+            />
           )}
 
           <button
@@ -398,6 +433,7 @@ export function FocusColumn({
               lastRun={lastRun}
               spawning={spawning}
               queuePosition={queuePosition}
+              syncActive={syncActive}
             />
             <OverflowMenu
               pipeline={pipeline}
@@ -427,19 +463,228 @@ export function FocusColumn({
             onAddTicket={() => onAddTicket?.(pipeline.id)}
           />
         ) : (
-          pipeline.tickets.map((t, i) => (
-            <TicketCard
-              key={t.id}
-              ticket={t}
-              tick={tick}
-              index={i}
-              isSplitting={splittingTicketId === t.id}
-              onClick={onTicketClick ? () => onTicketClick(t) : undefined}
-            />
-          ))
+          pipeline.tickets
+            // mode=sync 是舊版 synthetic ticket(已換成 pipeline.syncJob),歷史資料還可能存在 → 過濾不顯
+            .filter((t) => t.mode !== "sync")
+            .map((t, i) => (
+              <TicketCard
+                key={t.id}
+                ticket={t}
+                tick={tick}
+                index={i}
+                isSplitting={splittingTicketId === t.id}
+                onClick={onTicketClick ? () => onTicketClick(t) : undefined}
+              />
+            ))
         )}
       </div>
     </main>
+  );
+}
+
+// Sync 狀態列 — 在 pipeline header 顯示 syncJob 進度;沒 syncJob 且 behind > 0 退回顯示「落後 N · 同步」按鈕。
+// 鎖按鈕邏輯:lockedByState(pipeline 在跑)時「同步」按鈕禁用。其他狀態列各自決定按鈕可點性。
+function SyncStatusBar({
+  pipeline,
+  behindFallback,
+  pipelineBusy,
+  tick,
+  onStart,
+  onConfirmAi,
+  onCancel,
+  onDismiss,
+}: {
+  pipeline: Pipeline;
+  behindFallback: number | null;
+  pipelineBusy: boolean;
+  tick: number;
+  onStart: () => void;
+  onConfirmAi: () => void;
+  onCancel: () => void;
+  onDismiss: () => void;
+}) {
+  const j = pipeline.syncJob;
+
+  // 沒 syncJob → 顯示 fallback「落後 N · 同步」按鈕(或不顯示)
+  if (!j) {
+    if (behindFallback === null || behindFallback <= 0) return null;
+    return (
+      <button
+        type="button"
+        className="sync-chip"
+        title={
+          pipelineBusy
+            ? `落後 ${pipeline.baseBranch || "base"} ${behindFallback} commit(pipeline 在跑,等 pause/ready 才能 sync)`
+            : `落後 ${pipeline.baseBranch || "base"} ${behindFallback} commit · 點擊先試 git merge,衝突才呼叫 AI`
+        }
+        disabled={pipelineBusy}
+        onClick={onStart}
+      >
+        <span className="sync-chip-arrow" aria-hidden>⇣</span>
+        落後 {behindFallback} · 同步
+      </button>
+    );
+  }
+
+  // 有 syncJob → 依 state 渲染
+  if (j.state === "merging") {
+    return (
+      <span className="sync-chip sync-chip-busy" title="git merge 進行中">
+        <span className="qadr-thinking-dots" style={{ display: "inline-flex", verticalAlign: "middle" }}>
+          <span /><span /><span />
+        </span>
+        {" "}同步中… git merge
+      </span>
+    );
+  }
+
+  if (j.state === "conflict_await") {
+    const n = j.conflictFiles?.length ?? 0;
+    return (
+      <span className="sync-chip sync-chip-conflict" title="git merge 撞到衝突,等使用者決定要不要讓 AI 解">
+        <span className="sync-chip-arrow" aria-hidden>!</span>
+        遇衝突({n} 檔)
+        <button
+          type="button"
+          className="sync-chip-icon sync-chip-primary"
+          onClick={onConfirmAi}
+          title="讓 AI 解"
+          aria-label="讓 AI 解"
+        >
+          <CheckIconSm />
+        </button>
+        <button
+          type="button"
+          className="sync-chip-icon"
+          onClick={onCancel}
+          title="跳過(abort merge)"
+          aria-label="跳過"
+        >
+          <CloseIcon />
+        </button>
+      </span>
+    );
+  }
+
+  if (j.state === "ai_running") {
+    const elapsedSec = Math.max(0, Math.round((Date.now() - j.startedAt) / 1000));
+    void tick;
+    return (
+      <span className="sync-chip sync-chip-busy" title="AI 在解衝突">
+        <span className="qadr-thinking-dots" style={{ display: "inline-flex", verticalAlign: "middle" }}>
+          <span /><span /><span />
+        </span>
+        {" "}AI 解衝突 · {fmtElapsed(elapsedSec)}
+        <button
+          type="button"
+          className="sync-chip-icon"
+          onClick={onCancel}
+          title="取消"
+          aria-label="取消"
+        >
+          <CloseIcon />
+        </button>
+      </span>
+    );
+  }
+
+  if (j.state === "failed") {
+    return (
+      <span
+        className="sync-chip sync-chip-failed"
+        title={j.reason || "同步失敗"}
+      >
+        <span className="sync-chip-arrow" aria-hidden>✕</span>
+        同步失敗
+        <button
+          type="button"
+          className="sync-chip-icon sync-chip-primary"
+          onClick={onStart}
+          title="重試"
+          aria-label="重試"
+        >
+          <RefreshIcon />
+        </button>
+        <button
+          type="button"
+          className="sync-chip-icon"
+          onClick={onDismiss}
+          title="關"
+          aria-label="關"
+        >
+          <CloseIcon />
+        </button>
+      </span>
+    );
+  }
+
+  // done
+  return (
+    <span className="sync-chip sync-chip-done" title="同步完成">
+      <span className="sync-chip-arrow" aria-hidden>✓</span>
+      已同步
+      <button
+        type="button"
+        className="sync-chip-icon"
+        onClick={onDismiss}
+        title="關"
+        aria-label="關"
+      >
+        <CloseIcon />
+      </button>
+    </span>
+  );
+}
+
+// conflict_await 時跳的對話框,給 user 一個明確「要不要 AI 解」的決策關卡(token 花費前的最後確認)
+function SyncConflictModal({
+  pipeline,
+  onConfirmAi,
+  onCancel,
+}: {
+  pipeline: Pipeline;
+  onConfirmAi: () => void;
+  onCancel: () => void;
+}) {
+  const j = pipeline.syncJob;
+  if (!j || j.state !== "conflict_await") return null;
+  const files = j.conflictFiles ?? [];
+  // Portal 到 body 避免被 focus-head 的 transform / overflow 鎖死
+  return createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="modal-backdrop"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onCancel();
+      }}
+    >
+      <div className="modal-card">
+        <div className="modal-title">Sync 遇到衝突</div>
+        <div className="modal-body">
+          <p style={{ margin: "6px 0" }}>
+            落後 {j.behindCount} commit,git merge 撞到 <strong>{files.length}</strong> 個檔案衝突:
+          </p>
+          <ul className="mono" style={{ margin: "8px 0", paddingLeft: 18, fontSize: 12, color: "var(--fg-mute)", maxHeight: 200, overflowY: "auto" }}>
+            {files.map((f) => (
+              <li key={f}>{f}</li>
+            ))}
+          </ul>
+          <p style={{ margin: "12px 0 6px", fontSize: 13 }}>
+            要讓 AI 自動解嗎?(隨時可取消)
+          </p>
+        </div>
+        <div className="modal-actions">
+          <button type="button" className="btn" onClick={onCancel}>
+            取消(abort merge)
+          </button>
+          <button type="button" className="btn btn-primary" onClick={onConfirmAi}>
+            讓 AI 解 →
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -964,18 +1209,32 @@ function TicketCard({
   const isPaused = ticket.status === "paused";
   const isDraft = ticket.status === "draft";
 
-  // runner 不一定寫 totalElapsed,從 rounds[] 推:sum(endedAt - startedAt) / 1000
-  const totalElapsed =
-    ticket.iter?.totalElapsed ??
-    (ticket.iter?.rounds
-      ? Math.round(
-          ticket.iter.rounds.reduce(
-            (sum, r) => sum + Math.max(0, (r.endedAt ?? r.startedAt) - r.startedAt),
-            0
-          ) / 1000
-        )
-      : 0);
-  const elapsed = isRunning && ticket.iter ? totalElapsed + tick : totalElapsed;
+  // Round-sum 計時:已完成 round 累加 + in-progress round live(到 Date.now())。
+  // 避免 wall-clock 把暫停 / 跨日的閒置時間也算進去(觀感「6 小時還沒跑完」其實多半在等 user)。
+  // tick 當 re-render 訊號,使 in-progress round 每秒重算
+  void tick;
+  let elapsed: number;
+  const rs = ticket.iter?.rounds ?? [];
+  if (rs.length > 0) {
+    const completedSec = rs.reduce(
+      (sum, r) => sum + (r.endedAt && r.startedAt ? Math.max(0, r.endedAt - r.startedAt) : 0),
+      0
+    ) / 1000;
+    const inProg = rs.find((r) => !r.endedAt);
+    const liveSec = isRunning && inProg?.startedAt
+      ? Math.max(0, (Date.now() - inProg.startedAt) / 1000)
+      : 0;
+    elapsed = Math.round(completedSec + liveSec);
+  } else {
+    const ts = (ticket as { startedAt?: number; endedAt?: number }).startedAt;
+    const te = (ticket as { startedAt?: number; endedAt?: number }).endedAt;
+    if (typeof ts === "number") {
+      const end = isRunning ? Date.now() : (te ?? Date.now());
+      elapsed = Math.max(0, Math.round((end - ts) / 1000));
+    } else {
+      elapsed = ticket.iter?.totalElapsed ?? 0;
+    }
+  }
   const iterCurrentLabel = ticket.iter ? Math.max(1, ticket.iter.current) : 0;
   const accent = STATE_COLOR[ticket.status] || "var(--draft)";
 
@@ -1033,7 +1292,7 @@ function TicketCard({
           ticket.iter.stage !== "done";
         return (
           <>
-            {rounds.map((r) => (
+            {rounds.filter((r) => r.endedAt).map((r) => (
               <div key={r.n} className="ticket-iter ticket-iter-row">
                 <span className="iter-round-num mono">#{r.n}</span>
                 <IterStages
@@ -1043,27 +1302,38 @@ function TicketCard({
                   lastVerdict={r.criticVerdict}
                 />
                 <span className="iter-meta mono">
-                  {r.endedAt && r.startedAt
-                    ? fmtElapsed(Math.round((r.endedAt - r.startedAt) / 1000))
+                  {r.startedAt
+                    ? fmtElapsed(Math.round((r.endedAt! - r.startedAt) / 1000))
                     : "—"}
                 </span>
               </div>
             ))}
-            {inProgress && (
-              <div className="ticket-iter ticket-iter-row">
-                <span className="iter-round-num mono">
-                  #{(ticket.iter.current ?? 0) + 1}
-                </span>
-                <IterStages
-                  stage={ticket.iter.stage}
-                  status={ticket.status}
-                  stages={stageList}
-                />
-                <span className="iter-meta mono">
-                  {fmtElapsed(tick)}
-                </span>
-              </div>
-            )}
+            {inProgress && (() => {
+              // in-progress round 可能已有 startedAt(runner 開始即 append)或還沒 append。
+              // 優先用 in-progress round 自己的 startedAt;次選最後一筆 completed round 的 endedAt
+              const inProg = rounds.find((r) => !r.endedAt);
+              const completed = rounds.filter((r) => r.endedAt);
+              const lastEnded = completed[completed.length - 1]?.endedAt;
+              const roundStart = inProg?.startedAt ?? lastEnded ?? (ticket as { startedAt?: number }).startedAt;
+              const live = typeof roundStart === "number"
+                ? Math.max(0, Math.round((Date.now() - roundStart) / 1000))
+                : 0;
+              return (
+                <div className="ticket-iter ticket-iter-row">
+                  <span className="iter-round-num mono">
+                    #{inProg?.n ?? (ticket.iter?.current ?? 0) + 1}
+                  </span>
+                  <IterStages
+                    stage={ticket.iter!.stage}
+                    status={ticket.status}
+                    stages={stageList}
+                  />
+                  <span className="iter-meta mono">
+                    {fmtElapsed(live)}
+                  </span>
+                </div>
+              );
+            })()}
             {rounds.length === 0 && !inProgress && (
               // 還沒跑(ready 但 mode=iter/merge/sync 也屬此情形)
               <div className="ticket-iter ticket-iter-row">

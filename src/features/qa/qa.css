@@ -333,6 +333,19 @@
   flex: 1;
   min-width: 0;
 }
+/* multiline composer:取消 input 預設 1 行,允許 textarea auto-grow */
+.qadr-input-multiline {
+  resize: none;
+  overflow-y: auto;
+  min-height: 32px;
+}
+.qadr-composer-hint {
+  font-size: 10.5px;
+  color: var(--fg-faint);
+  margin-top: 4px;
+  text-align: right;
+  letter-spacing: 0.02em;
+}
 .qadr-textarea {
   font-family: inherit;
   font-size: 13px;

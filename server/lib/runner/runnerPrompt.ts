@@ -9,17 +9,20 @@ export function buildRunnerBehaviorPrompt(opts: {
 }): string {
   const { subAgent, merge } = opts;
   const subAgentDirective =
-    '\n## Task tool 派 sub-agent 用的 provider / model / effort\n\n' +
+    '\n## 派 sub-agent 用的 provider / model / effort\n\n' +
     '本次 run 的 sub-agent 配置:\n' +
     '- 一般 ticket(mode=step / iter):provider=' + subAgent.provider + ',model=' + subAgent.model + ',effort=' + subAgent.effort + '\n' +
-    '- merge / sync ticket(mode=merge / sync):provider=' + merge.provider + ',model=' + merge.model + ',effort=' + merge.effort + '\n\n' +
+    '- merge ticket(mode=merge):provider=' + merge.provider + ',model=' + merge.model + ',effort=' + merge.effort + '\n\n' +
     dispatchInstructions("一般 ticket", subAgent, /* allowWrite */ true) +
-    dispatchInstructions("merge / sync ticket", merge, /* allowWrite */ true) +
-    '\n**注意**:iter mode 的「審核 AI」(critic)派 sub-agent 時,prompt 內明確寫「只驗收、不改 code」;codex provider 派審核 AI 時,改用 `--read-only` 取代 `--write`(避免審核步驟誤改檔)。\n';
+    dispatchInstructions("merge ticket", merge, /* allowWrite */ true) +
+    '\n**注意**:iter mode 的「審核 AI」(critic)派 sub-agent 時,prompt 內明確寫「只驗收、不改 code」;codex provider 派審核 AI 時,Bash 改用 `-s read-only` 取代 `-s workspace-write`(避免審核步驟誤改檔)。\n';
   return RUNNER_BEHAVIOR_PROMPT_HEAD + subAgentDirective + RUNNER_BEHAVIOR_PROMPT_TAIL;
 }
 
-// 派 sub-agent 的具體 Task tool 呼叫格式,因 provider 而異。
+// 派 sub-agent 的具體呼叫格式,因 provider 而異。
+// 設計原則:claude provider 走 Task tool(原生 sub-agent 機制);非 claude provider
+// 一律走 Bash 直接呼 CLI(避開 plugin 中間層的 sandbox / flag 限制,完全控制)。
+// 多 provider 擴展靠這層:加新 CLI 只要補一段 dispatch 範例,不靠 plugin 包裝。
 function dispatchInstructions(label: string, cfg: TaskModelConfig, allowWrite: boolean): string {
   if (cfg.provider === "claude") {
     return (
@@ -31,20 +34,29 @@ function dispatchInstructions(label: string, cfg: TaskModelConfig, allowWrite: b
       '- effort:Task tool 不接 effort 參數,改在 prompt 開頭加一行「[Reasoning effort: ' + cfg.effort + ']」做 hint\n'
     );
   }
-  // codex:走 codex@openai-codex plugin 提供的 codex-rescue subagent_type
+  // codex:Bash 直接呼 codex CLI(避免走 codex-rescue plugin 那層 workspace-write sandbox)
+  const sandbox = allowWrite ? "workspace-write" : "read-only";
   return (
     '\n### ' + label + '(provider=codex)派法\n' +
-    '本 ticket 改派 **codex** 而非 claude sub-agent。用 Task tool,參數:\n' +
-    '- subagent_type: "codex-rescue"  ← **必須**,這是 codex@openai-codex plugin 提供的 forwarding agent\n' +
-    '- description: 5-10 字概述\n' +
-    '- prompt: **開頭一行**寫 routing flags,然後空行,然後完整任務指令。格式:\n' +
+    '**不走 Task tool**,直接 Bash 呼 codex CLI(避開 plugin 層 sandbox 限制 + 拿全 flag 控制)。指令格式:\n' +
     '\n' +
-    '  --model ' + cfg.model + ' --effort ' + cfg.effort + (allowWrite ? ' --write' : ' --read-only') + '\n' +
-    '  \n' +
-    '  <ticket.prompt + acceptance + 上輪 feedback,如有>\n' +
-    '\n' +
-    '  codex-rescue 會把這些 flag 抽出來 forward 給 codex-companion runtime,不會混進實際任務文本。\n' +
-    '- model:**不要傳** Task tool 的 model 參數(它只認 claude alias,給了會錯)。model 透過 prompt 內 `--model` flag 指定\n'
+    '```\n' +
+    'codex exec --json --skip-git-repo-check --ignore-user-config --ignore-rules \\\n' +
+    '  -c mcp_servers={} \\\n' +
+    '  -c model="' + cfg.model + '" \\\n' +
+    '  -c model_reasoning_effort="' + cfg.effort + '" \\\n' +
+    '  -s ' + sandbox + ' \\\n' +
+    (allowWrite ? '  --dangerously-bypass-approvals-and-sandbox \\\n' : '') +
+    '  --ephemeral \\\n' +
+    '  - <<\'EOF\'\n' +
+    '<ticket.prompt + acceptance + 上輪 feedback,如有>\n' +
+    'EOF\n' +
+    '```\n\n' +
+    '**輸出解析**:`--json` 給 JSONL,每行一個 event。最終 agent_message 在 `{"type":"item.completed","item":{"type":"agent_message","text":"..."}}`,掃所有行取**最後一個** agent_message.text 當 sub-agent 回應。\n' +
+    '**注意**:\n' +
+    '- 一定要加 `--dangerously-bypass-approvals-and-sandbox`(write mode)才能跑 install / kill / 動 user home 等環境級操作\n' +
+    '- read-only mode 不加 bypass,sandbox 自己擋\n' +
+    '- prompt 走 heredoc stdin(`- <<EOF...EOF`),避免 shell 引號 escape 雷\n'
   );
 }
 
@@ -132,43 +144,6 @@ JSON 結構:
 - 結束 session
 
 **merge ticket 不跑「ticket commit」流程**(merge commit 已在 main repo 由 sub-agent commit 完;worktree 不會有改動)。
-
-### mode = "sync" (AI sync ticket — synthetic,/sync endpoint append)
-這張 ticket 用 **rebase** 把 base branch 拉進 worktree。sub-agent 在 worktree 內操作。
-
-跑法跟 merge ticket 對稱(三選一回應 + iter 上限),但**完成後不改 pipeline.state**(只是 ticket done,pipeline 保持原 state ready/paused/merged)。
-
-讓 N = ticket.iterLimit ?? 3。
-
-迴圈最多 N 輪:
-1. Bash "date +%s%3N" 抓 startedAt;標 stage="doer";派 Task sub-agent;寫回 JSON
-2. sub-agent 回應開頭三選一:
-   - "PASS\\nNOTHING_TO_SYNC" → 已最新,沒 rebase 任何東西(等同 FF 0 commit);verdict="PASS"
-   - "PASS\\nSYNC_DONE" → rebase 成功(可能含衝突解);verdict="PASS"。**主 agent 必須跑 hash remap(見步驟 4b)**
-   - "FAIL\\n<reason>" → 可重試;verdict="FAIL",feedback=reason
-   - "FAIL_NORETRY\\n<reason>" → 致命(worktree 髒 / branch 不存在);verdict="FAIL",feedback=reason,**立刻終止 iter**
-3. Bash "date +%s%3N" 抓 endedAt;append round;current+=1;寫回 JSON
-4. PASS:
-   - **4a. NOTHING_TO_SYNC** → 直接標 ticket.status = "done";寫回 JSON,跳出迴圈
-   - **4b. SYNC_DONE** → 跑 hash remap:
-     i. cwd = worktree。Bash: git -C . log --format='%H %s' <baseBranch>..HEAD
-        (列出 rebase 後 branch 上的 unique commits;baseBranch 從 pipeline.baseBranch 拿,沒有的話預設 'main')
-     ii. 解析每行成 (newHash, subject) pairs
-     iii. 讀 pipeline.json,逐張 ticket 看 commits[] 陣列:
-          對每個 commit { hash: oldHash, subject, ts }:
-            - 在 step ii 結果裡找 subject 完全相同的 → 寫新 hash 取代 oldHash
-            - 找不到(可能 rebase 中被 skip 因 empty)→ 在 commit 物件加 'emptiedByRebase': true,保留 oldHash 給歷史紀錄
-            - 多個 subject 相同(罕見) → 用「pipeline.json 裡此 ticket 的第幾個 commits[i] 對應 git log 順序的第幾個 subject 相同 commit」匹配
-     iv. 寫回 pipeline.json
-   - 標 ticket.status = "done";寫回 JSON,跳出迴圈
-   - **不改 pipeline.state**(維持原 state)
-5. FAIL_NORETRY → status=failed_iter_limit + state=paused,結束 session
-6. FAIL → 下輪繼續,feedback 加進下輪 prompt
-
-跑完 N 輪還沒 PASS / FAIL_NORETRY 觸發:
-- 標 ticket.status = "failed_iter_limit",pipeline.state = "paused",結束 session
-
-**sync ticket 不跑「ticket commit」流程**(rebase 已在 worktree 完成,沒新增 commit 可 add)。
 
 ### mode = "iter" (迭代任務)
 讓 N = ticket.iterLimit ?? 5,iterStop = ticket.iterStopAtLimit ?? true。
@@ -262,13 +237,14 @@ JSON 結構:
 ## 工具限制(嚴格)
 
 - **Edit / Write**:**只准用在(1)pipeline.json(absolute path 那個)和(2)worktree 外的 tmp file**(/tmp/* 或系統 temp dir 內,給 ticket commit message 用)。**絕對不准**動 worktree 內的 source code、設定檔、任何其他檔案
-- **source code 修改**:**100% 透過 Task 派執行AI / 審核AI 來做**,你自己永遠不直接改
+- **source code 修改**:**100% 透過 sub-agent 派執行AI / 審核AI 來做**(claude → Task tool;codex → Bash 直呼 CLI),你自己永遠不直接改
 - **Bash**:可以跑
   - read-only:git status / git log / git diff / git rev-parse / cat / ls / tsc --noEmit (用來驗收)
   - **commit only**:git -C . add -A / git -C . commit -F <tmp> (僅限本流程「ticket commit」段使用)
   - **tmp 清理**:rm -f /tmp/vp-commit-*.txt(僅限清理自己寫的 commit message tmp file)
-  **不准**跑其他會改檔的指令(mv / npm install / git reset / git push / git checkout / 任何 install/build)
-- **Task** (派 sub-agent):這是你做事的主要工具。sub-agent 會繼承你的工具權限,所以你開放沒事
+  - **派 codex sub-agent**:codex exec --json ...(走上方「provider=codex 派法」段)。stdin heredoc 餵 prompt,JSONL stdout 解析 agent_message
+  **不准**跑其他會改檔的指令(mv / npm install / git reset / git push / git checkout / 任何 install/build — 那是 sub-agent 的工作)
+- **Task** (派 claude sub-agent):這是你派 claude provider sub-agent 的工具。sub-agent 繼承你的工具權限
 
 `;
 

@@ -171,6 +171,98 @@ export async function behindBaseCount(
   return Number.isFinite(n) ? n : null;
 }
 
+// 嘗試在 worktree 上 git merge base branch。
+// 回:
+//   { ok: true, alreadyUpToDate: true } → base 沒新東西
+//   { ok: true, commit } → merge 成功(fast-forward 或 clean 3-way),commit hash 是 merge commit(ff 時是 base HEAD)
+//   { ok: false, conflictFiles } → 有衝突,worktree 留在 conflict 狀態(caller 決定要 abort 還是進 AI 流程)
+//   { ok: false, error } → 其他失敗(worktree 不存在 / git error etc),也回乾淨狀態(成功 abort)
+export async function mergeFromBase(
+  projectPath: string,
+  pipelineId: string,
+  baseBranch: string
+): Promise<
+  | { ok: true; alreadyUpToDate: true }
+  | { ok: true; alreadyUpToDate?: false; commit: { hash: string; subject: string; ts: number } }
+  | { ok: false; conflictFiles: string[] }
+  | { ok: false; error: string }
+> {
+  const wt = worktreePath(projectPath, pipelineId);
+  if (!existsSync(wt)) return { ok: false, error: "worktree 不存在" };
+
+  // 先確認 worktree 乾淨,否則 git merge 會吃掉 user 未 commit 的改動
+  const dirty = await spawnGit(["status", "--porcelain"], wt);
+  if (!dirty.ok) return { ok: false, error: `git status 失敗:${dirty.err}` };
+  if (dirty.out.trim().length > 0) {
+    return { ok: false, error: "worktree 有未 commit 的改動,先 commit 或 stash 再 sync" };
+  }
+
+  // 取 baseBranch 最新(從 main repo fetch / pull origin 並非這層責任 — 上層若要更新 base 自己處理)
+  // 我們只 merge 本地 baseBranch 進 worktree branch
+  const baseHead = await spawnGit(["rev-parse", baseBranch], wt);
+  if (!baseHead.ok) return { ok: false, error: `找不到 base branch ${baseBranch}:${baseHead.err}` };
+
+  const myHead = await spawnGit(["rev-parse", "HEAD"], wt);
+  if (!myHead.ok) return { ok: false, error: `worktree HEAD 異常:${myHead.err}` };
+
+  // base merge-base == base HEAD 表示 worktree 已 contain base(沒落後)
+  const mergeBase = await spawnGit(["merge-base", "HEAD", baseBranch], wt);
+  if (mergeBase.ok && mergeBase.out.trim() === baseHead.out.trim()) {
+    return { ok: true, alreadyUpToDate: true };
+  }
+
+  // 跑 merge — --no-ff 永遠建 merge commit(timeline 清楚 base 何時被 pull 進來)
+  const mergeMsg = `sync: merge ${baseBranch} into pipeline branch`;
+  const mergeRes = await spawnGit(
+    ["merge", "--no-ff", "-m", mergeMsg, baseBranch],
+    wt
+  );
+
+  if (mergeRes.ok) {
+    const commitRes = await spawnGit(["rev-parse", "HEAD"], wt);
+    const subjectRes = await spawnGit(["log", "-1", "--format=%s"], wt);
+    return {
+      ok: true,
+      commit: {
+        hash: commitRes.out.trim(),
+        subject: subjectRes.out.trim() || mergeMsg,
+        ts: Date.now(),
+      },
+    };
+  }
+
+  // merge 失敗:多半是衝突。撈衝突檔案
+  const status = await spawnGit(["status", "--porcelain"], wt);
+  const conflictFiles = status.ok
+    ? status.out
+        .split(/\r?\n/)
+        .filter((l) => /^(UU|AA|DD|AU|UA|DU|UD)\s/.test(l))
+        .map((l) => l.replace(/^..\s+/, ""))
+    : [];
+  if (conflictFiles.length > 0) {
+    return { ok: false, conflictFiles };
+  }
+  // 沒衝突卻 merge 失敗 — 其他原因(detached HEAD / git config 問題等)。讓 caller 看 err
+  return { ok: false, error: mergeRes.err || mergeRes.out || "merge failed" };
+}
+
+// 中止當前 worktree 上進行中的 merge(把 worktree 回到 merge 前狀態,丟掉 conflict markers)
+// 對 ai_running 取消 / failed 收尾用
+export async function mergeAbort(
+  projectPath: string,
+  pipelineId: string
+): Promise<{ ok: boolean; error?: string }> {
+  const wt = worktreePath(projectPath, pipelineId);
+  if (!existsSync(wt)) return { ok: false, error: "worktree 不存在" };
+  const res = await spawnGit(["merge", "--abort"], wt);
+  if (!res.ok) {
+    // 沒在 merge 中時 abort 會失敗,當成已乾淨即可
+    if (/no merge to abort/i.test(res.err)) return { ok: true };
+    return { ok: false, error: res.err || res.out };
+  }
+  return { ok: true };
+}
+
 // 完整 unified diff:跟 base 比對 worktree 全部改動。
 // 回 { files: [{path, added, deleted}], raw } — raw 是 git diff 全文,前端自己 render。
 export async function fullDiff(
