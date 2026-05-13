@@ -6,6 +6,7 @@ import { STATE_COLOR, STATE_LABEL, fmtElapsed, fmtDuration, normalizeVerdict } f
 import { MODE_LABELS } from "../../api/qa";
 import { useConfirm } from "../../ui/ConfirmDialog";
 import { DiffModal } from "./DiffModal";
+import { useApi } from "../../hooks/useApi";
 import type { IterStage, Pipeline, Ticket, TicketStatus } from "../../types/pipeline";
 import * as api from "../../api/projects";
 import type { RunSummary } from "../../api/projects";
@@ -210,63 +211,37 @@ export function FocusColumn({
 
   // Worktree diff stat — fetch once on mount(讓 paused/ready 也看得到歷史 diff),
   // running/stopping 時 poll 每 3s 看即時進度。merged 後不打(已合進 base 沒意義)。
-  const [diffStat, setDiffStat] = useState<api.DiffStat | null>(null);
   // DiffModal 開關 — 由 head 上 chip 點擊觸發,任何 banner 不在的狀態都看得到
   const [diffOpen, setDiffOpen] = useState(false);
-  useEffect(() => {
-    if (!projectHash || pipeline.state === "merged" || pipeline.state === "planning") {
-      setDiffStat(null);
-      return;
+  const diffStatEnabled = !!projectHash && pipeline.state !== "merged" && pipeline.state !== "planning";
+  const diffLive = pipeline.state === "running" || pipeline.state === "stopping";
+  const { data: diffStat } = useApi<api.DiffStat | null>(
+    () => (diffStatEnabled ? api.getDiffStat(projectHash!, pipeline.id) : Promise.resolve(null)),
+    {
+      intervalMs: 3000,
+      gate: diffLive,
+      deps: [projectHash, pipeline.id, pipeline.state],
     }
-    let cancelled = false;
-    const tick = () => {
-      api
-        .getDiffStat(projectHash, pipeline.id)
-        .then((d) => {
-          if (!cancelled) setDiffStat(d);
-        })
-        .catch(() => {});
-    };
-    tick();
-    // 只 running/stopping 時持續 poll;paused/ready/failed 一次抓完就好
-    const live = pipeline.state === "running" || pipeline.state === "stopping";
-    const id = live ? setInterval(tick, 3000) : null;
-    return () => {
-      cancelled = true;
-      if (id) clearInterval(id);
-    };
-  }, [projectHash, pipeline.id, pipeline.state]);
+  );
 
   // Sync status — worktree 落後 base 幾個 commit。planning 沒 worktree 不抓;merged 仍然抓
   // (merged 不是終態,branch/worktree 還在,可以繼續加 ticket / sync / 再 merge)。
   // 跟 diffStat 同節奏:running/stopping 才 poll(base 那時可能被別條 pipeline 推進);
   // 其他 state 一次抓完,不同 pipeline.state 自動 refetch。
-  const [behind, setBehind] = useState<number | null>(null);
   // syncJob.state 也當 deps:user 點 ✕ 關掉 done/failed chip → syncJob undefined → 觸發 refetch
   // 否則 chip 消失但「落後 N · 同步」按鈕要等下次 polling 才出現
   const syncJobState = pipeline.syncJob?.state;
-  useEffect(() => {
-    if (!projectHash || pipeline.state === "planning") {
-      setBehind(null);
-      return;
+  const syncEnabled = !!projectHash && pipeline.state !== "planning";
+  const syncLive = pipeline.state === "running" || pipeline.state === "stopping";
+  const { data: syncStatus } = useApi<api.SyncStatus | null>(
+    () => (syncEnabled ? api.getSyncStatus(projectHash!, pipeline.id) : Promise.resolve(null)),
+    {
+      intervalMs: 5000,
+      gate: syncLive,
+      deps: [projectHash, pipeline.id, pipeline.state, syncJobState],
     }
-    let cancelled = false;
-    const tick = () => {
-      api
-        .getSyncStatus(projectHash, pipeline.id)
-        .then((s) => {
-          if (!cancelled) setBehind(s.behind);
-        })
-        .catch(() => {});
-    };
-    tick();
-    const live = pipeline.state === "running" || pipeline.state === "stopping";
-    const id = live ? setInterval(tick, 5000) : null;
-    return () => {
-      cancelled = true;
-      if (id) clearInterval(id);
-    };
-  }, [projectHash, pipeline.id, pipeline.state, syncJobState]);
+  );
+  const behind = syncStatus?.behind ?? null;
 
   const totalCost = runs.reduce((sum, r) => sum + (r.costUsd ?? 0), 0);
   const lastRun = runs[0] ?? null;
