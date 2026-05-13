@@ -20,6 +20,7 @@
 - **背景 push 真實 pipeline 事件觸發** — `/api/push/test` 鎖屏可收;runner 真實 pipeline 完成事件 → push 還沒實機跑過(ticketWatcher 路徑已寫好,缺最後一哩驗證)
 - **CLI 細節** — shell completion / `vbpl pipeline log --follow` log streaming / CI release artifact 自動 build
 - **Transient retry 真正觸發測試** — 沒自然 fixture,需 fault injection;低優先,留 production 真踩到再補
+- **Self-dogfood guard(警告層,worktree isolation 的輕量替代)** — `/run` `/merge` route 偵測「target repo === backend cwd」+「`process.execArgv` 含 `--watch`」兩條件交集成立 → response 加 `warnings: string[]` envelope;Web UI 跳 toast / modal,CLI stderr 印警告。設計取捨候選:(A)Backend 拒啟動回 `needs_confirmation`,CLI exit 1 要 `--force-self-dogfood` re-run / Web UI 跳 modal 強制 ack(real mitigation,推薦);(B)Backend 仍啟動只回 warnings(soft warn,零 friction 但長期變雜訊)。工程量 ~35 行(backend detect + envelope + CLI api.ts post() 統一處理 + Web UI toast)。dismiss 持久化用 localStorage / `~/.vibe-pipeline/state.json`「30 天內不再提示」
 
 ## Repo 結構(物理路徑 single source of truth)
 
