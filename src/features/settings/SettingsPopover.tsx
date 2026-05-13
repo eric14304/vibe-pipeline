@@ -927,7 +927,7 @@ export function SettingsPopover({
               provider={userCfg.defaults[tc].provider}
               model={userCfg.defaults[tc].model}
               effort={userCfg.defaults[tc].effort}
-              showProvider={tc === "runner"}
+              showProvider={!["executor", "critic", "merge"].includes(tc)}
               onChange={(patch) => updateTask(tc, patch)}
             />
           ))}
