@@ -3,13 +3,98 @@
   display: none;
 }
 
-/* Desktop:.task-row + .task-row-selects 用 display:contents 讓 4 個內容元素直接
-   進到 .settings-popover-task-grid 的 4 欄(label / provider / model / effort)。
-   行為跟舊版「TaskModelRow return 一段 fragment」等價。 */
-.task-row,
-.task-row-selects {
-  display: contents;
+/* ─── AI 任務 row(2026-05-13 拆 2 層 layout)────────────────────────
+   row1: label(左)+ selects(右,grid 對齊兩 group)
+   row2: hint(獨立一行,full width,長文字可自由換行不裁字)
+   Mobile breakpoint 改 flex column,selects 用 1fr 2fr 1fr 撐滿。 */
+
+:root {
+  --task-w-provider: 86px;
+  --task-w-model: 150px;
+  --task-w-effort: 95px;
 }
+
+.task-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.task-row-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 8px;
+  align-items: center;
+}
+
+.task-row-label {
+  font-size: 12px;
+  color: var(--fg);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-row-selects {
+  display: grid;
+  grid-template-columns: var(--task-w-provider) var(--task-w-model) var(--task-w-effort);
+  column-gap: 8px;
+}
+
+.task-row-selects > select {
+  padding: 3px 4px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--fg);
+  font-size: 11.5px;
+  font-family: var(--font-mono);
+  box-sizing: border-box;
+}
+
+.task-row-hint {
+  font-size: 10.5px;
+  color: var(--fg-faint);
+  line-height: 1.4;
+}
+
+.task-row-placeholder {
+  width: var(--task-w-provider);
+}
+
+/* ─── AI 任務 group container ──────────────────────────────────── */
+
+.task-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 8px;
+}
+
+.task-group--primary {
+  background: var(--panel);
+}
+
+.task-group--secondary {
+  background: var(--panel-2);
+  margin-bottom: 12px;
+}
+
+.task-group-hint {
+  font-size: 11px;
+  color: var(--fg-faint);
+  margin-bottom: 8px;
+}
+
+.settings-popover-task-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ─── Mobile ─────────────────────────────────────────────────── */
 
 @media (max-width: 767px) {
   .settings-popover {
@@ -55,44 +140,29 @@
     min-width: 0;
   }
 
-  /* Mobile:不再用 grid,改 flex column;每張 task-row 是 1 行 label + 1 行 selects */
-  .settings-popover-task-grid {
-    display: flex !important;
-    flex-direction: column;
-    align-items: stretch !important;
-    gap: 14px !important;
-    width: 100%;
-  }
-
-  .task-row {
-    display: flex !important;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 6px;
-    width: 100%;
+  /* Mobile:label 自己一行,selects 1fr 2fr 1fr 共一行 */
+  .task-row-head {
+    grid-template-columns: 1fr;
+    row-gap: 6px;
   }
 
   .task-row-label {
-    white-space: normal !important;
-    flex-direction: row !important;
-    align-items: baseline !important;
-    /* 原 inline 樣式有 alignSelf:"center",mobile 全寬卡式靠左 */
-    align-self: flex-start !important;
-    justify-content: flex-start !important;
-    gap: 8px;
+    white-space: normal;
   }
 
-  /* 3 個 select 用 grid 不平均分:model 佔 2 倍寬,容下 gpt-5.4-mini / sonnet-4-6 等 */
   .task-row-selects {
-    display: grid !important;
     grid-template-columns: 1fr 2fr 1fr;
     gap: 6px;
-    width: 100%;
   }
 
-  .task-row-selects select {
+  .task-row-selects > select {
     width: 100% !important;
     min-width: 0;
+  }
+
+  /* placeholder span(沒 provider 的 group)mobile 隱掉,讓 model/effort 自然填 */
+  .task-row-placeholder {
+    display: none;
   }
 
   /* 右上關閉 icon — mobile 全螢幕,需要明顯的關閉入口 */

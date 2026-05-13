@@ -47,21 +47,7 @@ type ProjectConfirmedValues = {
 type TaskConfirmedValue = Provider | ModelName | Effort;
 type TaskConfirmedValues = Partial<Record<`task:${TaskClass}:${TaskField}`, TaskConfirmedValue>>;
 
-const TASK_SELECT_STYLE: React.CSSProperties = {
-  padding: "3px 4px",
-  border: "1px solid var(--line)",
-  borderRadius: 4,
-  background: "var(--panel)",
-  color: "var(--fg)",
-  fontSize: 11.5,
-  fontFamily: "var(--font-mono)",
-  boxSizing: "border-box",
-};
-
-// 固定寬度,避免不同 provider / model / effort 字串長度讓 column 上下抖
-const PROVIDER_SELECT_STYLE: React.CSSProperties = { ...TASK_SELECT_STYLE, width: 86 };
-const MODEL_SELECT_STYLE: React.CSSProperties = { ...TASK_SELECT_STYLE, width: 150 };
-const EFFORT_SELECT_STYLE: React.CSSProperties = { ...TASK_SELECT_STYLE, width: 95 };
+// Select 樣式 + 寬度都搬到 SettingsPopover.css(.task-row-selects > select 與 --task-w-* CSS vars)
 
 function TaskModelRow({
   label,
@@ -82,81 +68,55 @@ function TaskModelRow({
   showProvider?: boolean;
   onChange: (patch: { provider?: Provider; model?: ModelName; effort?: Effort }) => void;
 }) {
-  // 新 layout(2026-05-13 update):
-  //   row1: label(左)+ selects(右,grid 對齊兩 group)
-  //   row2: hint(獨立一行,full width,長文字可自由換行不裁字)
-  // 廢掉之前的 display:contents grid 4-col 攤平,改成 row 自包含的 flex column。
+  // layout(2026-05-13 update,RWD 完整搬 CSS):
+  //   row1: label(左)+ selects(右,desktop grid / mobile 整列)
+  //   row2: hint(獨立一行,full width)
+  // 樣式全走 SettingsPopover.css 的 .task-row-* class,desktop / mobile breakpoint 都在 CSS 內。
   return (
-    <div
-      className="task-row"
-      style={{ display: "flex", flexDirection: "column", gap: 2 }}
-    >
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: `minmax(0, 1fr) ${PROVIDER_SELECT_STYLE.width}px ${MODEL_SELECT_STYLE.width}px ${EFFORT_SELECT_STYLE.width}px`,
-          columnGap: 8,
-          alignItems: "center",
-        }}
-      >
-        <span
-          style={{
-            fontSize: 12,
-            color: "var(--fg)",
-            minWidth: 0,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {label}
-        </span>
-        {showProvider ? (
+    <div className="task-row">
+      <div className="task-row-head">
+        <span className="task-row-label">{label}</span>
+        <div className="task-row-selects">
+          {showProvider ? (
+            <select
+              value={provider}
+              disabled={disabled}
+              onChange={(e) => onChange({ provider: e.target.value as Provider })}
+            >
+              {PROVIDERS.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="task-row-placeholder" />
+          )}
           <select
-            value={provider}
+            value={model}
             disabled={disabled}
-            onChange={(e) => onChange({ provider: e.target.value as Provider })}
-            style={PROVIDER_SELECT_STYLE}
+            onChange={(e) => onChange({ model: e.target.value as ModelName })}
           >
-            {PROVIDERS.map((p) => (
-              <option key={p} value={p}>
-                {p}
+            {modelsForProvider(provider).map((m) => (
+              <option key={m} value={m}>
+                {m.replace(/^claude-/, "")}
               </option>
             ))}
           </select>
-        ) : (
-          <span style={{ width: PROVIDER_SELECT_STYLE.width }} />
-        )}
-        <select
-          value={model}
-          disabled={disabled}
-          onChange={(e) => onChange({ model: e.target.value as ModelName })}
-          style={MODEL_SELECT_STYLE}
-        >
-          {modelsForProvider(provider).map((m) => (
-            <option key={m} value={m}>
-              {m.replace(/^claude-/, "")}
-            </option>
-          ))}
-        </select>
-        <select
-          value={effort}
-          disabled={disabled}
-          onChange={(e) => onChange({ effort: e.target.value as Effort })}
-          style={EFFORT_SELECT_STYLE}
-        >
-          {effortsForProvider(provider).map((eff) => (
-            <option key={eff} value={eff}>
-              {eff}
-            </option>
-          ))}
-        </select>
-      </div>
-      {hint && (
-        <div style={{ fontSize: 10.5, color: "var(--fg-faint)", lineHeight: 1.4 }}>
-          {hint}
+          <select
+            value={effort}
+            disabled={disabled}
+            onChange={(e) => onChange({ effort: e.target.value as Effort })}
+          >
+            {effortsForProvider(provider).map((eff) => (
+              <option key={eff} value={eff}>
+                {eff}
+              </option>
+            ))}
+          </select>
         </div>
-      )}
+      </div>
+      {hint && <div className="task-row-hint">{hint}</div>}
     </div>
   );
 }
@@ -922,17 +882,7 @@ export function SettingsPopover({
       {userCfg ? (
         <>
         {/* Group 1:獨立 agent(各自挑 provider) */}
-        <div
-          className="settings-popover-task-grid"
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 10,
-            padding: 10,
-            background: "var(--panel)",
-            borderRadius: 8,
-          }}
-        >
+        <div className="settings-popover-task-grid task-group task-group--primary">
           {(["qa", "split", "runner"] as const).map((tc) => (
             <TaskModelRow
               key={tc}
@@ -947,25 +897,11 @@ export function SettingsPopover({
           ))}
         </div>
         {/* Group 2:跟主 agent(只挑 model / effort,provider 跟 runner) */}
-        <div
-          style={{
-            padding: 10,
-            background: "var(--panel-2)",
-            borderRadius: 8,
-            marginBottom: 12,
-          }}
-        >
-          <div style={{ fontSize: 11, color: "var(--fg-faint)", marginBottom: 8 }}>
+        <div className="task-group task-group--secondary">
+          <div className="task-group-hint">
             ↑ 為了加快速度和節省 Token,預設跟隨 Main Agent 設定
           </div>
-          <div
-            className="settings-popover-task-grid"
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 10,
-            }}
-          >
+          <div className="settings-popover-task-grid">
             {(["executor", "critic", "merge"] as const).map((tc) => (
               <TaskModelRow
                 key={tc}
