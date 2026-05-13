@@ -18,6 +18,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { vibeHome } from "./paths";
 import {
   DEFAULT_USER_CONFIG,
+  PUSH_EVENT_KEYS,
   PROVIDERS,
   TASK_CLASSES,
   defaultEffortForProvider,
@@ -29,6 +30,7 @@ import {
   type Effort,
   type ModelName,
   type Provider,
+  type PushEventKey,
   type TaskClass,
   type TaskModelConfig,
   type UserConfig,
@@ -67,9 +69,29 @@ function coerceTaskModel(raw: unknown, fallback: TaskModelConfig): TaskModelConf
   return { provider, model, effort };
 }
 
+function defaultPushEvents(): Record<PushEventKey, boolean> {
+  return { ...DEFAULT_USER_CONFIG.pushEvents };
+}
+
+function defaultDefaults(): UserConfig["defaults"] {
+  return { ...DEFAULT_USER_CONFIG.defaults };
+}
+
+function coercePushEvents(raw: unknown): Record<PushEventKey, boolean> {
+  const out = defaultPushEvents();
+  if (!raw || typeof raw !== "object") return out;
+  const o = raw as Record<string, unknown>;
+  for (const key of PUSH_EVENT_KEYS) {
+    if (typeof o[key] === "boolean") out[key] = o[key];
+  }
+  return out;
+}
+
 function coerceConfig(raw: unknown): UserConfig {
   const fallback = DEFAULT_USER_CONFIG;
-  if (!raw || typeof raw !== "object") return { defaults: { ...fallback.defaults } };
+  if (!raw || typeof raw !== "object") {
+    return { defaults: defaultDefaults(), pushEvents: defaultPushEvents() };
+  }
   const o = raw as Record<string, unknown>;
   const rawDefaults = (o.defaults && typeof o.defaults === "object" ? o.defaults : {}) as Record<
     string,
@@ -92,16 +114,18 @@ function coerceConfig(raw: unknown): UserConfig {
       out[tc] = { ...runnerCfg };
     }
   }
-  return { defaults: out };
+  return { defaults: out, pushEvents: coercePushEvents(o.pushEvents) };
 }
 
 export async function loadUserConfig(): Promise<UserConfig> {
-  if (!existsSync(file())) return { defaults: { ...DEFAULT_USER_CONFIG.defaults } };
+  if (!existsSync(file())) {
+    return { defaults: defaultDefaults(), pushEvents: defaultPushEvents() };
+  }
   try {
     const text = await Bun.file(file()).text();
     return coerceConfig(JSON.parse(text));
   } catch {
-    return { defaults: { ...DEFAULT_USER_CONFIG.defaults } };
+    return { defaults: defaultDefaults(), pushEvents: defaultPushEvents() };
   }
 }
 
@@ -127,9 +151,10 @@ export class UserConfigPatchError extends Error {
 export async function patchUserConfig(body: unknown): Promise<UserConfig> {
   const cur = await loadUserConfig();
   if (!body || typeof body !== "object") return cur;
-  const incoming = (body as Record<string, unknown>).defaults;
-  if (!incoming || typeof incoming !== "object") return cur;
-  const incomingDefaults = incoming as Record<string, unknown>;
+  const bodyObj = body as Record<string, unknown>;
+  const incoming = bodyObj.defaults;
+  const incomingDefaults =
+    incoming && typeof incoming === "object" ? (incoming as Record<string, unknown>) : {};
   const nextDefaults: UserConfig["defaults"] = { ...cur.defaults };
   for (const tc of TASK_CLASSES) {
     if (!(tc in incomingDefaults)) continue;
@@ -216,7 +241,22 @@ export async function patchUserConfig(body: unknown): Promise<UserConfig> {
       nextDefaults[tc] = { provider, model, effort };
     }
   }
-  return writeUserConfig({ defaults: nextDefaults });
+  const nextPushEvents: Record<PushEventKey, boolean> = { ...cur.pushEvents };
+  if ("pushEvents" in bodyObj) {
+    const incomingPushEvents = bodyObj.pushEvents;
+    if (!incomingPushEvents || typeof incomingPushEvents !== "object") {
+      throw new UserConfigPatchError("pushEvents", "pushEvents 必須為 object");
+    }
+    const o = incomingPushEvents as Record<string, unknown>;
+    for (const key of PUSH_EVENT_KEYS) {
+      if (!(key in o)) continue;
+      if (typeof o[key] !== "boolean") {
+        throw new UserConfigPatchError(`pushEvents.${key}`, `pushEvents.${key} 必須為 boolean`);
+      }
+      nextPushEvents[key] = o[key];
+    }
+  }
+  return writeUserConfig({ defaults: nextDefaults, pushEvents: nextPushEvents });
 }
 
 // 拿單一 task class 的 provider/model/effort(spawn 點呼叫)

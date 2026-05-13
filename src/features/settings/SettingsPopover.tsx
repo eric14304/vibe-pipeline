@@ -25,6 +25,7 @@ import {
   type Effort,
   type ModelName,
   type Provider,
+  type PushEventKey,
   type TaskClass,
   type UserConfig,
 } from "../../../shared/types";
@@ -46,6 +47,13 @@ type ProjectConfirmedValues = {
 };
 type TaskConfirmedValue = Provider | ModelName | Effort;
 type TaskConfirmedValues = Partial<Record<`task:${TaskClass}:${TaskField}`, TaskConfirmedValue>>;
+
+const PUSH_EVENT_LABELS: Array<{ key: PushEventKey; label: string }> = [
+  { key: "ticket_done", label: "Ticket 完成" },
+  { key: "ticket_failed", label: "Ticket 失敗" },
+  { key: "pipeline_paused", label: "Pipeline 暫停需回應" },
+  { key: "auto_merge_conflict", label: "AI 接手解衝突" },
+];
 
 // Select 樣式 + 寬度都搬到 SettingsPopover.css(.task-row-selects > select 與 --task-w-* CSS vars)
 
@@ -122,8 +130,14 @@ function TaskModelRow({
 }
 
 function PushNotificationsSection({
+  userCfg,
+  pushSaving,
+  onTogglePushEvent,
   onActionError,
 }: {
+  userCfg: UserConfig | null;
+  pushSaving: Partial<Record<PushEventKey, boolean>>;
+  onTogglePushEvent: (key: PushEventKey, enabled: boolean) => void;
   onActionError?: (message: string) => void;
 }) {
   const [supported, setSupported] = useState<boolean | null>(null);
@@ -232,6 +246,28 @@ function PushNotificationsSection({
           </button>
         </div>
       )}
+      <div className="settings-popover-task-grid" aria-label="推播事件">
+        {PUSH_EVENT_LABELS.map((item) => {
+          const checked = userCfg?.pushEvents[item.key] ?? true;
+          return (
+            <label
+              key={item.key}
+              className={"toggle-pill mono" + (checked ? " is-on" : "")}
+            >
+              <input
+                type="checkbox"
+                checked={checked}
+                disabled={!userCfg || !!pushSaving[item.key]}
+                onChange={(e) => onTogglePushEvent(item.key, e.target.checked)}
+              />
+              <span className="toggle-pill-track" aria-hidden>
+                <span className="toggle-pill-thumb" />
+              </span>
+              {item.label}
+            </label>
+          );
+        })}
+      </div>
       <div className="push-hint">啟用後 pipeline 完成 / 失敗會推到此裝置(背景或前景皆可)。</div>
 
       {lastError && (
@@ -280,6 +316,7 @@ export function SettingsPopover({
   // User-level config(跨 project)— 跟上面的 project-level 是不同層,獨立 PUT
   const [userCfg, setUserCfg] = useState<UserConfig | null>(null);
   const [userCfgError, setUserCfgError] = useState<string | null>(null);
+  const [pushSaving, setPushSaving] = useState<Partial<Record<PushEventKey, boolean>>>({});
   const { status: authStatus } = useAuthStatus();
   // tab 切換 — 取代之前 stacked sections,避免 popover 越來越長
   type TabKey = "project" | "ai" | "notifications" | "security";
@@ -560,6 +597,45 @@ export function SettingsPopover({
     });
   }
 
+  function updatePushEvent(key: PushEventKey, enabled: boolean) {
+    if (!userCfg) return;
+    const prev = userCfg.pushEvents[key];
+    const next: UserConfig = {
+      ...userCfg,
+      pushEvents: {
+        ...userCfg.pushEvents,
+        [key]: enabled,
+      },
+    };
+    setUserCfg(next);
+    setUserCfgError(null);
+    setPushSaving((current) => ({ ...current, [key]: true }));
+    userConfigApi
+      .updateUserConfig({ pushEvents: { [key]: enabled } })
+      .then((fresh) => {
+        savedUserCfgRef.current = fresh;
+        setUserCfg(fresh);
+        setConfirmedTaskValues(fresh);
+        showSaved();
+      })
+      .catch((e: unknown) => {
+        toastSaveError(e);
+        setUserCfg((current) => {
+          if (!current) return current;
+          return {
+            ...current,
+            pushEvents: {
+              ...current.pushEvents,
+              [key]: prev,
+            },
+          };
+        });
+      })
+      .finally(() => {
+        setPushSaving((current) => ({ ...current, [key]: false }));
+      });
+  }
+
   // outside click + Esc 關
   useEffect(() => {
     if (!open) return;
@@ -816,7 +892,12 @@ export function SettingsPopover({
       </>}
 
       {activeTab === "notifications" && (
-        <PushNotificationsSection onActionError={onActionError} />
+        <PushNotificationsSection
+          userCfg={userCfg}
+          pushSaving={pushSaving}
+          onTogglePushEvent={updatePushEvent}
+          onActionError={onActionError}
+        />
       )}
 
       {activeTab === "security" && authStatus?.bound === true && (
