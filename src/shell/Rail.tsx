@@ -137,7 +137,7 @@ function lastActivityAt(p: Pipeline): number | null {
     }
     if (t.commits) {
       for (const c of t.commits) {
-        if (typeof c.ts === "number") max = Math.max(max, c.ts);
+        if (c && typeof c.ts === "number") max = Math.max(max, c.ts);
       }
     }
   }
