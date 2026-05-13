@@ -148,12 +148,16 @@ function modelHint(model: string, effort?: string): string {
 
 function commonExecArgs(model: string, effort: string): string[] {
   // value 一律當 TOML 字串(double quote 包),簡單情況夠用;特殊字元需要更嚴格 escape 才再加
+  //
+  // 移除 --ignore-user-config(2026-05-13 雷):那 flag 會把 ~/.codex/config.toml 的
+  // provider 設定(e.g. ChatGPT auth 模式 `provider = codex_local_access`)也 ignore 掉,
+  // fallback 用 default OpenAI API 模式,但 auth.json 內若是 internal/beta key 會 401。
+  // 保留 --ignore-rules(rules 不影響 auth)+ -c mcp_servers={}(避免 MCP 干擾)。
   return [
     "codex",
     "exec",
     "--json",
     "--skip-git-repo-check",
-    "--ignore-user-config",
     "--ignore-rules",
     "-c",
     "mcp_servers={}",
