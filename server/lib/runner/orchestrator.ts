@@ -674,6 +674,8 @@ async function maybeAutoMerge(opts: {
       // FCM push:user 可能不在 UI(autoMerge 場景就是要無人值守);告知 AI 接手了
       void (async () => {
         try {
+          const cfg = await loadUserConfig();
+          if (!cfg.pushEvents.auto_merge_conflict) return;
           const tokenStore = await import("../push/tokenStore");
           const { fanoutPush } = await import("../fcm");
           const records = await tokenStore.listTokens();

@@ -1,16 +1,18 @@
 import type {
   Effort,
   ModelName,
+  PushEventKey,
   TaskClass,
   TaskModelConfig,
   UserConfig,
 } from "../../shared/types";
 import { call } from "./_client";
 
-export type { UserConfig, TaskClass, TaskModelConfig, ModelName, Effort };
+export type { UserConfig, TaskClass, TaskModelConfig, ModelName, Effort, PushEventKey };
 
 export type UserConfigPatch = {
   defaults?: Partial<Record<TaskClass, Partial<TaskModelConfig>>>;
+  pushEvents?: Partial<Record<PushEventKey, boolean>>;
 };
 
 export function getUserConfig(): Promise<UserConfig> {

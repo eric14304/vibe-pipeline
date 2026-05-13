@@ -8,7 +8,8 @@ import * as notifs from "../notifs/store";
 import { fanoutPush } from "../fcm";
 import * as tokenStore from "../push/tokenStore";
 import * as testMode from "../testMode";
-import type { NotifEventType } from "../../../shared/types";
+import { loadUserConfig } from "../userConfig";
+import type { NotifEventType, PushEventKey } from "../../../shared/types";
 
 type Active = { unwatch: () => void };
 const watchers = new Map<string, Active>(); // key: <projHash>:<pipelineId>
@@ -63,6 +64,7 @@ function currentTicketTitle(tickets: TicketLite[]): string {
 }
 
 function pushAsync(opts: {
+  eventKey: PushEventKey;
   title: string;
   body: string;
   projectHash: string;
@@ -71,6 +73,8 @@ function pushAsync(opts: {
 }): void {
   void (async () => {
     try {
+      const cfg = await loadUserConfig();
+      if (!cfg.pushEvents[opts.eventKey]) return;
       const records = await tokenStore.listTokens();
       const dead = await fanoutPush(
         records.map((r) => r.token),
@@ -128,6 +132,7 @@ export async function start(opts: {
         });
         if (status === "done") {
           pushAsync({
+            eventKey: "ticket_done",
             title: "✅ Ticket 完成",
             body: titlePart,
             projectHash: opts.projectHash,
@@ -140,6 +145,7 @@ export async function start(opts: {
           status === "failed_transient"
         ) {
           pushAsync({
+            eventKey: "ticket_failed",
             title: "❌ Ticket 失敗",
             body: titlePart,
             projectHash: opts.projectHash,
@@ -152,6 +158,7 @@ export async function start(opts: {
         const current = currentTicket(tickets);
         const title = currentTicketTitle(tickets);
         pushAsync({
+          eventKey: "pipeline_paused",
           title: "⏳ 需要你的回應",
           body: `${p?.name || opts.pipelineId}${title ? ` ${title}` : ""}`,
           projectHash: opts.projectHash,

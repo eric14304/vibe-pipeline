@@ -20,8 +20,22 @@ export type TaskModelConfig = {
   effort: Effort;
 };
 
+export type PushEventKey =
+  | "ticket_done"
+  | "ticket_failed"
+  | "pipeline_paused"
+  | "auto_merge_conflict";
+
+export const PUSH_EVENT_KEYS: PushEventKey[] = [
+  "ticket_done",
+  "ticket_failed",
+  "pipeline_paused",
+  "auto_merge_conflict",
+];
+
 export type UserConfig = {
   defaults: Record<TaskClass, TaskModelConfig>;
+  pushEvents: Record<PushEventKey, boolean>;
 };
 
 export const TASK_CLASSES: TaskClass[] = ["qa", "split", "runner", "executor", "critic", "merge"];
@@ -71,6 +85,12 @@ export const DEFAULT_USER_CONFIG: UserConfig = {
     // 審核AI:讀 diff 判 PASS/FAIL,sonnet + medium 已夠用,省 token
     critic: { provider: "claude", model: "claude-sonnet-4-6", effort: "medium" },
     merge: { provider: "claude", model: "claude-opus-4-7", effort: "high" },
+  },
+  pushEvents: {
+    ticket_done: true,
+    ticket_failed: true,
+    pipeline_paused: true,
+    auto_merge_conflict: true,
   },
 };
 
