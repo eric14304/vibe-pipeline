@@ -144,12 +144,61 @@ flowchart TB
 
 ## CLI
 
-```bash
-# 安裝(跑完 bun run cli:build 後)
-mkdir ~/bin && cp dist-cli/vbpl* ~/bin/   # 把 ~/bin 加進 PATH
+### Build binary
 
-# 常用指令
+```bash
+bun run cli:build           # Windows x64 → dist-cli/vbpl.exe
+bun run cli:build:mac       # macOS arm64 → dist-cli/vbpl-mac
+bun run cli:build:linux     # Linux x64   → dist-cli/vbpl-linux
+```
+
+binary ~121 MB(bundle 整個 Bun runtime)。
+
+### Install to PATH(per OS)
+
+**macOS / Linux**(sudo 走 `/usr/local/bin`,預設已在 PATH):
+```bash
+sudo cp dist-cli/vbpl-mac /usr/local/bin/vbpl       # 或 vbpl-linux
+sudo chmod +x /usr/local/bin/vbpl
+vbpl --version                                      # 驗
+```
+
+不想 sudo 走 `~/bin`:
+```bash
+mkdir -p ~/bin && cp dist-cli/vbpl-mac ~/bin/vbpl
+chmod +x ~/bin/vbpl
+echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zshrc    # bash 用 .bashrc
+source ~/.zshrc
+```
+
+**Windows PowerShell**:
+```powershell
+New-Item -ItemType Directory -Force "$HOME\bin"
+Copy-Item dist-cli\vbpl.exe "$HOME\bin\vbpl.exe"
+$user = [Environment]::GetEnvironmentVariable("Path", "User")
+[Environment]::SetEnvironmentVariable("Path", "$HOME\bin;$user", "User")
+# 開新 terminal 驗:vbpl --version
+```
+
+**Windows Git Bash**(PATH 繼承 Windows user PATH,設一次兩邊都吃):
+```bash
+mkdir -p ~/bin && cp dist-cli/vbpl.exe ~/bin/
+echo 'export PATH="$HOME/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+### Trouble
+
+- **`command not found` 在新 terminal**:PATH 沒生效 → 開新 terminal session 或 source rc
+- **Windows `vbpl` 找不到但 `vbpl.exe` 找得到**:PowerShell PATHEXT 沒含,顯式打 `vbpl.exe` 或加 `.EXE` 到 PATHEXT
+- **macOS Gatekeeper 警告**(下載 binary 而非自己 build):`xattr -d com.apple.quarantine ~/bin/vbpl`
+- **多版本衝突**:`which vbpl` 看實際路徑,清舊版
+
+### 常用指令
+
+```bash
 vbpl project list
+vbpl project init --here                                        # fresh 資料夾一鍵 init
 vbpl pipeline list --project <hash>
 vbpl pipeline status <id>
 vbpl pipeline run <id>                                          # 啟動 runner(需要 backend)
@@ -158,7 +207,7 @@ vbpl ticket add --pipeline <id> --title "..." --mode iter
 vbpl config set runner.model claude-opus-4-7
 vbpl pipeline sync <id>                                         # git merge base → worktree
 vbpl pipeline sync <id> --ai                                    # 讓 AI 解衝突
-vbpl pipeline merge <id>                                        # AI merge 回 base
+vbpl pipeline merge <id>                                        # 合併回 base(先試 git,衝突才 AI)
 ```
 
 每個 verb 都吃 `--json`,搭配 `jq` / PowerShell `ConvertFrom-Json` 寫 script 用。
