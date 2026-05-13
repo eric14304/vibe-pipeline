@@ -12,7 +12,7 @@ claude CLI 自動載 CLAUDE.md + 對應 SKILL,codex 不會,所以本檔導你過
    - 改 `server/`(Bun server / fs / spawn / runner / QA / budget) → `.claude/skills/vibe-pipeline-backend/SKILL.md`
    - 改 `cli/`(`vbpl` 命令列) → `.claude/skills/vibe-pipeline-cli/SKILL.md`
    - 寫 / 改 / 跑 E2E(Playwright mock + real) → `.claude/skills/vibe-pipeline-e2e/SKILL.md`
-   - scope / 決策 / 完整功能清單 / 外部產品對照 → `.claude/skills/vibe-pipeline/SKILL.md`(主 SKILL)
+   - scope / 決策 / 完整功能清單 / 外部產品對照 → `docs/SKILL.md`(主 SKILL,enduser 安裝對象)
 
 CLAUDE.md 的「不踩的雷」段(目前 #1-16)是最容易踩的坑,**先讀完再動手**,避免重蹈覆轍。
 

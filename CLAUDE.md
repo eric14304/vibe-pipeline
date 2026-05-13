@@ -149,11 +149,12 @@ vibe-pipeline/
 │       └── project/           prototype HTML / proto jsx / wireframes(歷史紀錄,real code 已不引用)
 │
 ├── docs/
+│   ├── SKILL.md               主 SKILL — enduser AI 操作手冊(distributable artifact;enduser cp 進 ~/.claude/skills/vibe-pipeline/SKILL.md)
+│   ├── install.md             完整 install 手冊(per-OS / trouble),README §CLI pointer 過來
 │   └── refs/                  設計文件 / 競品對照 / 歷史 spec(maintainer 用,enduser 不裝)
 │
 ├── .claude/
-│   ├── skills/                AI 安裝點 — enduser 可 cp 整個資料夾到 ~/.claude/skills/
-│   │   ├── vibe-pipeline/SKILL.md           主 SKILL — enduser AI 操作手冊(精簡)
+│   ├── skills/                repo 內 maintainer SKILL(改 vibe-pipeline 自己 code 的 AI 用,不散發)
 │   │   ├── vibe-pipeline-frontend/SKILL.md  改 src/ 用
 │   │   ├── vibe-pipeline-backend/SKILL.md   改 server/ 用
 │   │   ├── vibe-pipeline-cli/SKILL.md       改 cli/ 用

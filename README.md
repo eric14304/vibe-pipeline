@@ -11,7 +11,7 @@
 User 把 repo URL 給你的話,標準流程:
 
 1. **看本 README 全文** — 了解產品 + 找到主 SKILL 位置
-2. **建議 user 裝主 SKILL** — `.claude/skills/vibe-pipeline/SKILL.md` 是本檔最重要的引導手冊;依 user 用的 AI 平台裝進對應 skills 路徑(Claude Code → `~/.claude/skills/`,codex → `~/.codex/skills/`,其他平台看各自 docs)。詳細路徑跟複製指令在 §給 AI 安裝
+2. **建議 user 裝主 SKILL** — `docs/SKILL.md` 是本檔最重要的引導手冊;依 user 用的 AI 平台裝進對應 skills 路徑(Claude Code → `~/.claude/skills/vibe-pipeline/SKILL.md`,codex → `~/.codex/skills/vibe-pipeline/SKILL.md`,其他平台看各自 docs)。詳細路徑跟複製指令在 §給 AI 安裝
 3. **(user 開新 session,你接收主 SKILL)** — 主 SKILL 是跨 project 永久載入的 AI 操作手冊
 4. **檢查 vbpl 裝了沒** — 跑 `vbpl --version`;沒裝 → 建議 user 跑 §CLI 內 build + PATH 步驟
 5. **進入正常操作** — 看主 SKILL「標準操作流」段
@@ -59,29 +59,34 @@ bun run cli:build:linux     # Linux x64
 
 ## 給 AI 安裝(讓你家的 AI 學會用 vbpl)
 
-把 `.claude/skills/vibe-pipeline/` 整個資料夾複製到 AI 的 skills 路徑,**任何 project 內**跟 AI 對話 AI 都能透過 SKILL 學會操作 vbpl(建 / 跑 / 看 / 合併 pipeline)。
+主 SKILL source 在 `docs/SKILL.md`。把它複製進 user AI 的 skills 路徑,**任何 project 內**跟 AI 對話 AI 都能透過 SKILL 學會操作 vbpl(建 / 跑 / 看 / 合併 pipeline)。
 
 **全域安裝**(所有 project 都可用):
 
 ```bash
 # macOS / Linux:
-cp -r .claude/skills/vibe-pipeline ~/.claude/skills/
+mkdir -p ~/.claude/skills/vibe-pipeline                            # Claude Code
+cp docs/SKILL.md ~/.claude/skills/vibe-pipeline/SKILL.md
+
+# 其他 AI 平台:cp 到對應 skills 路徑,e.g.
+# codex:  ~/.codex/skills/vibe-pipeline/SKILL.md
 
 # Windows PowerShell:
-Copy-Item -Recurse .claude\skills\vibe-pipeline $env:USERPROFILE\.claude\skills\
+New-Item -ItemType Directory -Force "$HOME\.claude\skills\vibe-pipeline"
+Copy-Item docs\SKILL.md "$HOME\.claude\skills\vibe-pipeline\SKILL.md"
 ```
 
 **只在特定 project**(對某個工作 repo 限定):
 
 ```bash
 cd /path/to/your-other-project
-mkdir -p .claude/skills
-cp -r /path/to/vibe-pipeline/.claude/skills/vibe-pipeline .claude/skills/
+mkdir -p .claude/skills/vibe-pipeline
+cp /path/to/vibe-pipeline/docs/SKILL.md .claude/skills/vibe-pipeline/SKILL.md
 ```
 
 驗證:在新 session 開 AI,問「我能用 vbpl 幹嘛?」AI 應該秒回 pipeline / ticket / executor / critic 心智 + 常用指令。
 
-> 註:本 repo 內還有 `vibe-pipeline-frontend` / `-backend` / `-cli` / `-e2e` 四個 SKILL,**那些只給改 vibe-pipeline 本身 code 的 AI 用**,enduser 不需要安裝。
+> 註:repo 內 `.claude/skills/` 還有 `vibe-pipeline-frontend` / `-backend` / `-cli` / `-e2e` 四個 SKILL,**那些只給改 vibe-pipeline 本身 code 的 AI 用**,enduser 不需要安裝。
 
 ---
 
@@ -199,7 +204,7 @@ tests/e2e/   Playwright(mock CI 模式 + real 模式)
 
 每層有對應 SKILL 文件在 `.claude/skills/` 內描述慣例 — 動非 trivial 改動前先讀:
 
-- [vibe-pipeline](.claude/skills/vibe-pipeline/SKILL.md) — 產品定位 / scope / 外部對照
+- [vibe-pipeline](docs/SKILL.md) — 產品定位 / scope / 外部對照(主 SKILL,enduser 可裝進 AI skills 路徑)
 - [vibe-pipeline-frontend](.claude/skills/vibe-pipeline-frontend/SKILL.md) — UI 慣例
 - [vibe-pipeline-backend](.claude/skills/vibe-pipeline-backend/SKILL.md) — server / runner / sync
 - [vibe-pipeline-cli](.claude/skills/vibe-pipeline-cli/SKILL.md) — CLI 慣例
