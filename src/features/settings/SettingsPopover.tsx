@@ -71,6 +71,7 @@ function TaskModelRow({
   effort,
   disabled,
   showProvider = false,
+  indented = false,
   onChange,
 }: {
   label: string;
@@ -80,10 +81,12 @@ function TaskModelRow({
   effort: Effort;
   disabled?: boolean;
   showProvider?: boolean;
+  indented?: boolean;
   onChange: (patch: { provider?: Provider; model?: ModelName; effort?: Effort }) => void;
 }) {
   // .task-row 用 display:contents(desktop)讓 grid 認 4 個內容子元素;
   // mobile breakpoint 內改 display:flex column 變成 card 卡式排版。
+  // indented:executor/critic/merge 視覺上縮排,表達「跟隨 Main Agent」附屬關係
   return (
     <div className="task-row">
       <span
@@ -94,6 +97,7 @@ function TaskModelRow({
           alignSelf: "center",
           whiteSpace: "nowrap",
           lineHeight: 1.25,
+          paddingLeft: indented ? 20 : 0,
         }}
       >
         <span style={{ fontSize: 12, color: "var(--fg)" }}>{label}</span>
@@ -927,6 +931,7 @@ export function SettingsPopover({
               model={userCfg.defaults[tc].model}
               effort={userCfg.defaults[tc].effort}
               showProvider={!["executor", "critic", "merge"].includes(tc)}
+              indented={["executor", "critic", "merge"].includes(tc)}
               onChange={(patch) => updateTask(tc, patch)}
             />
           ))}
