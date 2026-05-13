@@ -437,21 +437,13 @@ export function SettingsPopover({
     scheduleAutosave(
       key,
       async (signal, seq) => {
-        await userConfigApi.updateUserConfig({ defaults: { [tc]: patch } }, signal);
+        // backend cascade(2026-05-13):改 runner.provider 時 executor/critic/merge.provider 自動同步,
+        // 必須拿 response 覆寫 local state,不能只信 desiredTask(只 cover 當 tc)
+        const fresh = await userConfigApi.updateUserConfig({ defaults: { [tc]: patch } }, signal);
         if (seqRef.current[key] !== seq) return;
-        const current = savedUserCfgRef.current;
-        if (current) {
-          savedUserCfgRef.current = {
-            ...current,
-            defaults: {
-              ...current.defaults,
-              [tc]: { ...current.defaults[tc], ...desiredTask },
-            },
-          };
-        }
-        for (const patchedField of Object.keys(patch) as TaskField[]) {
-          confirmedTaskValuesRef.current[`task:${tc}:${patchedField}`] = desiredTask[patchedField];
-        }
+        savedUserCfgRef.current = fresh;
+        setUserCfg(fresh);
+        setConfirmedTaskValues(fresh);
         showSaved();
       },
       (e) => {
