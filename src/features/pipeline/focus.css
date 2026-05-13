@@ -1,0 +1,188 @@
+/* FocusColumn feature 專用 CSS — 從 inline style 搬過來,集中管理。
+   非 feature 共用 styles 仍在 src/styles/board.css。 */
+
+/* ─── Diff chip(chip-state 旁邊的 +N -N Nf)──────────────────── */
+
+.focus-diff-chip {
+  font-size: 11px;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: transparent;
+}
+
+.focus-diff-added { color: var(--done); }
+.focus-diff-sep {
+  color: var(--fg-faint);
+  margin: 0 4px;
+}
+.focus-diff-deleted { color: var(--failed); }
+.focus-diff-files {
+  color: var(--fg-mute);
+  margin-left: 6px;
+}
+
+/* ─── Empty tickets(沒 ticket 時的中央 CTA)─────────────────── */
+
+.focus-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 60px 24px;
+  color: var(--fg-mute);
+  text-align: center;
+}
+
+.focus-empty-title {
+  font-size: 14px;
+  color: var(--fg);
+  font-weight: 500;
+}
+
+.focus-empty-desc {
+  font-size: 12px;
+  line-height: 1.6;
+  max-width: 360px;
+}
+
+.focus-empty-cta {
+  margin-top: 4px;
+}
+
+/* ─── Overflow menu(⋯ 按鈕 + 展開的 menu) ─────────────────── */
+
+.focus-overflow {
+  position: relative;
+  display: inline-block;
+}
+
+.focus-overflow-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 260px;
+  white-space: nowrap;
+  background: var(--bg-elevated);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: var(--shadow-lg);
+  padding: 4px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.focus-overflow-item {
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 4px;
+  text-align: left;
+  color: var(--fg);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+}
+
+.focus-overflow-item:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.focus-overflow-item:disabled {
+  color: var(--fg-faint);
+  cursor: not-allowed;
+}
+
+.focus-overflow-item.is-danger {
+  color: var(--failed);
+}
+
+.focus-overflow-item-icon {
+  display: inline-flex;
+  justify-content: center;
+}
+
+.focus-overflow-item-label {
+  white-space: nowrap;
+}
+
+.focus-overflow-item-hint {
+  font-size: 10px;
+  color: var(--fg-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ─── FocusTitle 編輯模式 ────────────────────────────────────── */
+
+.focus-title-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.focus-title-input {
+  font-size: inherit;
+  font-weight: inherit;
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--fg);
+  min-width: 200px;
+}
+
+.focus-title-input.is-invalid {
+  border-color: var(--failed);
+}
+
+.focus-title-edit-btn {
+  padding: 2px 6px;
+  font-size: 12px;
+}
+
+/* ─── Modal body(sync conflict modal)── 內元素 spacing ─────── */
+
+.focus-modal-text {
+  margin: 6px 0;
+}
+
+.focus-modal-text--mt {
+  margin: 12px 0 6px;
+  font-size: 13px;
+}
+
+.focus-modal-files {
+  margin: 8px 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--fg-mute);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+/* ─── Misc 小元素 ──────────────────────────────────────────── */
+
+.focus-branch-icon {
+  color: var(--fg-mute);
+}
+
+.focus-runs-chip {
+  /* 已存在 board.css;這邊保 inline 補的 fontSize:11 + color:fg-mute */
+  font-size: 11px;
+  color: var(--fg-mute);
+}
+
+/* RunButton 旁邊的「~時間」副文字(上次跑多久,給 user 參考) */
+.focus-run-duration {
+  opacity: 0.7;
+  margin-left: 6px;
+  font-size: 11px;
+}

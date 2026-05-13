@@ -10,6 +10,7 @@ import { useApi } from "../../hooks/useApi";
 import type { IterStage, Pipeline, Ticket, TicketStatus } from "../../types/pipeline";
 import * as api from "../../api/projects";
 import type { RunSummary } from "../../api/projects";
+import "./focus.css";
 
 // RunButton 狀態決策表(authoritative)— 加新 PipelineState 一定要在 switch 補,
 // 不然 TS exhaustive `never` 編譯就 fail。
@@ -128,7 +129,7 @@ export function RunButton({
         >
           ▶ {titleBase}
           {lastDur && (
-            <span className="mono" style={{ opacity: 0.7, marginLeft: 6, fontSize: 11 }}>
+            <span className="mono focus-run-duration">
               ~{lastDur}
             </span>
           )}
@@ -320,7 +321,7 @@ export function FocusColumn({
             existingNames={existingNames}
           />
           <span className="chip mono focus-branch-chip">
-            <span style={{ color: "var(--fg-mute)" }}>⎇</span> {pipeline.branch}
+            <span className="focus-branch-icon">⎇</span> {pipeline.branch}
           </span>
           <span
             className="chip chip-state"
@@ -345,7 +346,6 @@ export function FocusColumn({
             <span
               className="chip mono focus-runs-chip"
               title={`累計 ${runs.length} 次執行,共 $${totalCost.toFixed(2)}`}
-              style={{ fontSize: 11, color: "var(--fg-mute)" }}
             >
               {runs.length} run{runs.length === 1 ? "" : "s"} · $
               {totalCost.toFixed(2)}
@@ -354,15 +354,14 @@ export function FocusColumn({
           {diffStat && (diffStat.files > 0 || diffStat.added > 0 || diffStat.deleted > 0) && projectHash && (
             <button
               type="button"
-              className="chip mono"
+              className="chip mono focus-diff-chip"
               title={`點擊看完整 diff:${diffStat.files} files,+${diffStat.added} -${diffStat.deleted} vs ${pipeline.baseBranch || "base"}`}
-              style={{ fontSize: 11, cursor: "pointer", border: "1px solid var(--line)", background: "transparent" }}
               onClick={() => setDiffOpen(true)}
             >
-              <span style={{ color: "var(--done)" }}>+{diffStat.added}</span>
-              <span style={{ color: "var(--fg-faint)", margin: "0 4px" }}>·</span>
-              <span style={{ color: "var(--failed)" }}>-{diffStat.deleted}</span>
-              <span style={{ color: "var(--fg-mute)", marginLeft: 6 }}>{diffStat.files}f</span>
+              <span className="focus-diff-added">+{diffStat.added}</span>
+              <span className="focus-diff-sep">·</span>
+              <span className="focus-diff-deleted">-{diffStat.deleted}</span>
+              <span className="focus-diff-files">{diffStat.files}f</span>
             </button>
           )}
           {diffOpen && projectHash && (
@@ -685,15 +684,15 @@ function SyncConflictModal({
       <div className="modal-card">
         <div className="modal-title">Sync 遇到衝突</div>
         <div className="modal-body">
-          <p style={{ margin: "6px 0" }}>
+          <p className="focus-modal-text">
             落後 {j.behindCount} commit,git merge 撞到 <strong>{files.length}</strong> 個檔案衝突:
           </p>
-          <ul className="mono" style={{ margin: "8px 0", paddingLeft: 18, fontSize: 12, color: "var(--fg-mute)", maxHeight: 200, overflowY: "auto" }}>
+          <ul className="mono focus-modal-files">
             {files.map((f) => (
               <li key={f}>{f}</li>
             ))}
           </ul>
-          <p style={{ margin: "12px 0 6px", fontSize: 13 }}>
+          <p className="focus-modal-text--mt">
             要讓 AI 自動解嗎?(隨時可取消)
           </p>
         </div>
@@ -719,36 +718,18 @@ function EmptyTickets({
   onAddTicket: () => void;
 }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 12,
-        padding: "60px 24px",
-        color: "var(--fg-mute)",
-        textAlign: "center",
-      }}
-    >
-      <div
-        style={{
-          fontSize: 14,
-          color: "var(--fg)",
-          fontWeight: 500,
-        }}
-      >
+    <div className="focus-empty">
+      <div className="focus-empty-title">
         {hasActiveDraft ? "有一張 ticket 在 QA 中" : "還沒任何 ticket"}
       </div>
-      <div style={{ fontSize: 12, lineHeight: 1.6, maxWidth: 360 }}>
+      <div className="focus-empty-desc">
         {hasActiveDraft
           ? "之前開了 QA 但沒收尾,點下方按鈕接續對話。"
           : "用「+ ticket」開 QA drawer,跟 AI 對話收斂出 goal / acceptance / prompt,完成後加進 pipeline。"}
       </div>
       <button type="button"
-        className="btn btn-primary"
+        className="btn btn-primary focus-empty-cta"
         onClick={onAddTicket}
-        style={{ marginTop: 4 }}
       >
         <PlusIcon /> {hasActiveDraft ? "接續 QA" : "建第一張 ticket"}
       </button>
@@ -802,7 +783,7 @@ function OverflowMenu({
   if (!onResetAll && !onRevealWorktree && !onPruneWorktree && !onDelete && !onToggleAutoMerge && !onShowHistory) return null;
 
   return (
-    <div ref={wrapRef} className="focus-overflow" style={{ position: "relative", display: "inline-block" }}>
+    <div ref={wrapRef} className="focus-overflow">
       <button type="button"
         className="btn"
         onClick={() => setOpen((o) => !o)}
@@ -813,25 +794,7 @@ function OverflowMenu({
         ⋯
       </button>
       {open && (
-        <div
-          role="menu"
-          style={{
-            position: "absolute",
-            top: "calc(100% + 4px)",
-            right: 0,
-            minWidth: 260,
-            whiteSpace: "nowrap",
-            background: "var(--bg-elevated)",
-            border: "1px solid var(--line)",
-            borderRadius: 6,
-            boxShadow: "var(--shadow-lg)",
-            padding: 4,
-            zIndex: 1000,
-            display: "flex",
-            flexDirection: "column",
-            gap: 2,
-          }}
-        >
+        <div role="menu" className="focus-overflow-menu">
           {onToggleAutoMerge && (
             <MenuItem
               icon={<span style={{ color: pipeline.autoMerge ? "var(--done)" : "var(--fg-faint)" }}>{pipeline.autoMerge ? "●" : "○"}</span>}
@@ -974,41 +937,14 @@ function MenuItem({
   return (
     <button type="button"
       role="menuitem"
-      className="pipeline-overflow-menu-item"
+      className={"pipeline-overflow-menu-item focus-overflow-item" + (danger ? " is-danger" : "")}
       onClick={onClick}
       disabled={disabled}
-      style={{
-        display: "grid",
-        gridTemplateColumns: "16px 1fr auto",
-        gap: 8,
-        alignItems: "center",
-        padding: "6px 10px",
-        border: 0,
-        borderRadius: 4,
-        textAlign: "left",
-        color: disabled ? "var(--fg-faint)" : danger ? "var(--failed)" : "var(--fg)",
-        cursor: disabled ? "not-allowed" : "pointer",
-        font: "inherit",
-        fontSize: 12.5,
-      }}
     >
-      <span style={{ display: "inline-flex", justifyContent: "center" }}>
-        {icon}
-      </span>
-      <span style={{ whiteSpace: "nowrap" }}>{label}</span>
+      <span className="focus-overflow-item-icon">{icon}</span>
+      <span className="focus-overflow-item-label">{label}</span>
       {hint && (
-        <span
-          className="mono"
-          style={{
-            fontSize: 10,
-            color: "var(--fg-faint)",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
-          {hint}
-        </span>
+        <span className="mono focus-overflow-item-hint">{hint}</span>
       )}
     </button>
   );
@@ -1062,10 +998,10 @@ function FocusTitle({
 
   if (editing) {
     return (
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+      <span className="focus-title-edit">
         <input
           ref={inputRef}
-          className="mono"
+          className={"mono focus-title-input" + (valid ? "" : " is-invalid")}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
@@ -1077,16 +1013,6 @@ function FocusTitle({
           }}
           spellCheck={false}
           autoComplete="off"
-          style={{
-            fontSize: "inherit",
-            fontWeight: "inherit",
-            padding: "2px 6px",
-            border: `1px solid ${valid ? "var(--line)" : "var(--failed)"}`,
-            borderRadius: 4,
-            background: "var(--panel)",
-            color: "var(--fg)",
-            minWidth: 200,
-          }}
         />
         <button type="button"
           className="btn btn-primary"
@@ -1117,18 +1043,14 @@ function FocusTitle({
   }
 
   return (
-    <h2
-      className="focus-title"
-      style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-    >
+    <h2 className="focus-title focus-title-edit">
       {pipeline.name}
       {onRename && (
         <button type="button"
-          className="btn btn-ghost"
+          className="btn btn-ghost focus-title-edit-btn"
           onClick={() => setEditing(true)}
           disabled={lockedByState}
           title={lockedByState ? "running 中不能改名" : "改名"}
-          style={{ padding: "2px 6px", fontSize: 12 }}
         >
           ✎
         </button>
