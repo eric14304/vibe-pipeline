@@ -170,6 +170,7 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
+  vertical-align: middle;
 }
 .qadr-thinking-dots > span {
   width: 5px;

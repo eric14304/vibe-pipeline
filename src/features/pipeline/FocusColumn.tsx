@@ -41,7 +41,7 @@ export function RunButton({
   if (syncActive) {
     return (
       <button type="button" className="btn" disabled title="同步進行中,等同步收尾才能跑 ticket">
-        <span className="qadr-thinking-dots" style={{ display: "inline-flex", verticalAlign: "middle" }}>
+        <span className="qadr-thinking-dots">
           <span /><span /><span />
         </span>{" "}
         同步中
@@ -56,7 +56,7 @@ export function RunButton({
   ) {
     return (
       <button type="button" className="btn" disabled title="啟動 runner session…">
-        <span className="qadr-thinking-dots" style={{ display: "inline-flex", verticalAlign: "middle" }}>
+        <span className="qadr-thinking-dots">
           <span /><span /><span />
         </span>{" "}
         啟動中
@@ -74,7 +74,7 @@ export function RunButton({
     case "stopping":
       return (
         <button type="button" className="btn" disabled title="停止中…">
-          <span className="qadr-thinking-dots" style={{ display: "inline-flex", verticalAlign: "middle" }}>
+          <span className="qadr-thinking-dots">
             <span /><span /><span />
           </span>{" "}
           停止中
@@ -532,7 +532,7 @@ function SyncStatusBar({
         className="sync-chip sync-chip-busy"
         title={`git merge ${pipeline.baseBranch || "base"} 進行中(落後 ${j.behindCount} commits)`}
       >
-        <span className="qadr-thinking-dots" style={{ display: "inline-flex", verticalAlign: "middle" }}>
+        <span className="qadr-thinking-dots">
           <span /><span /><span />
         </span>
         {" "}同步中… git merge
@@ -585,7 +585,7 @@ function SyncStatusBar({
         className="sync-chip sync-chip-busy"
         title={`AI 解衝突中 · ${fmtElapsed(elapsedSec)} elapsed\n衝突檔(${files.length}):\n${tipPreview}${tipMore}`}
       >
-        <span className="qadr-thinking-dots" style={{ display: "inline-flex", verticalAlign: "middle" }}>
+        <span className="qadr-thinking-dots">
           <span /><span /><span />
         </span>
         {" "}AI 解衝突 · {fmtElapsed(elapsedSec)}
