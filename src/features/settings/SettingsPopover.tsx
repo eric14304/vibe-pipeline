@@ -957,7 +957,7 @@ export function SettingsPopover({
           }}
         >
           <div style={{ fontSize: 11, color: "var(--fg-faint)", marginBottom: 8 }}>
-            ↑ 以下跟主 agent(provider 自動同步)
+            ↑ 為了加快速度和節省 Token,預設跟隨 Main Agent 設定
           </div>
           <div
             className="settings-popover-task-grid"
