@@ -3,65 +3,12 @@ name: vibe-pipeline-frontend
 description: vibe-pipeline 前端開發規範 — shell 結構、設計 token、共用元件、加新畫面 SOP、狀態 gallery 驗證、routing 慣例。改 src/features、src/shell、src/ui、src/styles、src/App.tsx 或加任何新畫面之前先讀。
 ---
 
-## 當前 phase 提醒
+## 開工前
 
-> 完整 phase 落地 / 後續打磨清單 → [`CLAUDE.md`](../../../CLAUDE.md)。本段只列「**改前端時要意識到的新東西**」。
+1. root [`CLAUDE.md`](../../../CLAUDE.md) — repo 結構 / 雷區 / 設計信條 / 架構決策
+2. 歷次大改動 / Phase 進度 → [`CHANGELOG.md`](../../../CHANGELOG.md)
 
-**Phase 1-5 全套已落地**(2026-05-11 為止 6 條 pipeline merge 進 main)。Phase 5 後 frontend 多了三大區塊:
-
-### auth 模組(`src/features/auth/`)
-TOTP 雙重驗證 — 非 loopback 連線需先 setup → bind → cookie session。
-- `SetupScreen.tsx` 全屏 — 顯示 QR Code + 6 碼驗證(`/setup` route)
-- `LoginScreen.tsx` 全屏 — cookie 過期後重新輸 6 碼(`/login` route)
-- `SecurityTab.tsx` — SettingsPopover 內「安全」tab,顯示 active sessions + 撤銷 + 重置 TOTP + 擴增裝置
-- `AddDeviceDialog.tsx` — 擴增裝置時顯 QR 給新裝置掃
-- `useAuthStatus` hook — 全域 auth state(bound / sessions)
-- `authedFetch` wrapper — 401 自動 redirect `/login`(避免在 setup/login 頁無限循環)
-- App.tsx router 加 `/setup` `/login` routes
-
-### Settings popover Tab UI(`src/features/settings/`)
-925 行 stacked 區塊改 4-tab(Project / AI 任務 / 通知 / 安全)。
-- 固定寬度 480px,切 tab 不抖
-- 「已儲存 ✓」chip 升級到 tab bar 右側全域(原本在 Project section header)
-- mobile 全螢幕 + 右上 ✕ icon
-- AI 任務 task row 用 `display:contents` desktop pass-through grid / mobile flex column + select grid `1fr 2fr 1fr`(model 欄佔 2 倍)
-- 「安全」tab 僅在 `authStatus.bound === true` 時顯示
-
-### FCM Web Push(`src/lib/fcm.ts` + App.tsx + Settings 通知 tab)
-Firebase web SDK + Service Worker。
-- `initFCM` / `requestAndRegisterToken` / `setupForegroundHandler` / `unregisterToken`
-- 前景訊息走 `ServiceWorkerRegistration.showNotification()`(Android Chrome 不認 `new Notification()`)
-- Service Worker 在 `public/firebase-messaging-sw.js`,push event 自己 `event.waitUntil(showNotification(...))`(不依賴 FCM SDK auto-display)
-- PWA manifest `public/manifest.json` + icon SVG/PNG(`scripts/gen-icons.ts` ImageMagick 產)
-
-### Mobile RWD(全套 12 個 `@media (max-width:767.98px)`)
-- BoardScreen bottom tab bar:Pipeline / Ticket 切換(取代 Rail + FocusColumn 並排)
-- Drawer / Settings popover / DiffModal 改全螢幕(`position: fixed inset: 0 height: 100dvh`)
-- TopBar 收合:project switcher / theme / settings 仍 inline,「開啟資料夾」hide
-- 自動合併 toggle 從 focus-head 移到 ⋯ menu(MenuItem ● / ○ 點切換不關 menu)
-- hover-only 互動全補 touch 等效(overflow menu / chip click-to-copy / focus-visible / @media (hover:none) fallback)
-
-### Icon 統一
-- Action button 內 Unicode glyph(↺ ✂ 🗑 🤖 ⊘ ⌫)全換 SVG(RefreshIcon / ScissorsIcon / TrashIcon / ProhibitIcon)
-- close ✕ 對齊 SettingsPopover 風格(32×32 + svg 16 + border-radius 6 + hover bg)
-- 保留純 semantic 符號(分支 ⎇、play ▶、sync ⇣、unit ⏱ ↺ $)
-
-**已串 backend 的部分**(Phase 5 後新增)
-- `/api/user/config` GET/PUT — SettingsPopover AI 任務 tab(2026-05-13 拆 executor / critic,6 row)
-- `/api/auth/*` — setup / login / sessions / reset / status
-- `/api/projects/browse?path=` — TopBar「選擇其他資料夾…」走 browse modal(Tailscale 用)
-- `/api/projects/:h/pipelines/:id/sync` + `/sync/{ai,cancel,dismiss}` — `SyncStatusBar` / `SyncConflictModal`(FocusColumn 內)走新 syncJob contract
-
-**重要 UX 慣例變更**(2026-05-13)
-- **Pipeline 執行紀錄拆出 TicketDrawer** → 改在 pipeline header OverflowMenu「執行紀錄」開 `PipelineHistoryDrawer`(scope 對齊:pipeline-level data 不該塞 ticket-level drawer 底)
-- **Inbox strip 整塊觸碰** → 個別 dot 不再各自 button(太小難點),整塊變單一 `<button>`;hover 進入 + 滾輪切換 preview;preview popover portal 到 body(`.inbox-col` 有 `overflow:hidden`)
-- **QA `viewOverride`** → `'chat' | 'review' | null`,雙向蓋過 `draft.complete` 自動切;user 在 SpecReview 「繼續討論」 / chat 「→ 回最終預覽」對應切換。**不要在送訊息時清 override**(會撞 race condition,backend 還沒寫回 disk 時 SpecReview 又跳出)
-- `/api/push/*` — config / register / unregister / tokens / test
-
-**還沒做**
-- iOS PWA push 實測
-- 真實 pipeline 完成事件 → push 端對端驗
-- FCM / RWD 對應 e2e mock spec
+Phase 5 後 `src/` 加了 `features/auth/`(TOTP)+ `lib/fcm.ts`(Web Push)+ Settings 4-tab UI + 全套 mobile RWD(`@media (max-width:767.98px)`)。改這些段前看現有檔案,別憑記憶。
 
 ## UI 防禦規則(來自 runner real-run 踩到的雷)
 
@@ -178,67 +125,21 @@ phase 3-5 後 prototype variant + pixel-diff 已砍。新畫面流程:
 
 ## Pitfall
 
-### 1. **不用 `<StrictMode>`**
-React StrictMode 在 dev 會把 `useEffect([])` 觸發兩次。`src/main.tsx` 已關,不要加回來。
+root [`CLAUDE.md`](../../../CLAUDE.md) 雷區 #1-16 是全 repo 公用,本段只列 src/ 特有:
 
-### 2. **theme class 在 React mount 前同步設好**
-`index.html` 內 inline `<script>` 讀 `?theme=` + localStorage,設 `html.light` class。靠 React `useEffect` 會 first-paint flash。
-
-### 3. **animation 要 `none`,不要 `0s`**
-`animation: none !important`。`0s` 對 `fade-up` 等 from-opacity-0 keyframe 仍套起始狀態,元件透明。
-
-### 4. **字型 ready 才能截圖**
-若沒等 `document.fonts.ready`,中文字 fallback 字型差幾 px,diff 會出現整段文字邊緣噪音。
-
-### 5. **`page.route()` URL 用 regex 不用 string**
-Playwright 預設把 string URL 當 glob 解,`?` 變萬用字元,query string 永遠不匹配。所以注入 EDITMODE 失效。**用 `new RegExp(...)` 強制字面匹配**。
-
-### 6. **prototype dev-only UI 要在注入時關掉**
-`Prototype - Ticket Drawer.html` 有個 `state-switcher-pill`(底部 4 顆 state 切換按鈕,`showSwitcher: true` 時出現)。我的實作沒這個 UI(它是 designer 的 dev tool),所以注入時 `showSwitcher: false`。同類:tweaks panel 與 proto-jumpback 也都是 dev-only,HIDE_CSS 藏掉。
-
-### 7. **Sub-pixel AA 噪音(< 50 px)是可接受的**
-某些 dashed border、SVG dot 在不同瀏覽器 context 會有 ±1 sub-pixel 差,屬 anti-aliasing 級噪音。視覺上不可區分。當前 4/36 變體有此狀況(全 < 0.01%)。要追求絕對 0 px 不切實際,接受門檻 < 50 px / variant。
-
-### 8. **加新 feature 要避開 prototype 命名空間**
-`src/styles/qa.css` 是 prototype 全屏 QA(QAScreen 4 變體)留下的,定了一堆 `.qa-*` class(含 `.qa-body { display: grid }`)。Phase 2 我加了 QADrawer 用 `.qa-body` 結果被 grid 拉伸,bubble 高度暴增。
-
-**修法**:新 feature 用獨立 prefix(這次走 `qadr-`),完全脫離 prototype 命名空間。改 prototype 的 css 不可行(會破 pixel-diff),我們的責任是繞開。
-
-### 9. **CSS template literal 內不用 backtick**
-`server/lib/qa/systemPrompt.ts` 是 Bun 跑的 .ts,內含一大段 template literal 系統 prompt。寫 markdown 風文檔時手癢用了 `` `optionsMode` `` 框 inline code,backtick 直接終止字串、parse fail、backend crash、frontend 收到 500 + 空 body → "Unexpected end of JSON input"。
-
-**修法**:template literal 內所有 inline code 用引號或 plain 文字。同樣套用到 frontend 的 .ts/.tsx 內 template string。
+1. **新 feature 避開 prototype 命名空間殘留** — `src/styles/qa.css` 是 prototype 留的 `.qa-*` class(含 `.qa-body { display: grid }`)。Phase 2 加 QADrawer 用 `.qa-body` 被 grid 拉伸 bubble 高度暴增。修法:新 feature 走獨立 prefix(QADrawer 用 `qadr-*`),不要 reuse prototype class
 
 ## Routing 慣例
 
-所有畫面都靠 query param 控變體。共用 param:
-- `?theme=light|dark`(沒給預設 light)
+跨畫面共享 state 全走 URL query param(refresh 不掉、bookmark 帶完整 context)。例外:`active project hash` 走 localStorage、`theme` 走 localStorage(URL `?theme=` 仍 override)。
 
-各畫面專屬:
-- `/notifications`: `?state=` `?filter=` `?density=`
-- `/board`: `?density=` `?creating=1`
-- `/init`: 無
-- `/drawer`: `?state=`
-- `/qa`: `?variant=` `?autoplay=0|1`
+主要 route:
+- `/` → redirect `/board`
+- `/board` 主畫面;`?project=<hash>&pipeline=<id>&ticket=<id>` 帶 context
+- `/dev/states` 狀態 gallery(改 RunButton / ReadyBanner 視覺驗收)
+- `/setup` / `/login` TOTP
 
-加新 query param 時,**同步更新 pixel-diff 的對應 variant 跟 spec(本 SKILL 表格)**。
-
-## Mock data
-
-`src/data/pipelines.ts`:
-- `PIPELINES`: 4 條範例 pipeline(feat-auth, feat-search, refactor-api, infra-ci)
-- `PROJECTS`: 4 個專案
-- `STATE_COLOR` / `STATE_LABEL`: 狀態 → 色/標籤映射(**這兩個不算 mock,是 UI 共用 token,留著**)
-- `fmtElapsed(seconds)`: 秒 → "MM:SS"(同上)
-
-`src/data/notifications.ts`:
-- `NOTIFS_SEED`: 8 條範例通知
-- `SEV_COLOR` / `SECTION_LABEL`: severity 映射(共用 token,留著)
-
-**串接期改造**:
-- `PIPELINES` / `PROJECTS` / `NOTIFS_SEED` 從 const → fetch from backend(透過下面「API 串接慣例」)
-- pixel-diff 的「demo data 滿」變體**保留**(對照 prototype 用),但跑時用「**注入 mock fixture**」模式 — 例如 fetch URL 在測試環境攔截後回 PIPELINES const。已實作畫面繼續通過 pixel-diff
-- 真實 runtime data 都從 backend 來
+`STATE_COLOR` / `STATE_LABEL` / `SEV_COLOR` / `fmtElapsed` 在 `src/data/` 是純 helper(原本的 mock seed 已全砍);新 helper 可加進這層。
 
 ## API 串接慣例
 
@@ -310,19 +211,9 @@ backend 一律回 `{ ok: true, data }` 或 `{ ok: false, error: { code, message 
 - 跨畫面跳轉**保留 query param**(`navigate(\`/drawer?project=\${project}&ticket=\${id}\`)`)
 - 寫一個 `src/router/buildPath.ts` helper 集中所有 route 構造,避免散落字串
 
-## 空狀態畫面
+## 觸發本 SKILL 的場景
 
-**Prototype 沒設計過**,串接期要新增。設計直接走 prototype 的 token 體系自由創作。
-
-四個空狀態:
-1. **沒選 project**: TopBar 顯示「點這選資料夾」,Rail / Focus 都空,中央放引導文字 + 大按鈕
-2. **有 project + 沒 .vibe-pipeline/**: Modal `InitPopup` 蓋上,Board 在背後 dim
-3. **有 project + 有 .vibe-pipeline/ 但沒 pipeline**: Rail 只有「+ 新 pipeline」,Focus 放 empty illustration
-4. **有 pipeline 但沒 ticket**: Focus head 正常顯示,list 區放 empty illustration
-
-實作位置:
-- 「沒選 project」放 `src/features/pipeline/EmptyProject.tsx`
-- 「沒 .vibe-pipeline/」彈 `src/features/init/InitPopup.tsx`(**新元件**,跟 InitScreen 共享 init.css 但走 modal 形式)
-- 「沒 pipeline」與「沒 ticket」放 `src/features/pipeline/EmptyStates.tsx`(兩個小元件)
-
-**這些變體 pixel-diff 暫不跑**(沒 prototype 對照)。寫好後自己 review render OK 即可。後續若 prototype 補了空狀態設計,再加 diff variants。
+- 改 `src/features/*` / `src/shell/*` / `src/ui/*` / `src/styles/*` / `src/App.tsx`
+- 加新畫面 / 新 route / 新 modal / popover
+- 動 token / theme / button 強度分級
+- 改 mobile RWD 或 portal 行為

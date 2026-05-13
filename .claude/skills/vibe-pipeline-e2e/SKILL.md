@@ -9,17 +9,9 @@ description: vibe-pipeline E2E 測試規範 — Playwright 雙模式(mock CI / r
 
 E2E 用 Playwright 跑真瀏覽器 + 真 backend,**不靠 unit test 取代**。phase 3 砍掉 prototype + pixel-diff 後重新建,目標**完整覆蓋所有 user flow**(列在 § 覆蓋矩陣)。
 
-## 現況(2026-05-11)
+## 現況
 
-> 完整 phase 落地 → [`CLAUDE.md`](../../../CLAUDE.md)。本 SKILL 只負責 e2e 領域。
-
-**已有 spec**:`tests/e2e/mock/*.spec.ts` 12 個 spec / 55 test 全綠(phase 4 第一/二刀)+ `auth.spec.ts` 125 行(Phase 5 #13 落地:TOTP happy path / cookie 過期 / loopback bypass);real 模式套 `vp-autotest` scaffold 過 iter ticket 真跑驗證。
-
-**缺覆蓋**(下一個 e2e sprint):
-- FCM / push token 註冊與 fanout(需 mock FCM Admin SDK)
-- RWD breakpoint(width 375 / 768 / desktop 三套)
-- autoMerge / splitInto / sync ticket / prune worktree / userConfig 新功能
-- Phase 5 後續打磨涉及的 UI(Settings popover Tab UI / inline AI 拆分 confirm / 自動合併 toggle 在 ⋯ menu)
+12 mock spec / 55 test + `auth.spec.ts`(TOTP)+ real 套 `vp-autotest` iter ticket 驗證。缺覆蓋:FCM fanout(需 mock FCM Admin SDK)/ RWD breakpoint / autoMerge / splitInto / sync / prune worktree / Settings 4-tab。Phase 進度 → [`CHANGELOG.md`](../../../CHANGELOG.md)。
 
 ## 雙模式
 
@@ -234,15 +226,6 @@ bunx playwright show-report    # 看上次 HTML report
 - 改 frontend UI → 對應 spec 的 selector/PO 要跟著改;testid 散在元件內,別只改 spec
 - 加新 mock 注入點 → 一律走 `/api/__test/*`,不要直接改業務 lib
 - 任何讓「real 模式炸但 mock 過」的 PR 都不該 merge — 兩套要互補不互蓋
-
-## 進度
-
-- [x] Phase 1:架構 scaffolding(playwright.config + smoke 3 個 test)— commit `be5f541`
-- [x] Phase 2:Mock 注入點 + `/api/__test/*` + fixture lifecycle — commit `8f4a895`
-- [x] Phase 3:Mock 套覆蓋全部主要 flow(12 個 spec / 55 個 test)— commits `178e881` `cf07a88` `dac2cd2` `28b1996`
-  - smoke / fixture / pipeline-crud / qa-flow / runner-flow / runner-edge / ticket-drawer / merge / notif / topbar / guards / empty / project-lifecycle / dev-states
-- [ ] Phase 4:Real 套 — 等用戶手動觸發,real claude CLI 燒 token
-- [ ] Phase 5:CI 整合(GitHub Actions / 本地 pre-push hook)— 等用戶決定 CI provider
 
 ## 已知 flake / 限制
 
