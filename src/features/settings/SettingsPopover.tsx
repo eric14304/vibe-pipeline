@@ -931,7 +931,6 @@ export function SettingsPopover({
             padding: 10,
             background: "var(--panel)",
             borderRadius: 8,
-            marginBottom: 8,
           }}
         >
           {(["qa", "split", "runner"] as const).map((tc) => (
