@@ -263,76 +263,10 @@ routes:
 
 ## 手機遠端使用方式
 
-透過 Tailscale 把桌機 VP 暴露給手機,搭配 FCM Web Push 收 ticket / pipeline 事件通知。
+Tailscale + TOTP + FCM 完整 setup 流程(裝 / 連 / 啟通知 / FCM env 表)見 [`README.md`](README.md) §遠端存取。本段只記 README 沒提的雷:
 
-### 前置需求
-
-- 桌機與手機都安裝並登入同一個 Tailscale 帳號(同 tailnet)
-- 取得桌機的 Tailscale IP(`100.x.x.x`,在 Tailscale 控制台或 `tailscale ip -4` 看)
-- 桌機防火牆允許 5173 / 3001 入站(僅限 tailnet 介面)
-
-### 連線步驟
-
-1. backend 預設以 `0.0.0.0` 監聽(`server/index.ts` 已設,不要改回 `127.0.0.1`,否則手機連不到)
-2. 桌機開 vite + backend(`bun run dev` / `bun run server`)
-3. 手機瀏覽器開 `http://<tailscale-ip>:5173`,即可看到 Board
-4. 若手機端 API 全部失敗(CORS 紅字),檢查桌機 `.env` 的 `ALLOWED_ORIGINS` 是否含手機端 origin(例如 `http://100.x.x.x:5173`);多個來源逗號分隔
-
-### 啟用推播通知
-
-1. 手機開 VP 後進 TopBar 的 Settings → Push Notifications
-2. 點「啟用通知」→ 瀏覽器跳系統權限對話框,選允許
-3. 狀態變「已啟用」即訂閱完成(token 寫進 backend)
-4. 之後 ticket 開始 / 完成 / 失敗、pipeline ready / merged / failed 事件會推到手機;點通知直接跳轉對應 pipeline / ticket
-5. **離線補送**:手機離線(關螢幕 / 沒網路)時,push 由 FCM 伺服器暫存,裝置上線後自動補送(FCM 預設保留 28 天);不需 VP 端做 queue
-
-### TOTP 雙重驗證
-
-非 loopback 連線(手機透過 Tailscale 進來)會被 `authGuard` 攔截,需走 TOTP。loopback(`127.0.0.1` / `::1`)永遠 bypass,本機開發完全不受影響。
-
-**首次設定流程**
-
-1. 手機開 `http://<tailscale-ip>:5173`,首次無 secret 會被導去 `/setup`
-2. 畫面顯示 QR Code,用 Authenticator App(Google Authenticator / 1Password / Authy 等)掃描,加入帳號 `vibe-pipeline`
-3. 輸入 App 產生的 6 碼驗證碼 → 成功後 secret 寫進 `~/.vibe-pipeline/auth.json`,同時下發 session cookie(`vp_auth`,HttpOnly + SameSite=Strict,7 天)
-4. 自動跳回 `/board`
-
-**Cookie 過期後重新登入**
-
-- session cookie 預設 7 天,過期或手動 `/api/auth/logout` 後,受保護 endpoint 回 401 + `redirect=/login`
-- 手機被導去 `/login`,輸入 Authenticator App 當下 6 碼即可重新拿到 cookie(不需重新掃 QR — secret 已存在桌機)
-- 多裝置:不同手機 / 桌機各自 login 取得獨立 session,可在 SettingsPopover → 安全性 看 active sessions 並單獨踢除
-
-**Windows auth.json 權限提醒**
-
-- `~/.vibe-pipeline/auth.json` 存 TOTP secret(等同密碼)
-- 程式呼叫 `fs.chmod(0o600)` 在 POSIX(macOS / Linux)真實生效;**Windows 上 NTFS ACL 不被這 call 改動**
-- Windows 使用者請手動確認:檔案總管右鍵 `C:\Users\<你>\.vibe-pipeline\auth.json` → 內容 → 安全性 → 編輯 → 移除 Users / Everyone,只保留目前使用者讀寫
-- 若桌機是個人 PC 且唯一帳戶為自己,user profile 目錄預設 ACL 已隔離其他 user,可略過(但多帳戶 / 工作機建議手動確認)
-
-### HTTPS 需求(實機推播)
-
-- FCM Web Push 規範要求 service worker 跑在 secure context;`localhost` 例外免 HTTPS,但 `http://100.x.x.x:5173` 不算 secure → 手機實機無法註冊 push subscription
-- 解法:桌機跑 `tailscale serve https / http://localhost:5173`,Tailscale 簽 Let's Encrypt 給 `<machine>.<tailnet>.ts.net`,手機改開該 HTTPS URL
-- backend(3001)也建議走 `tailscale serve` 或同網域 reverse proxy,讓前端 `/api/*` 同 origin 不用再開 CORS
-
-### 環境變數設定
-
-寫進桌機的 `.env`(已加進 `.gitignore`,別 commit)。
-
-| 變數 | 取得位置 | 用途 |
-|---|---|---|
-| `FCM_SERVICE_ACCOUNT_JSON` | Firebase console → 專案設定 → 服務帳戶 → 產生新的私密金鑰(整段 JSON inline 貼進 env) | backend 用 Admin SDK 發送 push;與下方 `_PATH` 二選一 |
-| `FCM_SERVICE_ACCOUNT_PATH` | 同上,下載 JSON 後存檔,填絕對路徑 | 同上,適合不想把 JSON inline 進 env 的情境 |
-| `FCM_API_KEY` | Firebase console → 專案設定 → 您的應用程式 → Web app → SDK setup | 前端 Firebase SDK init |
-| `FCM_MESSAGING_SENDER_ID` | 同上 | 前端 init |
-| `FCM_APP_ID` | 同上 | 前端 init |
-| `FCM_VAPID_KEY` | Firebase console → Cloud Messaging → Web 設定 → Web Push 憑證 → 產生金鑰組 | 前端 `getToken({ vapidKey })` 用 |
-| `ALLOWED_ORIGINS` | 手動列舉 | backend CORS 白名單,逗號分隔(例:`http://localhost:5173,http://100.64.0.5:5173,https://desktop.tailnet.ts.net`) |
-
-### 安全提醒
-
-- service account JSON **絕對不要 commit**;`.env` / 金鑰檔放在 repo 外,或確認 `.gitignore` 有蓋到
-- service account 權限等同 Firebase 專案 admin;洩漏即可任意推播給所有 token
-- `ALLOWED_ORIGINS` 不要放 `*`,僅列實際使用的 origin
-- VP 已加 TOTP auth 層(非 loopback 連線強制),但 Tailscale tailnet 仍是最外層邊界;不要把 5173 / 3001 暴露到 public internet
+- **Windows `auth.json` NTFS ACL** — `~/.vibe-pipeline/auth.json` 存 TOTP secret 雜湊。程式 `fs.chmod(0o600)` 在 Windows NTFS 不生效,個人 PC 單帳戶 OK(user profile 目錄預設已隔離),多帳戶 / 工作機要手動右鍵 → 安全性 → 移除 Users/Everyone
+- **HTTPS 不可省** — FCM service worker 要 secure context,`http://100.x.x.x:5173` 不算 secure → push 訂閱不會註冊。手機必須走 `tailscale serve --https=443 http://localhost:5173`
+- **`server/index.ts` 必須 `0.0.0.0` 監聽** — 改回 `127.0.0.1` 手機連不到,Tailscale 介面也算非 loopback
+- **`ALLOWED_ORIGINS` 不要放 `*`** — TOTP 是 auth 層但 CORS 也是邊界,Tailscale tailnet 不該假設絕對安全
+- **離線 push 補送靠 FCM 不靠 VP** — 手機離線時 FCM server 暫存 28 天,VP 端不做 queue;debug 時別找 VP backend 的 queue,沒有
