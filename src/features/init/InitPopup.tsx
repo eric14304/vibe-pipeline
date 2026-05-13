@@ -87,17 +87,7 @@ export function InitPopup({
 
         {!project.hasGit && (
           <div className="init-tree-wrap" style={{ paddingTop: 0 }}>
-            <label
-              className="mono"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                fontSize: 12,
-                color: "var(--fg-mute)",
-                cursor: "pointer",
-              }}
-            >
+            <label className="mono init-git-toggle">
               <input
                 type="checkbox"
                 checked={alsoGitInit}

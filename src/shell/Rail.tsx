@@ -59,18 +59,7 @@ function RailItem({ p, active, onClick, muted, hasDraft }: { p: Pipeline; active
         <span className="rail-state-dot" style={{ background: STATE_COLOR[p.state] }} />
         <span className="rail-item-name">{p.name}</span>
         {hasDraft && (
-          <span
-            className="mono"
-            title="進行中 QA"
-            style={{
-              fontSize: 9,
-              padding: "1px 5px",
-              borderRadius: 3,
-              background: "var(--accent-soft)",
-              color: "var(--accent)",
-              letterSpacing: "0.04em",
-            }}
-          >
+          <span className="mono rail-qa-badge" title="進行中 QA">
             QA
           </span>
         )}

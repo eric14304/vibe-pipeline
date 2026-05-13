@@ -155,3 +155,12 @@ html.light .init-cmd-text { color: #fbf8f1; }
   background: var(--accent-soft);
   border: 1px solid var(--accent);
 }
+
+.init-git-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--fg-mute);
+  cursor: pointer;
+}
