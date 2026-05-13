@@ -44,6 +44,7 @@
 - **codex 主 runner 改 in-process spawn_agent pattern**:取代舊 Bash `codex exec` subprocess fallback,主 agent 用 `spawn_agent` → `wait_agent` → `close_agent` 三步 atomic in-process 序列派 sub-agent;需 codex CLI 的 multi_agent feature flag,`codexAdapter.spawnRunner` 自動加 `-c features.multi_agent=true`。codex-codex 達到 claude-claude 同級 in-process 速度
 - **UI 砍 executor/critic/merge 的 provider 欄**(SettingsPopover):只 runner row 仍可選 provider,其餘 task class 自動跟隨 runner
 - **`coerceConfig` silent snap migration**:讀 user config 時自動把 executor / critic / merge 的 `provider` snap 成 `runner.provider`;PUT 進來若 mismatch 也擋掉(server 端強制一致)
+- **codex 主 runner e2e 驗證通過**:vp-autotest `codex-runner-smoke` pipeline 跑 step ticket,log 內多次 `spawn_agent` 出現,確認用 in-process API(非 Bash fallback);ticket commit + pipeline 收 ready 都正常。順帶修一個雷:`codexAdapter.commonExecArgs` 內 `--ignore-user-config` flag 會把 `~/.codex/config.toml` 內 `provider = codex_local_access`(ChatGPT auth)設定 ignore 掉,fallback default OpenAI API 模式,用 `auth.json` 內 internal/beta key 撞 401 Unauthorized。移除該 flag,保留 `--ignore-rules` + `-c mcp_servers={}` 維持隔離
 
 ---
 
