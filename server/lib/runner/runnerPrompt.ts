@@ -192,10 +192,10 @@ JSON 結構:
   }
 
 迴圈最多 N 輪:
-1. Bash "date +%s%3N" 抓 startedAt;標 stage="doer";**派執行AI sub-agent**(prompt = ticket.prompt + 上輪 criticFeedback 如有);寫回 JSON
+1. Bash "date +%s%3N" 抓 startedAt;**把 partial round 寫進 rounds[current]**: { "n": current+1, "startedAt": <unix ms> }(只這兩欄,其他欄位 step 4 補);標 stage="doer";寫回 JSON;**派執行AI sub-agent**(prompt = ticket.prompt + 上輪 criticFeedback 如有)
 2. 拿執行AI 輸出;標 stage="critic";寫回 JSON
 3. **派審核AI sub-agent**(根據 acceptance 驗收,要它**回覆開頭明確寫 PASS 或 FAIL 或 PARTIAL** + feedback)
-4. Bash "date +%s%3N" 抓 endedAt;append 一筆 round 到 rounds[];append verdict 到 verdicts[];current+=1;寫回 JSON
+4. Bash "date +%s%3N" 抓 endedAt;**update rounds[current]**(in-place 補 endedAt / executorSummary / criticVerdict / criticFeedback,**不是 append 新筆**);append verdict 到 verdicts[];current+=1;寫回 JSON
 5. PASS → 標 stage="done", ticket.status="done",跳出迴圈
 6. FAIL/PARTIAL → 進下輪(下輪 step 1 會把 stage 標回 "doer"),把 criticFeedback 加進下輪 prompt
 
