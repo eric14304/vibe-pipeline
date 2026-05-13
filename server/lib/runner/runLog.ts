@@ -37,7 +37,7 @@ export async function listRuns(
     const file = join(dir, f);
     try {
       const text = await Bun.file(file).text();
-      const detail = parseFullLog(f, text);
+      const detail = parseFullLog(f, file, text);
       if (detail) {
         const { stdout: _s, stderr: _e, ...summary } = detail;
         void _s;
@@ -91,10 +91,10 @@ export async function getRun(
   const file = join(logsDir(projectPath), filename);
   if (!existsSync(file)) return null;
   const text = await Bun.file(file).text();
-  return parseFullLog(filename, text);
+  return parseFullLog(filename, file, text);
 }
 
-function parseFullLog(filename: string, text: string): RunDetail | null {
+function parseFullLog(filename: string, logPath: string, text: string): RunDetail | null {
   const m = filename.match(FILENAME_RE);
   if (!m) return null;
   const startedAt = Number(m[2]);
@@ -150,6 +150,7 @@ function parseFullLog(filename: string, text: string): RunDetail | null {
 
   return {
     filename,
+    logPath,
     startedAt,
     exitCode,
     durationMs,

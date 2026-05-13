@@ -342,6 +342,7 @@ export type SyncJob = {
 // ─── Run log(.runtime/logs/<pipelineId>-<ts>.log 解析結果) ───
 export type RunSummary = {
   filename: string;       // <pipelineId>-<ts>.log
+  logPath: string;        // absolute path to runtime log file
   startedAt: number;      // 從 filename 拆 ts
   exitCode: number | null;
   durationMs: number | null;
