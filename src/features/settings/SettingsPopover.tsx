@@ -902,9 +902,8 @@ export function SettingsPopover({
 
       {/* ─── AI 任務 tab ─── */}
       {activeTab === "ai" && <>
-      <div style={{ fontSize: 11, color: "var(--fg-faint)", marginBottom: 10, lineHeight: 1.5 }}>
-        <div>跨 project — provider / model</div>
-        <div>同 provider 最快最省 — claude 主走 Task tool / codex 主走 spawn_agent,皆 in-process + prompt cache 共享</div>
+      <div style={{ fontSize: 11, color: "var(--fg-faint)", marginBottom: 10 }}>
+        跨 project — provider / model
       </div>
       {userCfg ? (
         <div

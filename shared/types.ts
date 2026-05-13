@@ -91,7 +91,7 @@ export const TASK_CLASS_LABELS: Record<TaskClass, string> = {
 export const TASK_CLASS_HINTS: Record<TaskClass, string> = {
   qa: "規格收斂",
   split: "大任務拆分 Ticket",
-  runner: "任務執行主 Agent",
+  runner: "任務執行主 Agent · 下方 executor/critic/merge 跟隨",
   executor: "執行AI(改 code)",
   critic: "審核AI(判 PASS/FAIL)",
   merge: "合併衝突解決",
