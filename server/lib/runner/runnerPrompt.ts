@@ -7,7 +7,7 @@
 // 全部封裝在 dispatchInstructions() 內,依 cfg.provider 分流。
 // 新加 provider 只要補一段 dispatch 範例,主流程不動。
 
-import type { TaskModelConfig } from "../../../shared/types";
+import type { Provider, TaskModelConfig } from "../../../shared/types";
 
 export function buildRunnerBehaviorPrompt(opts: {
   executor: TaskModelConfig;
@@ -15,77 +15,57 @@ export function buildRunnerBehaviorPrompt(opts: {
   merge: TaskModelConfig;
 }): string {
   const { executor, critic, merge } = opts;
-  const subAgentDirective =
-    '\n## 派 sub-agent 用的 provider / model / effort\n\n' +
-    '本次 run 的 sub-agent 配置(2026-05 起 executor / critic 拆開,可各自挑 model):\n' +
-    '- 執行AI(doer,改 code / 跑指令):provider=' + executor.provider + ',model=' + executor.model + ',effort=' + executor.effort + '\n' +
-    '- 審核AI(critic,讀 diff 判 PASS/FAIL):provider=' + critic.provider + ',model=' + critic.model + ',effort=' + critic.effort + '\n' +
-    '- merge ticket(mode=merge):provider=' + merge.provider + ',model=' + merge.model + ',effort=' + merge.effort + '\n\n' +
-    dispatchInstructions("執行AI(改 code)", executor, /* allowWrite */ true) +
-    dispatchInstructions("審核AI(read-only 驗收)", critic, /* allowWrite */ false) +
-    dispatchInstructions("merge ticket", merge, /* allowWrite */ true) +
-    '\n**注意**:審核AI prompt 內明確寫「只驗收、不改 code」;codex 審核 sub-agent sandbox=read-only 雙保險擋誤改檔。\n';
-  return RUNNER_BEHAVIOR_PROMPT_HEAD + subAgentDirective + RUNNER_BEHAVIOR_PROMPT_TAIL;
+  // executor / critic / merge 經 silent snap cascade 已同 provider(coerceConfig 保證),
+  // 用 runner.provider 印一份通則即可;3 角色差別只 cfg(model / effort / allowWrite)。
+  const provider = executor.provider;
+  const roleTable =
+    '\n## 派 sub-agent 用的 3 種角色\n\n' +
+    '| 角色 | model | effort | 可改檔? |\n' +
+    '|---|---|---|---|\n' +
+    '| 執行AI(doer) | ' + executor.model + ' | ' + executor.effort + ' | ✓(workspace-write)|\n' +
+    '| 審核AI(critic,read-only 驗收) | ' + critic.model + ' | ' + critic.effort + ' | ✗(read-only)|\n' +
+    '| merge ticket(mode=merge)| ' + merge.model + ' | ' + merge.effort + ' | ✓(workspace-write)|\n\n';
+  return RUNNER_BEHAVIOR_PROMPT_HEAD + roleTable + dispatchProtocol(provider) + RUNNER_BEHAVIOR_PROMPT_TAIL;
 }
 
 // 派 sub-agent 的具體呼叫格式,因 provider 而異。
 // 設計原則:
 //   claude provider → Task tool(原生 sub-agent 機制,in-process)
-//   codex  provider → spawn_agent + wait_agent + close_agent(codex 0.x multi_agent
-//                    feature flag 提供的 in-process sub-agent 原語;需 features.multi_agent=true)
-// 多 provider 擴展靠這層:加新 CLI 只要補一段 dispatch 範例。
-function dispatchInstructions(label: string, cfg: TaskModelConfig, allowWrite: boolean): string {
-  if (cfg.provider === "claude") {
+//   codex  provider → spawn_agent + wait_agent + close_agent(codex multi_agent feature)
+function dispatchProtocol(provider: Provider): string {
+  if (provider === "claude") {
     return (
-      '\n### ' + label + '(provider=claude)派法\n' +
-      '用 Task tool 派 sub-agent 並等結果(atomic;Task tool 同步回傳 sub-agent 最終訊息)。參數:\n' +
+      '## 派 sub-agent — claude Task tool\n\n' +
+      '用 Task tool 同步派 sub-agent + 等結果。每次派傳:\n' +
       '- subagent_type: "general-purpose"\n' +
-      '- model: "' + cfg.model + '"(full ID,Task tool 也吃 alias opus/sonnet/haiku,但本 pipeline 統一傳 full ID)\n' +
+      '- model: 上方表格的 model(full ID)\n' +
       '- description: 5-10 字概述(例 "修 tsc errors")\n' +
-      '- prompt: 完整指令(ticket.prompt + acceptance + 上輪 feedback,如有)\n' +
-      '- effort:Task tool 不接 effort 參數,改在 prompt 開頭加一行「[Reasoning effort: ' + cfg.effort + ']」做 hint\n' +
-      '工具限制(寫進 prompt 約束 sub-agent,不靠外層 sandbox):\n' +
-      (allowWrite
-        ? '- 執行類:可改 source code(Edit/Write/Bash),**禁止改 pipeline.json**(那是 orchestrator 才能寫的)\n'
-        : '- 審核類:**只驗收、不改 code**;只能 Read / Bash read-only(git diff / git log / cat / tsc --noEmit)對照 acceptance 判 PASS/FAIL/PARTIAL\n')
+      '- prompt: ticket.prompt + acceptance + 上輪 feedback(若有);prompt 開頭加「[Reasoning effort: <表格 effort>]」做 hint(Task tool 不接 effort 參數)\n' +
+      '工具限制(寫進 prompt 約束 sub-agent):\n' +
+      '- 寫入類(執行AI / merge):可 Edit/Write/Bash,**禁止改 pipeline.json**\n' +
+      '- 唯讀類(審核AI):**只驗收**,只 Read / Bash read-only(git diff / log / tsc --noEmit),回覆開頭 PASS/FAIL/PARTIAL + feedback\n'
     );
   }
-  // codex provider:走 codex CLI 的 multi_agent feature(spawn_agent / wait_agent / close_agent)。
-  // 這三個 tool 由 codex runtime 提供 in-process sub-agent 原語,需在 spawn 時帶
-  // -c features.multi_agent=true 開啟(本 repo codexAdapter.spawnRunner 已加)。
-  const sandbox = allowWrite ? "workspace-write" : "read-only";
+  // codex provider
   return (
-    '\n### ' + label + '(provider=codex)派法\n' +
-    '用 codex multi_agent in-process 原語派 sub-agent 並等結果。**三步 atomic 序列**:spawn_agent → wait_agent → close_agent。\n\n' +
-    '**步驟 1 — spawn_agent**:啟動 sub-agent。\n' +
-    'input:\n' +
-    '  {\n' +
-    '    "agent_type": "<TODO: 合法值請依當前 codex runtime 提供的列表;預期值類似 \\"executor\\" / \\"reviewer\\" / \\"general\\"。若 spawn 報 invalid agent_type,fallback 用 \\"general\\" 並把角色職責寫進 message 開頭>",\n' +
-    '    "message": "[Reasoning effort: ' + cfg.effort + ']\\n<ticket.prompt + acceptance + 上輪 feedback,如有>",\n' +
-    '    "fork_context": false,\n' +
-    '    "model": "' + cfg.model + '",\n' +
-    '    "reasoning_effort": "' + cfg.effort + '"\n' +
-    '  }\n' +
-    'output:{ "agent_id": "<id>", "nickname": "<human label>" } — 記住 agent_id 給下一步用。\n\n' +
-    '**步驟 2 — wait_agent**:同步等 sub-agent 完工。\n' +
-    'input:\n' +
-    '  {\n' +
-    '    "targets": ["<spawn 拿到的 agent_id>"],\n' +
-    '    "timeout_ms": 1800000\n' +
-    '  }\n' +
-    'output:{ "status": { "<id>": { "completed": "<sub-agent 最終訊息全文>" } } } — 從 status[id].completed 拿 sub-agent 回應。\n\n' +
-    '**步驟 3 — close_agent**:回收 sub-agent context。\n' +
-    'input:{ "target": "<agent_id>" }\n' +
-    'output:{ "previous_status": "<...>" } — 不關鍵,確認回收即可。\n\n' +
-    '**工具限制 / sandbox**:本 sub-agent 角色為 ' + (allowWrite ? '寫入類' : '唯讀類') + ',對應 sandbox=' + sandbox + '。\n' +
-    (allowWrite
-      ? '- spawn_agent 的 message 開頭明說「sandbox=workspace-write,可改 source code(禁止改 pipeline.json)」\n'
-      : '- spawn_agent 的 message 開頭明說「sandbox=read-only,只驗收、不改 code;只回覆 PASS / FAIL / PARTIAL + feedback」\n') +
-    '**注意**:\n' +
-    '- spawn_agent / wait_agent / close_agent 三個 tool 需 codex runtime 啟 features.multi_agent=true(本 runner spawn 時已帶 -c features.multi_agent=true)。若工具不存在(老 codex 版本),fallback 走 Bash 直呼 "codex exec --json --skip-git-repo-check --ignore-user-config --ignore-rules -c mcp_servers={} -c model=\\"' + cfg.model + '\\" -c model_reasoning_effort=\\"' + cfg.effort + '\\" -s ' + sandbox + (allowWrite ? ' --dangerously-bypass-approvals-and-sandbox' : '') + ' --ephemeral - <<EOF ... EOF",JSONL stdout 取最後一個 agent_message.text 當回應(舊行為,2026-05 前用)\n' +
-    '- agent_type 合法值清單未列入本 prompt(TODO:codex runtime 文件未在本 repo 同步);實測若 invalid,fallback "general" 並把角色寫 message\n' +
-    '- timeout_ms 預設 30 分鐘(1800000);長 ticket 視需要調大\n' +
-    '- 每個 sub-agent **務必 close_agent**,不然 context 累積會吃 token\n'
+    '## 派 sub-agent — codex spawn_agent(三步 atomic)\n\n' +
+    'codex runtime 已 enable `features.multi_agent=true`(spawn 時帶旗標)。三步序列:spawn_agent → wait_agent → close_agent。\n\n' +
+    '**1. spawn_agent** input:\n' +
+    '```\n' +
+    '{\n' +
+    '  "agent_type": "general",  // invalid 就 fallback,把角色職責寫進 message\n' +
+    '  "message": "[Reasoning effort: <表格 effort>]\\n[Sandbox: workspace-write|read-only]\\n<ticket.prompt + acceptance + 上輪 feedback>",\n' +
+    '  "fork_context": false,\n' +
+    '  "model": "<表格 model>",\n' +
+    '  "reasoning_effort": "<表格 effort>"\n' +
+    '}\n' +
+    '```\n' +
+    'output:`{ "agent_id": "<id>", "nickname": "<...>" }` — 拿 agent_id 給下一步。\n\n' +
+    '**2. wait_agent** input:`{ "targets": ["<agent_id>"], "timeout_ms": 1800000 }` → output `{ "status": { "<id>": { "completed": "<sub-agent 全文回應>" } } }`,從 `status[id].completed` 取回應。\n\n' +
+    '**3. close_agent** input:`{ "target": "<agent_id>" }`。**每個 sub-agent 務必 close**,不然 context 累積吃 token。\n\n' +
+    '工具限制(透過 spawn_agent.message 開頭寫,sandbox 也已對齊):\n' +
+    '- 寫入類(執行AI / merge):message 寫「sandbox=workspace-write,可改 source,禁止改 pipeline.json」\n' +
+    '- 唯讀類(審核AI):message 寫「sandbox=read-only,只驗收,回覆開頭 PASS/FAIL/PARTIAL + feedback」\n'
   );
 }
 
