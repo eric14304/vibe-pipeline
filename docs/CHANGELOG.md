@@ -40,6 +40,7 @@
 
 ## 2026-05-14 大改動
 
+- **`cost_limit_usd` enforcement 從 project 累積改 per-pipeline 累積**:設定位置仍在 `<project>/.vibe-pipeline/config.json`,但每條 pipeline 各自用自己的 tickets/runs cost 判斷上限,不再跨 pipeline 加總互相擋 /run
 - **Provider 鏈一致化(主跟 sub 同 provider)正式落地**:設計原則「主 agent 是 X,sub-agent 跟著用 X」徹底實現,executor / critic / merge 不再各自選 provider,全部 snap 成 runner.provider
 - **codex 主 runner 改 in-process spawn_agent pattern**:取代舊 Bash `codex exec` subprocess fallback,主 agent 用 `spawn_agent` → `wait_agent` → `close_agent` 三步 atomic in-process 序列派 sub-agent;需 codex CLI 的 multi_agent feature flag,`codexAdapter.spawnRunner` 自動加 `-c features.multi_agent=true`。codex-codex 達到 claude-claude 同級 in-process 速度
 - **UI 砍 executor/critic/merge 的 provider 欄**(SettingsPopover):只 runner row 仍可選 provider,其餘 task class 自動跟隨 runner
