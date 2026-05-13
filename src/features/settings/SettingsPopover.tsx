@@ -725,7 +725,7 @@ export function SettingsPopover({
           <span className="mono settings-inline-unit">USD,0 = 無限</span>
         </div>
       </div>
-      <div className="settings-subhint">超過上限會擋下新 /run 並發 notif。</div>
+      <div className="settings-subhint">每條 pipeline 個別累積上限,超過擋該 pipeline /run 不影響其他。</div>
 
       <div className="settings-field-row settings-field-row--tight">
         <span className="settings-field-label">自動合併</span>
