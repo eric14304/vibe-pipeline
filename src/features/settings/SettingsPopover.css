@@ -1,6 +1,161 @@
+/* ─── Desktop popover root ────────────────────────────────────── */
+
+.settings-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  /* 固定寬度,各 tab 切換時 popover 不會抖動;480 容得下 AI 任務 grid */
+  width: min(480px, calc(100vw - 32px));
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  background: var(--bg-elevated);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow-lg);
+  padding: 14px 16px 12px;
+  z-index: 1500;
+  font-size: 13px;
+}
+
 /* Desktop:右上關閉 icon 隱藏(點外面 / Esc 已夠);mobile 才顯示 */
 .settings-popover-close {
   display: none;
+}
+
+/* ─── Tab bar ──────────────────────────────────────────────────── */
+
+.settings-popover-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.settings-popover-tab {
+  padding: 7px 12px;
+  margin-bottom: -1px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--fg-mute);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 120ms;
+}
+
+.settings-popover-tab.is-active {
+  border-bottom-color: var(--accent);
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.settings-popover-tabs-spacer {
+  flex: 1;
+}
+
+.settings-popover-saved {
+  color: var(--done);
+  background: var(--done-soft);
+  border-color: var(--done-soft);
+  margin-bottom: 6px;
+  transition: opacity 350ms ease;
+}
+
+.settings-popover-saved.is-fading {
+  opacity: 0;
+}
+
+/* ─── Field row(Project tab + 通用)─────────────────────────── */
+
+.settings-field-row {
+  display: grid;
+  grid-template-columns: 112px 1fr;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.settings-field-label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.settings-input {
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--fg);
+  font-size: 13px;
+}
+
+.settings-input--w-narrow { width: 64px; }
+.settings-input--w-mid { width: 100px; }
+.settings-input--w-full { width: 100%; box-sizing: border-box; }
+
+.settings-subhint {
+  font-size: 10.5px;
+  color: var(--fg-faint);
+  line-height: 1.5;
+  margin-left: 122px;
+  margin-bottom: 10px;
+}
+
+.settings-subhint--top {
+  margin-left: 0;
+  margin-bottom: 10px;
+}
+
+.settings-inline-unit {
+  font-size: 11px;
+  color: var(--fg-faint);
+}
+
+.settings-field-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ─── Push notification status ─────────────────────────────────── */
+
+.push-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12.5px;
+}
+
+.push-status-icon {
+  font-family: var(--font-mono);
+}
+
+.push-action-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.push-hint {
+  font-size: 11px;
+  color: var(--fg-faint);
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+.push-error {
+  font-size: 11px;
+  color: var(--failed);
+  margin-top: 8px;
+  padding: 8px;
+  background: color-mix(in srgb, var(--failed) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--failed) 30%, var(--line));
+  border-radius: 4px;
+  word-break: break-all;
 }
 
 /* ─── AI 任務 row(2026-05-13 拆 2 層 layout)────────────────────────
@@ -155,12 +310,18 @@
     gap: 6px;
   }
 
+  /* 沒 provider 的 group(executor/critic/merge):placeholder 撐第一欄不渲染,
+     只剩 model + effort,grid 改 2fr 1fr 讓 model 較寬容下「sonnet-4-6」等 */
+  .task-row-selects--no-provider {
+    grid-template-columns: 2fr 1fr;
+  }
+
   .task-row-selects > select {
     width: 100% !important;
     min-width: 0;
   }
 
-  /* placeholder span(沒 provider 的 group)mobile 隱掉,讓 model/effort 自然填 */
+  /* placeholder span 在沒 provider 場合不渲染,desktop / mobile 都不佔位 */
   .task-row-placeholder {
     display: none;
   }

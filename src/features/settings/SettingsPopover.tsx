@@ -76,7 +76,7 @@ function TaskModelRow({
     <div className="task-row">
       <div className="task-row-head">
         <span className="task-row-label">{label}</span>
-        <div className="task-row-selects">
+        <div className={"task-row-selects" + (showProvider ? "" : " task-row-selects--no-provider")}>
           {showProvider ? (
             <select
               value={provider}
