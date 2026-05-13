@@ -85,6 +85,17 @@ function coerceConfig(raw: unknown): UserConfig {
   for (const tc of TASK_CLASSES) {
     out[tc] = coerceTaskModel(rawDefaults[tc], fallback.defaults[tc]);
   }
+  // executor/critic/merge.provider 必須跟 runner.provider 對齊;不齊 → snap 到 runner.provider 預設
+  const runnerProvider = out.runner.provider;
+  for (const tc of ["executor", "critic", "merge"] as const) {
+    if (out[tc].provider !== runnerProvider) {
+      out[tc] = {
+        provider: runnerProvider,
+        model: defaultModelForProvider(runnerProvider),
+        effort: defaultEffortForProvider(runnerProvider),
+      };
+    }
+  }
   return { defaults: out };
 }
 
@@ -172,6 +183,42 @@ export async function patchUserConfig(body: unknown): Promise<UserConfig> {
       }
     }
     nextDefaults[tc] = { provider, model, effort };
+  }
+  // executor/critic/merge.provider 必須跟 runner.provider 一致;
+  // 例外:同次 PUT body 同時改 runner + 該 tc 兩者新 provider 一致(用 nextDefaults.runner.provider 比較)
+  const finalRunnerProvider = nextDefaults.runner.provider;
+  for (const tc of ["executor", "critic", "merge"] as const) {
+    const incomingTc = incomingDefaults[tc];
+    const incomingHasProvider =
+      incomingTc &&
+      typeof incomingTc === "object" &&
+      "provider" in (incomingTc as Record<string, unknown>);
+    if (incomingHasProvider && nextDefaults[tc].provider !== finalRunnerProvider) {
+      throw new UserConfigPatchError(
+        `defaults.${tc}.provider`,
+        `defaults.${tc}.provider 必須跟 defaults.runner.provider 一致(runner=${finalRunnerProvider})`
+      );
+    }
+  }
+  // runner.provider 換了 → 自動把 executor/critic/merge.provider 跟著換;
+  // 該 tc 的 model/effort 若 incoming 沒同步指定且跟新 provider 不相容 → 用 default 補
+  if (cur.defaults.runner.provider !== finalRunnerProvider) {
+    for (const tc of ["executor", "critic", "merge"] as const) {
+      const incomingTc = (incomingDefaults[tc] && typeof incomingDefaults[tc] === "object"
+        ? (incomingDefaults[tc] as Record<string, unknown>)
+        : {}) as Record<string, unknown>;
+      const cur_n = nextDefaults[tc];
+      let provider: Provider = finalRunnerProvider;
+      let model: ModelName = cur_n.model;
+      let effort: Effort = cur_n.effort;
+      if (!("model" in incomingTc) || !isValidModel(provider, model)) {
+        model = defaultModelForProvider(provider);
+      }
+      if (!("effort" in incomingTc) || !isValidEffort(provider, effort)) {
+        effort = defaultEffortForProvider(provider);
+      }
+      nextDefaults[tc] = { provider, model, effort };
+    }
   }
   return writeUserConfig({ defaults: nextDefaults });
 }
