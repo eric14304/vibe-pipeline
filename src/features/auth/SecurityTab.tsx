@@ -3,6 +3,7 @@ import { authedFetch } from "./authApi";
 import { useConfirm } from "../../ui/ConfirmDialog";
 import { AddDeviceDialog } from "./AddDeviceDialog";
 import type { AuthStatus, SessionInfo } from "./types";
+import "./auth.css";
 
 type Envelope<T> = { ok: boolean; data?: T; error?: { code: string; message: string } };
 
@@ -104,84 +105,45 @@ export function SecurityTab({
     }
   }
 
-  const hint: React.CSSProperties = {
-    fontSize: 11,
-    color: "var(--fg-faint)",
-    lineHeight: 1.5,
-    marginBottom: 8,
-  };
-
-  const sessionRow: React.CSSProperties = {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: 8,
-    padding: "8px 0",
-    borderBottom: "1px solid var(--line)",
-    fontSize: 12,
-  };
-
   return (
     <div>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          marginBottom: 10,
-          fontSize: 12.5,
-        }}
-      >
-        <span style={{ color: "var(--done)", fontFamily: "var(--font-mono)" }}>✓</span>
+      <div className="auth-bound-header">
+        <span className="auth-bound-check">✓</span>
         <span style={{ color: "var(--fg)" }}>已綁定</span>
-        <span className="mono" style={{ fontSize: 11, color: "var(--fg-faint)" }}>
+        <span className="mono auth-bound-ts">
           {formatBoundAt(status.boundAt)}
         </span>
       </div>
 
-      <div
-        style={{
-          fontSize: 11,
-          color: "var(--fg-mute)",
-          fontWeight: 600,
-          marginTop: 12,
-          marginBottom: 4,
-        }}
-      >
+      <div className="auth-section-label">
         活躍 Sessions
       </div>
       {sessions === null ? (
-        <div style={hint}>載入中…</div>
+        <div className="auth-hint">載入中…</div>
       ) : sessions.length === 0 ? (
-        <div style={hint}>無活躍 session。</div>
+        <div className="auth-hint">無活躍 session。</div>
       ) : (
-        <div style={{ marginBottom: 10 }}>
+        <div className="auth-session-list">
           {sessions.map((s) => (
-            <div key={s.cookieHash} style={sessionRow}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="mono" style={{ color: "var(--fg)", fontSize: 12 }}>
+            <div key={s.cookieHash} className="auth-session-row">
+              <div className="auth-session-info">
+                <div className="mono auth-session-ip">
                   {s.ip}
                 </div>
                 <div
-                  className="mono"
-                  style={{
-                    color: "var(--fg-faint)",
-                    fontSize: 10.5,
-                    marginTop: 2,
-                    wordBreak: "break-all",
-                  }}
+                  className="mono auth-session-ua"
                   title={s.ua}
                 >
                   {truncate(s.ua, 56)}
                 </div>
-                <div style={{ color: "var(--fg-mute)", fontSize: 10.5, marginTop: 2 }}>
+                <div className="auth-session-last-active">
                   最後活動 {formatRelativeTime(s.lastActiveAt)}
                 </div>
               </div>
               <button
                 type="button"
-                className="btn"
+                className="btn auth-revoke-btn"
                 onClick={() => void revoke(s.cookieHash)}
-                style={{ fontSize: 11, padding: "3px 8px" }}
               >
                 撤銷
               </button>
@@ -191,20 +153,12 @@ export function SecurityTab({
       )}
 
       {error && (
-        <div
-          className="mono"
-          style={{
-            fontSize: 11,
-            color: "var(--failed)",
-            marginBottom: 8,
-            wordBreak: "break-word",
-          }}
-        >
+        <div className="mono auth-error">
           {error}
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+      <div className="auth-actions">
         <button type="button" className="btn" onClick={() => setAddDeviceOpen(true)}>
           擴增裝置
         </button>
