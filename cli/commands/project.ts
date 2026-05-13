@@ -12,8 +12,9 @@ export async function runProject(sub: string | undefined, args: ParsedArgs): Pro
     case "show": return projectShow(args);
     case "add":  return projectAdd(args);
     case "remove": return projectRemove(args);
+    case "init": return projectInit(args);
     default:
-      fail("INVALID_ARGS", `Unknown project subcommand: ${sub ?? "(none)"}. Use list|show|add|remove`);
+      fail("INVALID_ARGS", `Unknown project subcommand: ${sub ?? "(none)"}. Use list|show|add|remove|init`);
   }
 }
 
@@ -92,6 +93,34 @@ async function projectAdd(args: ParsedArgs): Promise<void> {
     return;
   }
   print(`Added project: ${proj.name} (${proj.hash})`);
+}
+
+async function projectInit(args: ParsedArgs): Promise<void> {
+  const positional = args.positional[0];
+  const here = args.flags["here"] === true;
+  const rawPath = positional ?? (here ? process.cwd() : undefined);
+  if (!rawPath) fail("INVALID_ARGS", "Usage: vbpl project init <path> | vbpl project init --here");
+  const abs = resolve(rawPath!);
+
+  if (pipelineDir.hasInit(abs)) {
+    print("Already initialized, nothing to do");
+    return;
+  }
+
+  let proj: Project;
+  try {
+    await pipelineDir.init(abs);
+    proj = await projectStore.open(abs);
+  } catch (err) {
+    fail("INVALID_PATH", (err as Error).message);
+    return;
+  }
+
+  if (isJsonMode()) {
+    okJson({ path: abs, hash: proj.hash });
+    return;
+  }
+  print("Initialized: " + proj.name + " (" + proj.hash + ") at " + abs);
 }
 
 async function projectRemove(args: ParsedArgs): Promise<void> {

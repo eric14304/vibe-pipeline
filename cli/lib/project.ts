@@ -32,6 +32,6 @@ export async function resolveProject(flags: Record<string, string | boolean>): P
 
 export async function requireInit(projectPath: string): Promise<void> {
   if (!projectDir.hasInit(projectPath)) {
-    fail("NOT_INITIALIZED", `Project at ${projectPath} has no .vibe-pipeline/ directory`);
+    fail("NOT_INITIALIZED", "Project at " + projectPath + " has no .vibe-pipeline/ directory. Run 'vbpl project init --here' (or 'vbpl project init <path>') to initialize.");
   }
 }
