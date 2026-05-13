@@ -94,6 +94,8 @@ function TaskModelRow({
           alignSelf: "center",
           whiteSpace: "nowrap",
           lineHeight: 1.25,
+          minWidth: 0,
+          overflow: "hidden",
         }}
       >
         <span style={{ fontSize: 12, color: "var(--fg)" }}>{label}</span>
@@ -912,10 +914,9 @@ export function SettingsPopover({
           className="settings-popover-task-grid"
           style={{
             display: "grid",
-            // 第一欄寫死 fixed-width,讓兩個 group(qa/split/runner 跟 executor/critic/merge)
-            // 的 selects 對齊;130 容得下「大任務拆分 Ticket」中文 hint(10.5px 字),
-            // 太寬會把 selects 推出 popover 邊界
-            gridTemplateColumns: "130px max-content max-content max-content",
+            // 第一欄用 minmax(0, 1fr) 自適應剩餘空間,select 三欄 fixed width;
+            // 兩個 group 共用同 popover 寬 + 同 fixed select widths → label 1fr 相等對齊
+            gridTemplateColumns: "minmax(0, 1fr) max-content max-content max-content",
             columnGap: 8,
             rowGap: 8,
             padding: 10,
@@ -954,10 +955,9 @@ export function SettingsPopover({
             className="settings-popover-task-grid"
             style={{
               display: "grid",
-              // 第一欄寫死 fixed-width,讓兩個 group(qa/split/runner 跟 executor/critic/merge)
-            // 的 selects 對齊;130 容得下「大任務拆分 Ticket」中文 hint(10.5px 字),
-            // 太寬會把 selects 推出 popover 邊界
-            gridTemplateColumns: "130px max-content max-content max-content",
+              // 第一欄用 minmax(0, 1fr) 自適應剩餘空間,select 三欄 fixed width;
+            // 兩個 group 共用同 popover 寬 + 同 fixed select widths → label 1fr 相等對齊
+            gridTemplateColumns: "minmax(0, 1fr) max-content max-content max-content",
               columnGap: 8,
               rowGap: 8,
               alignItems: "center",
