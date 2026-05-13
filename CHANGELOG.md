@@ -54,7 +54,7 @@
 - **vp-autotest project**(`d:/sugarfungit/vp-autotest`,hash `cf94d1b2`)— Claude 跑 runner 測試專用,user 主 project 不污染
 - **Pixel-diff 不救**(2026-05-10 phase 3-5 砍):prototype variant routes(/init, /drawer, /qa, /notifications)+ NotifBanner / NotificationsScreen / DrawerStage / QAScreen / InitScreen 全刪,tests/ 整個刪,playwright/pixelmatch/pngjs 從 devDeps 移除,`bun run diff` script 移除。design/ 留作歷史紀錄不再對齊
 - **log/notif GC** 走 per-pipeline 10 / 全 project 500 上限,trigger 在 /run spawn 前
-- **Self-dogfood AI merge worktree isolation 不做** — 99% user(對別 project 用 VP)不會踩 `--watch` reload 殺 child 問題;只有 VP 改自己時要避免。研究紀錄見 [`docs/refs/merge-isolation-2026-05-11.md`](docs/refs/merge-isolation-2026-05-11.md);實作 ~150 行不划算
+- **Self-dogfood AI merge worktree isolation 目前不做(等需求訊號)** — 觸發條件三項交集:(a) target repo 是 VP 本身、(b) backend `server:watch` / `dev:all` watch mode、(c) AI 改到 `server/**/*.ts`;少任一條不踩。99% end-user(對別 project 用 VP)不會踩 — `bun run server` no-watch default + 雷區 #7/#8 文件化規避是 free mitigation。實作 worktree isolation ~150 行只半解 merge 階段(平常 ticket exec 改 backend code 仍踩);完整解要 process group detach 動 Bun.spawn internals。研究紀錄見 [`docs/refs/merge-isolation-2026-05-11.md`](docs/refs/merge-isolation-2026-05-11.md)。**等需求訊號**(VP fork 變多 + user 抱怨累積)再回頭做
 - **Runner spawn `--setting-sources` 不砍** — 保留給 Task sub-agent 讀 user/project CLAUDE.md。砍掉省 ~13% cache 但 sub-agent 失去 context 繼承,得失不對稱
 
 > 2026-05-13 update:原本「Runner 主 agent 永遠是 claude」被搬回 Phase 6 候選。理由:查 codex CLI 確認本體有 `spawn_agent` / `wait_agent` / `close_agent` 原語(需 `[features] multi_agent = true`),跟 claude Task tool 對等。若接起來,codex 主 + codex sub 可達到 claude-claude 同級 in-process 速度,「子跟隨主」原則才有性能依據。當前 runnerPrompt 全 claude-isms + Bash spawn codex sub 那條 fallback 設計也跟著要重寫。
