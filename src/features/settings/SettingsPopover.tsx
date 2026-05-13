@@ -764,7 +764,7 @@ export function SettingsPopover({
       {/* ─── AI 任務 tab ─── */}
       {activeTab === "ai" && <>
       <div className="settings-subhint settings-subhint--top">
-        跨 project — provider / model
+        全域 provider / model 設定
       </div>
       {userCfg ? (
         <>
