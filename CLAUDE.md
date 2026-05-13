@@ -12,8 +12,11 @@
 - **Client-side folder browser**:新 `GET /api/projects/browse?path=` endpoint,瀏覽器內導覽 host 上目錄;Tailscale 遠端開 project 走這個(native picker 跑在 host user 看不到 dialog)
 - **`vbpl` CLI 落地**:`cli/` 內,reuse `server/lib/*` 直接讀寫 fs(no HTTP)。4 nouns(project/pipeline/ticket/config)+ `--json` mode。`bun run vbpl <noun> <verb>`。約定見 [`vibe-pipeline-cli` SKILL](.claude/skills/vibe-pipeline-cli/SKILL.md)
 - **Auto-merge 二段式**:`autoMerge=true` 觸發時 backend 先 `git merge --no-ff`(機械式,~90% clean case 毫秒級 done);**撞衝突 → 自動 fallback 到 spawn AI 全套** + emit notif + FCM push「🤖 AI 接手解衝突」(autoMerge 核心情境就是 user 不在現場,所以推播必要)。dirty / git_error 等非 AI 能解的失敗才 emit `merge_blocked` 等 user。心智:autoMerge 是「全自動」承諾;速度收益留在 clean 場景
+- **Manual merge 也走 git-first 二段式**:跟 auto-merge 對稱化。`mergePipeline` route 改成先試 `autoMergeNoAI`,衝突才 fallback `triggerMerge`。response 加 `mode: "mechanical" | "ai"` discriminator;CLI / Web UI handler 依 mode 分流顯示。按鈕 label「AI 合併」→「合併」(AI 變 fallback)。`alreadyMerged` 路徑也補寫 pipeline state=merged + 清殘存 failed merge ticket
+- **CLI mutate 操作走 backend HTTP**(`cli/lib/api.ts`):`vbpl pipeline run / stop / merge / sync --ai / sync --cancel` 走 POST,避免 CLI 自己 spawn child 後 CLI 退出 → child 孤兒 / orchestrator running map 蒸發。其他 verb(list / show / create / delete / config 等)維持 fs 直存,read 不受 backend 起沒起影響
+- **`Pipeline.createdAt` 欄位**:取代 id 內嵌 hex timestamp 當排序依據(AI / fixture 手 craft 的假 id 會排亂)。`listPipelines` 讀檔時若無此欄位自動 backfill 用 id-ts;新 pipeline 寫真 `Date.now()`。CLI `pipeline create` 同步讀 project config `defaults.auto_merge` 預設值(原本漏)
 - **`pipelineDir.init` 改 idempotent**:`.vibe-pipeline/` partial init 殘骸自動補齊不報錯;`.gitignore` 自動補 `pipelines/`(原本漏)
-- **UX 收斂**:Pipeline 執行紀錄從 TicketDrawer 拆到 pipeline-level OverflowMenu;Inbox strip 整塊觸碰 + 滾輪 preview popover;QA reopen + viewOverride 雙向
+- **UX 收斂**:Pipeline 執行紀錄從 TicketDrawer 拆到 pipeline-level OverflowMenu;Inbox strip 整塊觸碰 + 滾輪 preview popover;QA reopen + viewOverride 雙向;CTA 視覺強度三檔(`btn` / `btn-accent` / `btn-primary`),+ ticket 跟 RunButton 主色互斥避免兩顆都搶眼;`bun run start` 一指令包 preview + server(production-like)
 
 | Phase | 一句話 |
 |---|---|

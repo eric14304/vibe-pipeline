@@ -27,14 +27,23 @@ cli/
 
 ## 設計信條
 
-### 1. Reuse backend lib,不發 HTTP
+### 1. Read 直 fs,mutate spawn / kill 走 HTTP(2026-05-13 拆分)
 
-每個 command 直接 `import * as pipelineDir from "../../server/lib/pipelineDir"` 然後 `pipelineDir.readPipeline(path, id)`。理由:
-- backend server 沒起也能用 CLI(state.json / pipeline.json 都在 fs,server 只是 HTTP wrapper)
+**Read 操作**(list / show / status / log / config get):直接 `import * as pipelineDir from "../../server/lib/pipelineDir"` 然後 `pipelineDir.readPipeline(path, id)`。理由:
+- backend server 沒起也能用 CLI(state.json / pipeline.json 都在 fs)
 - 沒網路 round-trip,本地操作毫秒級
 - 共享同套驗證 / 寫盤邏輯,行為一致
 
-代價:CLI 跟 backend lib 強耦合,改 `server/lib/*` 的 export 介面要記得 CLI 也用。**改 server/lib 前 grep `from "../../server/lib"` 確認 CLI 是否吃到**。
+**Mutate 純 fs 操作**(project add / remove / pipeline create / delete / ticket add/update/remove / config set):也直存 fs(沒 spawn child process,純寫 json)。
+
+**Spawn / kill 子程操作**(`vbpl pipeline run / stop / merge / sync --ai / sync --cancel`):**必須走 HTTP POST 給 backend**。透過 `cli/lib/api.ts:post()` 包好的 `requireBackend()` health check + fetch。
+
+為什麼:CLI 自己 spawn child 會在 CLI process 退出時失去 child 控制權(orchestrator running map 蒸發,watchdog / pause / stop 全失效,實測 Windows 上 child 也常被當孤兒 GC)。改成 backend 養 child:CLI 死了 backend 還活著,child 仍可被監控、kill、cleanup。
+
+- 環境變數 `VBPL_API_BASE` 覆寫 default `http://127.0.0.1:3001`
+- backend 沒起 → `fail("NO_BACKEND", "先跑 bun run server")` 而非靜默 spawn 孤兒
+
+代價:CLI 跟 backend lib 強耦合,改 `server/lib/*` 的 export 介面要記得 CLI 也用;新增 mutate verb 要決定走 fs 還是 HTTP(原則:有沒有 spawn 或 kill child process)。**改 server/lib 前 grep `from "../../server/lib"` 確認 CLI 是否吃到**。
 
 ### 2. --json mode 為機器可讀,human mode 為 user 友善
 
@@ -54,10 +63,11 @@ cli/
 `fail()` 第一個參數是大寫 SCREAMING_SNAKE code:
 - `INVALID_ARGS` — 參數不齊 / 格式錯
 - `NO_PROJECT` — resolveProject 找不到
+- `NO_BACKEND` — `requireBackend()` health check 失敗(spawn / kill verb 需 backend up)
 - `NOT_INITIALIZED` — `.vibe-pipeline/` 不存在
 - `NOT_FOUND` — pipeline / ticket id 不存在
 - `STATE_GUARD` — operation 不允許在當前 state(e.g. pipeline 已 merged 不准 run)
-- `IO_ERROR` — fs / spawn 失敗 fallback
+- `IO_ERROR` — fs / spawn / fetch 失敗 fallback
 
 新加 command 用既有 code,不夠才加新的(也在這 SKILL 補一行)。
 
@@ -72,14 +82,19 @@ cli/
 
 ## Noun × verb 矩陣
 
-| noun | verbs |
+| noun | verbs(粗體 = 走 HTTP,其餘 fs) |
 |---|---|
 | `project` | list / show / add `<path>` / remove `<hash>` |
-| `pipeline` | list / create `<name>` / show `<id>` / delete `<id>` / run `<id>` / stop `<id>` / status `<id>` / log `<id>` |
-| `ticket` | list / show `<id>` / add(`--title --mode ...`) / update / remove,**全部要 `--pipeline <id>`** |
+| `pipeline` | list / create / show / delete / **run / stop / merge / sync --ai / sync --cancel** / sync (default) / sync --dismiss / status / log |
+| `ticket` | list / show `<id>` / add / update / remove,**全部要 `--pipeline <id>`** |
 | `config` | list / get `<key>` / set `<key> <value>`(user-level `~/.vibe-pipeline/config.json`) |
 
-`pipeline log` 走 `runLog.listRuns` + `getRun`(同 RunHistory drawer 後端);`pipeline run` 走 `orchestrator.start(...)`(同 web UI 的 /run endpoint)— 但**沒 daemon 模式**:CLI 跑完 spawn 後就 exit,runner child 繼續在背景跑。要看狀態用 `vbpl pipeline status <id>`(讀 pipeline.json)。
+走 HTTP 的 5 個 verb 需要 backend up,沒起會回 `NO_BACKEND` error。其餘 fs 路徑沒 backend 也能用。
+
+`pipeline log` 走 `runLog.listRuns` + `getRun`(同 RunHistory drawer 後端,fs)。
+`pipeline run` 走 `POST /api/.../run` → backend 內 `orchestrator.start(...)` spawn child → backend 養 child 不會孤兒。
+`pipeline merge` 走 `POST /api/.../merge` → backend 二段式(autoMergeNoAI → conflict 才 AI),response `mode: "mechanical" | "ai"` 分流訊息(mechanical 直印 commit hash;ai 印 ticketId + 提示 watch log)。
+`pipeline create` 沒帶 `--auto-merge` flag 時 fallback 讀 project config `defaults.auto_merge`(對齊 web UI)。
 
 ## 不踩的雷
 

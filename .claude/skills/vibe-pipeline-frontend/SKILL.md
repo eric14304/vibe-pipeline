@@ -140,6 +140,18 @@ EmptyShell (src/shell/EmptyShell.tsx)    ← Init 用
 
 主題切換靠 `<html>` 加 / 移 `light` class。深色是預設(無 class),`html.light` 覆寫變數值。
 
+### Button CTA 三檔強度(2026-05-13)
+
+`tokens.css` 內 button 三檔,視覺強度低 → 高:
+
+| Class | 樣式 | 用途 |
+|---|---|---|
+| `btn` | panel-2 灰底 + line border | 中性 / 純功能(取消 / overflow menu / 純資訊按鈕)|
+| `btn-accent` | 透明 accent 10% 底 + accent 邊 + accent 字 | **次要 CTA**,跟主 CTA 並排時用(e.g. `+ ticket` 在 RunButton 旁邊) |
+| `btn-primary` | accent 填 + 白字 | 主動作(RunButton 開始/繼續/重試;empty pipeline 的 + ticket)|
+
+**互斥規則**:同一視覺區域內**最多一顆 btn-primary**。範例:`+ ticket` 跟 `RunButton` 在 pipeline header 並排 — pipeline 有 ticket 時 RunButton 是 primary、+ ticket 降 `btn-accent`;沒 ticket 時 RunButton disabled,+ ticket 升 primary。避免兩顆都搶眼 user 不知按哪個。
+
 ## 共用元件
 
 ### `src/ui/icons.tsx`
