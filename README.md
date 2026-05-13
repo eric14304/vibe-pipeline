@@ -41,6 +41,34 @@ bun run cli:build:linux     # Linux x64
 
 ---
 
+## 給 AI 安裝(讓你家的 AI 學會用 vbpl)
+
+把 `.claude/skills/vibe-pipeline/` 整個資料夾複製到 AI 的 skills 路徑,**任何 project 內**跟 AI 對話 AI 都能透過 SKILL 學會操作 vbpl(建 / 跑 / 看 / 合併 pipeline)。
+
+**全域安裝**(所有 project 都可用):
+
+```bash
+# macOS / Linux:
+cp -r .claude/skills/vibe-pipeline ~/.claude/skills/
+
+# Windows PowerShell:
+Copy-Item -Recurse .claude\skills\vibe-pipeline $env:USERPROFILE\.claude\skills\
+```
+
+**只在特定 project**(對某個工作 repo 限定):
+
+```bash
+cd /path/to/your-other-project
+mkdir -p .claude/skills
+cp -r /path/to/vibe-pipeline/.claude/skills/vibe-pipeline .claude/skills/
+```
+
+驗證:在新 session 開 AI,問「我能用 vbpl 幹嘛?」AI 應該秒回 pipeline / ticket / executor / critic 心智 + 常用指令。
+
+> 註:本 repo 內還有 `vibe-pipeline-frontend` / `-backend` / `-cli` / `-e2e` 四個 SKILL,**那些只給改 vibe-pipeline 本身 code 的 AI 用**,enduser 不需要安裝。
+
+---
+
 ## 架構
 
 ```mermaid

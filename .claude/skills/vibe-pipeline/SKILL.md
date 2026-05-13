@@ -1,98 +1,111 @@
 ---
 name: vibe-pipeline
-description: vibe-pipeline 專案總覽 — 產品定位、已實作畫面與功能、未實作功能(指向 ref)、設計信條、開發環境。在這個 repo 裡思考 scope、決策優先順序、判斷某需求是否在計畫內、回答「這個東西要不要做 / 做到哪」之前先讀。
+description: vibe-pipeline 操作手冊 — 給 AI 看的「怎麼用 vbpl 替 user 管 pipeline / ticket」精簡指南。User 把這 SKILL 安裝到 ~/.claude/skills/ 後,你會在任何 project 看到本檔,知道 host 上裝了 vbpl 工具。觸發:user 提到 vibe-pipeline / vbpl / pipeline / ticket / 「幫我跑這個 pipeline」/ 「建 ticket」/ 「審核 AI 過了沒」之類。
 ---
 
-> 當前 phase / 架構決策 / 開發環境 / 雷區 / repo 結構樹 → 在 root [`CLAUDE.md`](../../../CLAUDE.md) (always-on)。
-> 本 SKILL 是 deep-dive:產品定位、已實作畫面細節、設計信條、未實作功能、外部對照 ref。
+# vibe-pipeline — AI 操作手冊
 
-## 一句話定位
+User 在這台機器裝了 **vibe-pipeline**(多 AI agent 的 ticket / pipeline 編排器)。完整功能介紹在 https://github.com/eric14304/vibe-pipeline 的 README。本檔只教你「怎麼操作」。
 
-vibe-pipeline 是 **多 AI agent(執行AI + 審核AI)的 ticket / pipeline 編排器**,以 Web 應用為主介面,將來會配 `vp` CLI。每張 ticket 由 執行AI 跑、審核AI 審,iterative 模式會自動迴圈到 審核AI pass;pipeline 是 ticket 的有序組合,每條跑在獨立 git branch 上,完成後 merge 回 base。
+## 心智模型
 
-## 產品形態
+```
+project(user 的某個 git repo)
+ └── pipeline(獨立 git branch, 一組相關 ticket)
+       └── ticket(可獨立交付的工作單元)
+              └── iter rounds(executor 改 code → critic 判 PASS/FAIL,迴圈到通過)
+```
 
-- **主介面**: Web 應用(Bun + Vite + React 18 + TypeScript)+ PWA(可加入手機主畫面)
-- **CLI**: 命令名 `vbpl`,2026-05-13 落地(`cli/` 內,reuse `server/lib/*` 直接讀寫 fs,no HTTP)。`bun run vbpl <noun> <verb>` 走 4 nouns(project/pipeline/ticket/config)。約定 → [`vibe-pipeline-cli` SKILL](../vibe-pipeline-cli/SKILL.md)
-- **資料**: phase 1-5 全套已落地,真接 backend(無 mock seed)
-- **遠端控制**: Tailscale + HTTPS (`tailscale serve`) + TOTP auth + FCM Web Push,手機 Chrome 可遠端管 pipeline + 收 ticket / pipeline 事件通知
+- **executor**:真改 code 的 AI sub-agent(高 capability model)
+- **critic**:讀 diff 判 PASS / FAIL / PARTIAL 的 AI sub-agent(便宜 model 即可)
+- **iter mode**:executor + critic 來回到 critic PASS 或達 iter 上限(預設 5)
+- **step mode**:跑一次就收(no critic loop)
+- **autoMerge**:全 ticket done → 自動 git merge 回 base(衝突才 AI)
 
-## Routes
+## 你能做什麼(透過 vbpl CLI)
 
-| route | 用途 |
-|---|---|
-| `/` | redirect `/board` |
-| `/board` | 主介面(Rail + FocusColumn + Inbox) |
-| `/dev/states` | 狀態 gallery(改 RunButton / ReadyBanner 等視覺驗收用) |
+**讀(不需 backend)**:
 
-之前 phase 1 prototype variant routes(`/notifications` `/init` `/drawer` `/qa`)已於 phase 3-5 砍掉,連同 pixel-diff 整套(playwright / pixelmatch / pngjs / 4 個 prototype component / NOTIFS_SEED / PIPELINES seed / tests/ 整個刪)。設計時確認 pixel-diff 不救,專心做 production code。`design/` 留歷史紀錄,real code 已不引用。
+```bash
+vbpl project list                                      # 列已知 project
+vbpl pipeline list --project <hash>                    # 列該 project 的 pipeline
+vbpl pipeline status <pipelineId>                      # 看 pipeline 跟 ticket 即時狀態
+vbpl pipeline log <pipelineId>                         # 過往 run 摘要(cost / duration / result)
+vbpl ticket list --pipeline <pipelineId>               # 列 ticket
+vbpl config list                                       # 看 user 的 per-task-class model 配置
+```
 
-## 未實作 / 計畫中
+**寫(fs 直存,不需 backend)**:
 
-主 spec 在 [refs/spec-2026-05-09.md](refs/spec-2026-05-09.md)(2026-05-09 版,使用者標示「不是最終結果,以後會更新」)。包含三層:
+```bash
+vbpl pipeline create <name> [--auto-merge] [--base-branch main]
+vbpl ticket add --pipeline <id> --title "..." --mode iter
+vbpl config set <key> <value>                          # e.g. runner.model claude-opus-4-7
+```
 
-- `[M]` MVP — 專案 init、Ticket/Pipeline schema CRUD、執行AI+審核AI、iterative loop、branch lifecycle、SQLite log、exclusive lock、CLI 命令集
-- `[P2]` Phase 2 — Q&A 收斂引擎、stall detection、intervention 五型、budget tracker、context retrieval、worktree 並行、TUI dashboard
-- `[P3]` Phase 3 — AI 輔助 merge 衝突、多 pipeline 並行 scheduler、plugin、第三方通知
+**啟動 / 停 / 合併(需 backend up — `bun run server`)**:
 
-之後若有更新版 spec,新增 `refs/spec-YYYY-MM-DD.md` 並在這裡 update 索引。**不要直接覆蓋舊 ref**,留下歷史。
+```bash
+vbpl pipeline run <pipelineId>                         # 啟動 runner
+vbpl pipeline stop <pipelineId>                        # 暫停(runner 跑完當前 ticket 就停)
+vbpl pipeline merge <pipelineId>                       # 合併回 base(先試 git,衝突才 AI)
+vbpl pipeline sync <pipelineId>                        # 把 base 拉進 pipeline worktree
+vbpl pipeline sync <id> --ai                           # 衝突時讓 AI 解
+vbpl pipeline sync <id> --cancel                       # 取消同步
+```
 
-## 外部對照 ref
+**所有指令吃 `--json`**,給你結構化資料用 JSON.parse 後判斷;沒 `--json` 印給 human 看。
 
-設計新功能 / 推進 backend 前,參考類似產品的成熟設計。三個 ref 都做過同類型(multi-agent / coding-agent orchestrator)但走不同路線,**互相補位**。
+## 標準操作流(常見 user 意圖)
 
-### [refs/archive/vibe-kanban-2026-05-09.md](refs/archive/vibe-kanban-2026-05-09.md)
-BloopAI vibe-kanban(**已 sunset** 但設計成熟,26k stars)。**人為主、agent 為工具**的 kanban 編排器。
-- **task → attempt → execution_process 三層 model**(對應我們的 ticket → run → iteration)
-- **Executor = profile,不是程式碼分支**(換 model / 換 provider 不改程式)
-- **`Needs Attention` session 狀態**(對應我們的 paused 子狀態)
-- **Repository lifecycle script 三契約**(setup / dev / cleanup)
-- **Approvals 事前介入機制**(補我們 intervention 五型缺的「事前」這格)
-- 不抄:Kanban 拖卡 UI、Cloud / Relay、Tauri、多 repo workspace
+1. **「幫我建一條 pipeline 做 X」**
+   - 確認在哪個 project(`vbpl project list`,user 若沒指定就問或用當前 cwd)
+   - `vbpl pipeline create <name>`
+   - 用 `vbpl ticket add` 或建議 user 開 web UI 走 QA 對話讓 AI 收斂規格(複雜需求建議走 QA,簡單一張可用 CLI)
 
-### [refs/archive/symphony-2026-05-09.md](refs/archive/symphony-2026-05-09.md)
-OpenAI Symphony(**reference impl,不會當產品線維護**,22.7k stars)。**寄生 Linear、無 DB、純 reconcile** 的 Codex 1:1 dispatcher。
-- **`WORKFLOW.md` 模式**(prompt + config + hooks 同檔、版控、熱 reload、front matter typed config)
-- **Run Attempt 11 個明確 lifecycle state**(不是 success/fail 二分)
-- **三層 timeout**(read / turn / stall)分開語意
-- **Reconciliation-driven recovery**(每 tick 校對 source of truth,不靠 durable scheduler state)
-- **Service / Agent 硬邊界**(orchestrator 只 read,mutate 全丟 agent)
-- **Continuation retry vs exponential backoff 兩條路徑分開**
-- **Workspace safety invariants**(cwd MUST 在 workspace、sanitize 規則、bash -lc hook)
-- 不抄:寄生外部 tracker、無 DB、綁 Codex 一個 backend
+2. **「跑這條 pipeline」**
+   - `vbpl pipeline run <id>` — backend 沒起會回 `NO_BACKEND` error,告訴 user 跑 `bun run server`
+   - 啟動後**不等完成**,CLI 即返回,告訴 user「已啟動,看 `vbpl pipeline status <id>` 或 web UI」
+   - 不要 polling status 一直問;user 真要進度自己會問
 
-### [refs/archive/composio-ao-2026-05-09.md](refs/archive/composio-ao-2026-05-09.md)
-Composio agent-orchestrator(**production-ready,actively maintained**,6.9k stars)。**橫向 fan-out 多 issue 平行**的 supervisor。三個 ref 中最值得直接抄結構。
-- **Plugin slot 切 8 個且收斂**(runtime / agent / workspace / tracker / scm / notifier / terminal / lifecycle)— 不是「什麼都能 plugin」
-- **Session state machine `(state, reason)` 雙欄**(我們 SQLite `runs.status` 應拆成這形)
-- **殭屍 session 偵測寫回 invariant**(每次 reconcile 都掃,不靠 process 自己 cleanup)
-- **把外部系統當訊息匯流排**(git branch + PR + CI status,不發明 IPC)
-- **Reaction 是 first-class 概念**(審核AI verdict / stall / budget warn / conflict 都是 reaction trigger)
-- **結構化 JSON log + correlation id + `/api/observability`**(Web UI 不直讀 SQLite)
-- **hash-based 路徑命名空間**(同 user 多 checkout 不撞名)
-- 不抄:無 DB、橫向 fan-out 主流(我們是縱向 iterate)
+3. **「進度?」/「跑完了嗎?」**
+   - `vbpl pipeline status <id> --json` 看 `state` + `tickets[].status`
+   - `running` / `paused` / `ready` / `merged` / `failed` 對應 user 看得懂的中文回報
+   - `paused` 多半要 user 介入(failed_transient = 暫時錯誤可繼續;failed_iter_limit = critic 連 N 輪沒過,要 user 改 ticket)
 
-### Top 跨 ref 共識(三家都做)
-- **每個 attempt / session / run 一個 git worktree + branch + 隔離 cwd**
-- **Workspace cwd 與路徑必須 sanitize、有 invariant 防 traversal**
-- **Multi-agent CLI 走 subprocess + stdio**,不是 SDK / API
-- **Reconciliation > Durable scheduler state**(state 對得上 source of truth 比保存 in-flight context 重要)
+4. **「合併」**
+   - `vbpl pipeline merge <id>` — backend 先試 `git merge --no-ff`,90% 直接成功
+   - response `mode: "mechanical"` = 純 git 成功,沒燒 token
+   - response `mode: "ai"` = 撞衝突,AI 接手解,需 1-3 分鐘
+   - 失敗 reason `working_tree_dirty` → 告訴 user「main repo 工作區有未 commit 改動,先 commit 或 stash」
 
-### 加新 ref 流程
-- 命名 `refs/{產品名}-{YYYY-MM-DD}.md`
-- 結構:§0 狀態警告 / §1 一句話定位+核心差異 / §2 借鏡點 / §3 不抄方向 / §4 Top 3 / §5 待解 / Appendix 原始萃取
-- 在本段加索引條目,描述「對方主路線一句話 + 重點借鏡 bullet」
+5. **「看這 pipeline 花了多少」**
+   - `vbpl pipeline log <id> --json`,加總 `costUsd` 欄位
 
-## 設計信條(從 spec 蒸餾,實作時別丟)
+## 不要擅自做的事
 
-1. **單一定義源** — Ticket / Pipeline / SKILL 只在 YAML,SQLite 是執行狀態的快取
-2. **Branch 是並行邊界** — 不靠 worktree、不靠 lock,靠 git branch 隔離
-3. **人工 approve SKILL** — AI 永遠不直接寫 SKILL.md,只能 stage 候選
-4. **跨 pipeline 不直傳 context** — 一律走 SKILL 中介
-5. **Critic fail 不等於 ticket fail** — Iterative 會重試,Pipeline-step 走 `on_fail` action
-6. **Exclusive lock 永遠優先於並行** — Deploy/DB 不管在哪 branch 都鎖
-7. **無 `max_iter` 預設** — 用 stall detection 替代次數上限
+- **不要自動 retry failed pipeline / ticket** — 失敗有原因(衝突 / critic 不認可 / token 超限),先問 user
+- **不要 `merge` 撞衝突就 cancel** — backend 已自動切 AI 解衝突,讓它跑;真要砍 user 自己會說
+- **不要改 user 沒拜託的 config**(`vbpl config set`) — 動 model / effort 影響 cost
+- **不要碰 `~/.vibe-pipeline/state.json` / pipeline.json 手** — 走 vbpl 指令,後端有 atomic write / race guard
+- **看到 `merge_blocked` notif** — 通常 user 工作區髒 / git_error,reporter 告知不主動解
+- **`pipeline run` 不要塞給 backend 沒起的 user** — 先 health check,給明確提示「需 backend up」
 
-## 開發環境 / 子 SKILL 對應
+## 出錯訊息對照
 
-→ 都在 root [`CLAUDE.md`](../../../CLAUDE.md)。本 SKILL 不重複。
+| Error code | 意思 | 怎麼回 user |
+|---|---|---|
+| `NO_BACKEND` | backend server 沒起 | 「先跑 `bun run server`」 |
+| `NO_PROJECT` | resolveProject 找不到 | 「--project <hash> 指定 / 或先 `vbpl project add <path>`」 |
+| `NOT_INITIALIZED` | project 沒 `.vibe-pipeline/` | 「跑 vbpl project add,首次進去 web UI 點自動初始化」 |
+| `STATE_GUARD` | operation 不允許在當前 state | 看 state(running 要先 pause / merged 不准 run) |
+| `working_tree_dirty` | merge 時 main repo 髒 | 「先 commit / stash 再 merge」 |
+
+## 完整參考
+
+- **README**:https://github.com/eric14304/vibe-pipeline — 安裝 / 完整功能 / Tailscale 遠端
+- **CLAUDE.md**(repo 內):repo 結構 / 雷區 / 設計信條 — 改 vibe-pipeline 自己的 code 才需要看
+- **子 SKILL**(repo 內 `.claude/skills/`):改 frontend / backend / cli / e2e code 才看
+- **`vbpl --help`** 看每個 verb 的 flag,新功能比這份手冊新
+
+寫指令前不確定 flag → `vbpl <noun> <verb> --help` 或 `--json` 試。本檔過時時 CLI 自己的 help 是 source of truth。
