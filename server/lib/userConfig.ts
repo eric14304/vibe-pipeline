@@ -85,15 +85,11 @@ function coerceConfig(raw: unknown): UserConfig {
   for (const tc of TASK_CLASSES) {
     out[tc] = coerceTaskModel(rawDefaults[tc], fallback.defaults[tc]);
   }
-  // executor/critic/merge.provider 必須跟 runner.provider 對齊;不齊 → snap 到 runner.provider 預設
-  const runnerProvider = out.runner.provider;
+  // executor/critic/merge 整組對稱 runner;不齊 → snap 整套(provider + model + effort)= runner
+  const runnerCfg = out.runner;
   for (const tc of ["executor", "critic", "merge"] as const) {
-    if (out[tc].provider !== runnerProvider) {
-      out[tc] = {
-        provider: runnerProvider,
-        model: defaultModelForProvider(runnerProvider),
-        effort: defaultEffortForProvider(runnerProvider),
-      };
+    if (out[tc].provider !== runnerCfg.provider) {
+      out[tc] = { ...runnerCfg };
     }
   }
   return { defaults: out };
@@ -200,22 +196,22 @@ export async function patchUserConfig(body: unknown): Promise<UserConfig> {
       );
     }
   }
-  // runner.provider 換了 → 自動把 executor/critic/merge.provider 跟著換;
-  // 該 tc 的 model/effort 若 incoming 沒同步指定且跟新 provider 不相容 → 用 default 補
+  // runner.provider 換了 → executor/critic/merge 整組對稱 runner(provider + model + effort 全跟);
+  // 例外:incoming 同次明確指定該 tc 的 model/effort,則尊重 incoming(且必須跟新 provider 相容,否則 fallback runner 值)
   if (cur.defaults.runner.provider !== finalRunnerProvider) {
+    const runnerNext = nextDefaults.runner;
     for (const tc of ["executor", "critic", "merge"] as const) {
       const incomingTc = (incomingDefaults[tc] && typeof incomingDefaults[tc] === "object"
         ? (incomingDefaults[tc] as Record<string, unknown>)
         : {}) as Record<string, unknown>;
-      const cur_n = nextDefaults[tc];
-      let provider: Provider = finalRunnerProvider;
-      let model: ModelName = cur_n.model;
-      let effort: Effort = cur_n.effort;
-      if (!("model" in incomingTc) || !isValidModel(provider, model)) {
-        model = defaultModelForProvider(provider);
+      const provider: Provider = runnerNext.provider;
+      let model: ModelName = runnerNext.model;
+      let effort: Effort = runnerNext.effort;
+      if ("model" in incomingTc && isValidModel(provider, nextDefaults[tc].model)) {
+        model = nextDefaults[tc].model;
       }
-      if (!("effort" in incomingTc) || !isValidEffort(provider, effort)) {
-        effort = defaultEffortForProvider(provider);
+      if ("effort" in incomingTc && isValidEffort(provider, nextDefaults[tc].effort)) {
+        effort = nextDefaults[tc].effort;
       }
       nextDefaults[tc] = { provider, model, effort };
     }
