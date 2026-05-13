@@ -449,6 +449,25 @@
   overflow: auto;
 }
 
+/* iter 輪次摘要行 — 第 N 輪 · M 次審核 */
+.tdrw-iter-summary {
+  font-size: 12px;
+  color: var(--fg-mute);
+}
+
+/* IterLimitField wrapper span */
+.tdrw-iter-limit-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* critic feedback 空值 placeholder */
+.tdrw-feedback-empty {
+  color: var(--fg-faint);
+  font-style: italic;
+}
+
 /* Iter rounds */
 .tdrw-iter-rounds {
   display: flex;
