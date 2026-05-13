@@ -144,55 +144,14 @@ flowchart TB
 
 ## CLI
 
-### Build binary
-
+打包:
 ```bash
 bun run cli:build           # Windows x64 → dist-cli/vbpl.exe
 bun run cli:build:mac       # macOS arm64 → dist-cli/vbpl-mac
 bun run cli:build:linux     # Linux x64   → dist-cli/vbpl-linux
 ```
 
-binary ~121 MB(bundle 整個 Bun runtime)。
-
-### Install to PATH(per OS)
-
-**macOS / Linux**(sudo 走 `/usr/local/bin`,預設已在 PATH):
-```bash
-sudo cp dist-cli/vbpl-mac /usr/local/bin/vbpl       # 或 vbpl-linux
-sudo chmod +x /usr/local/bin/vbpl
-vbpl --version                                      # 驗
-```
-
-不想 sudo 走 `~/bin`:
-```bash
-mkdir -p ~/bin && cp dist-cli/vbpl-mac ~/bin/vbpl
-chmod +x ~/bin/vbpl
-echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zshrc    # bash 用 .bashrc
-source ~/.zshrc
-```
-
-**Windows PowerShell**:
-```powershell
-New-Item -ItemType Directory -Force "$HOME\bin"
-Copy-Item dist-cli\vbpl.exe "$HOME\bin\vbpl.exe"
-$user = [Environment]::GetEnvironmentVariable("Path", "User")
-[Environment]::SetEnvironmentVariable("Path", "$HOME\bin;$user", "User")
-# 開新 terminal 驗:vbpl --version
-```
-
-**Windows Git Bash**(PATH 繼承 Windows user PATH,設一次兩邊都吃):
-```bash
-mkdir -p ~/bin && cp dist-cli/vbpl.exe ~/bin/
-echo 'export PATH="$HOME/bin:$PATH"' >> ~/.bashrc
-source ~/.bashrc
-```
-
-### Trouble
-
-- **`command not found` 在新 terminal**:PATH 沒生效 → 開新 terminal session 或 source rc
-- **Windows `vbpl` 找不到但 `vbpl.exe` 找得到**:PowerShell PATHEXT 沒含,顯式打 `vbpl.exe` 或加 `.EXE` 到 PATHEXT
-- **macOS Gatekeeper 警告**(下載 binary 而非自己 build):`xattr -d com.apple.quarantine ~/bin/vbpl`
-- **多版本衝突**:`which vbpl` 看實際路徑,清舊版
+裝 PATH:`vbpl --version` 驗即可。**完整 install per-OS + trouble 看 [`docs/install.md`](docs/install.md)**。
 
 ### 常用指令
 

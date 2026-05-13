@@ -134,52 +134,7 @@ bun run cli:build:mac     # macOS arm64    → dist-cli/vbpl-mac
 bun run cli:build:linux   # Linux x64      → dist-cli/vbpl-linux
 ```
 
-`dist-cli/` 已 gitignore。要散發給其他人:跑 build → 把 binary 複製到對方 PATH 上,然後**確認 PATH 有那個資料夾**(關鍵且常被忽略)。
-
-### Install to PATH(per OS)
-
-**macOS / Linux**:
-```bash
-mkdir -p ~/bin
-cp dist-cli/vbpl-mac ~/bin/vbpl   # 或 vbpl-linux,複製時改名 vbpl
-chmod +x ~/bin/vbpl
-# 加進 PATH(.zshrc / .bashrc 看 shell;通常 macOS 用 zshrc)
-echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zshrc
-source ~/.zshrc
-which vbpl   # 驗:/Users/<u>/bin/vbpl
-```
-
-`/usr/local/bin/`(預設已在 PATH)是另一選:`sudo cp dist-cli/vbpl-mac /usr/local/bin/vbpl` 一行搞定,免改 shell rc。
-
-**Windows(PowerShell,推薦)**:
-```powershell
-New-Item -ItemType Directory -Force "$HOME\bin"
-Copy-Item dist-cli\vbpl.exe "$HOME\bin\vbpl.exe"
-# 加進 user PATH(永久,不影響 system)
-$user = [Environment]::GetEnvironmentVariable("Path", "User")
-[Environment]::SetEnvironmentVariable("Path", "$HOME\bin;$user", "User")
-# 開新 terminal 驗:where.exe vbpl
-```
-
-**Windows(Git Bash)**:
-```bash
-mkdir -p ~/bin
-cp dist-cli/vbpl.exe ~/bin/
-echo 'export PATH="$HOME/bin:$PATH"' >> ~/.bashrc
-source ~/.bashrc
-which vbpl   # 驗:/c/Users/<u>/bin/vbpl
-```
-
-Git Bash 的 `~/bin` 對應 Windows `C:\Users\<u>\bin\`;若 user 想 PowerShell 跟 Git Bash 都用同個 binary,只要設一次 Windows user PATH 兩邊都吃(Git Bash 繼承 Windows PATH)。
-
-**驗證 install**:`vbpl --version` 或 `vbpl project list`。若回 command not found → PATH 沒生效,要開新 terminal session 或 source rc。
-
-### Trouble
-
-- **`vbpl: command not found` 在新 terminal**:user 設了 PATH 但沒重開 shell。叫他 source rc 或開新 terminal
-- **Windows `vbpl` 找不到但 `vbpl.exe` 找得到**:PowerShell 預設要 `.exe`,加 `[Environment]` PATHEXT 或叫 user 顯式打 `vbpl.exe`
-- **macOS quarantine**(下載 binary 而非自己 build)`xattr -d com.apple.quarantine ~/bin/vbpl`
-- **多版本衝突**:`which vbpl` 看實際路徑,可能舊 binary 在 `/usr/local/bin/` 蓋過 `~/bin/`
+`dist-cli/` 已 gitignore。完整 install per-OS + trouble + 散發流程看 [`docs/install.md`](../../../docs/install.md)(single source of truth)。
 
 注意:binary 大(~121 MB)因為 bundle 整個 Bun runtime。若要更小看 `--target=bun-windows-x64-baseline` 等 baseline target。
 
