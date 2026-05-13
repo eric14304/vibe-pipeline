@@ -294,19 +294,38 @@
     min-width: 0;
   }
 
-  /* Mobile:label 自己一行,selects 1fr 2fr 1fr 共一行 */
-  .task-row-head {
-    grid-template-columns: 1fr;
+  /* Mobile:label + hint 同一行(inline),selects 跨欄落第二行
+     用 .task-row 2x2 grid 接管 layout,.task-row-head 設 display:contents 把
+     label / selects 攤到外層 grid,跟 .task-row-hint 一起在 .task-row 內排版 */
+  .task-row {
+    display: grid !important;
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+      "label hint"
+      "selects selects";
+    align-items: baseline;
+    column-gap: 8px;
     row-gap: 6px;
   }
 
+  .task-row-head {
+    display: contents;
+  }
+
   .task-row-label {
+    grid-area: label;
     white-space: normal;
   }
 
+  .task-row-hint {
+    grid-area: hint;
+  }
+
   .task-row-selects {
+    grid-area: selects;
     grid-template-columns: 1fr 2fr 1fr;
     gap: 6px;
+    width: 100%;
   }
 
   .task-row-selects > select {
