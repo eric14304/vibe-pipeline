@@ -65,7 +65,14 @@ export function useQA(projectHash: string | null) {
     if (!polledDraft) return;
     const newLast = polledDraft.turns[polledDraft.turns.length - 1];
     if (newLast && newLast.role === "ai") {
-      setState((s) => (s.draft?.draftId === polledDraft.draftId ? { ...s, draft: polledDraft } : s));
+      setState((s) => {
+        if (s.draft?.draftId !== polledDraft.draftId) return s;
+        // race guard:sendTurn optimistic 加 user turn 後,useApi 立刻 fetch disk
+        // (disk 仍是 backend turnQA 處理前的舊版,lastRole=ai)→ 若沒擋會蓋掉 optimistic user turn。
+        // 只在 polled.turns 嚴格比 local 多時才同步;一樣長度視為 stale 不蓋
+        if (polledDraft.turns.length <= (s.draft?.turns.length ?? 0)) return s;
+        return { ...s, draft: polledDraft };
+      });
     }
   }, [polledDraft]);
 
