@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
-import { mkdirSync } from "node:fs";
+import { createWriteStream, mkdirSync, type WriteStream } from "node:fs";
+import { open as openFile } from "node:fs/promises";
 import * as pipelineDir from "../pipelineDir";
 import * as projectStore from "../projectStore";
 import * as worktree from "../git/worktree";
@@ -10,6 +11,8 @@ import * as runLog from "./runLog";
 import * as testMode from "../testMode";
 import { buildRunnerBehaviorPrompt } from "./runnerPrompt";
 import { loadUserConfig, getTaskConfigWithAdapter } from "../userConfig";
+
+const LOG_CODE_WIDTH = 10;
 
 type RunningProcess = {
   pipelineId: string;
@@ -22,6 +25,24 @@ type RunningProcess = {
 };
 
 const running = new Map<string, RunningProcess>(); // key: <projectHash>:<pipelineId>
+
+function runnerLogHeader(pipelineId: string, state: "active" | "exited", code: number | null = null): string {
+  const codeText = code == null ? "".padEnd(LOG_CODE_WIDTH) : String(code).padEnd(LOG_CODE_WIDTH);
+  return `[runner ${pipelineId}] ${state} code=${codeText}\n`;
+}
+
+function endStream(stream: WriteStream): Promise<void> {
+  return new Promise((resolve) => stream.end(resolve));
+}
+
+async function patchRunnerLogExitCode(logFile: string, pipelineId: string, code: number | null): Promise<void> {
+  const file = await openFile(logFile, "r+");
+  try {
+    await file.write(runnerLogHeader(pipelineId, "exited", code), 0, "utf8");
+  } finally {
+    await file.close();
+  }
+}
 
 // 暴露給 syncJob.ts 註冊 / 卸載 sync 的 running entry。
 // 共用 running map 讓 isRunning() / runningCount() / max_parallel 自動把 sync 算成 busy。
@@ -489,26 +510,37 @@ async function spawnDirect(opts: {
   const logsDir = pipelineDir.ensureRuntime(projectPath, "logs");
   mkdirSync(logsDir, { recursive: true });
   const logFile = join(logsDir, `${pipelineId}-${Date.now()}.log`);
+  await Bun.write(logFile, runnerLogHeader(pipelineId, "active") + "--- stdout ---\n");
 
   // 不 await — let it run async,handler 監看 exit
   (async () => {
     let stdoutText = "";
     let stderrText = "";
+    let logStream: WriteStream | null = null;
     try {
-      [stdoutText, stderrText] = await Promise.all([
-        new Response(proc.stdout).text(),
-        new Response(proc.stderr).text(),
-      ]);
-      await proc.exited;
+      logStream = createWriteStream(logFile, { flags: "a" });
+      const stdoutPromise = (async () => {
+        if (!proc.stdout) return;
+        for await (const chunk of proc.stdout as ReadableStream<Uint8Array>) {
+          const s = new TextDecoder().decode(chunk);
+          stdoutText += s;
+          logStream?.write(s);
+        }
+      })();
+      const stderrPromise = (async () => {
+        if (!proc.stderr) return;
+        for await (const chunk of proc.stderr as ReadableStream<Uint8Array>) {
+          stderrText += new TextDecoder().decode(chunk);
+        }
+      })();
+      await Promise.all([stdoutPromise, stderrPromise]);
+      const codeFromExited = await proc.exited;
       const code = proc.exitCode;
-      const log = [
-        `[runner ${pipelineId}] exited code=${code}`,
-        `--- stdout ---`,
-        stdoutText,
-        `--- stderr ---`,
-        stderrText,
-      ].join("\n");
-      await Bun.write(logFile, log);
+      logStream.write("\n--- stderr ---\n");
+      logStream.write(stderrText);
+      await endStream(logStream);
+      logStream = null;
+      await patchRunnerLogExitCode(logFile, pipelineId, code ?? codeFromExited);
       console.log(`[runner ${pipelineId}] exited code=${code}, log → ${logFile}`);
 
       // Emit notif based on final pipeline state
@@ -572,8 +604,16 @@ async function spawnDirect(opts: {
       }
     } catch (e) {
       console.error(`[runner ${pipelineId}] error:`, e);
+      if (logStream) {
+        try {
+          logStream.write("\n--- stderr ---\n");
+          logStream.write(stderrText);
+          await endStream(logStream);
+          logStream = null;
+        } catch {}
+      }
       try {
-        await Bun.write(logFile, `[runner ${pipelineId}] error: ${String(e)}\nstdout:\n${stdoutText}\nstderr:\n${stderrText}`);
+        await Bun.write(logFile, `${runnerLogHeader(pipelineId, "active")}--- stdout ---\n${stdoutText}\n--- stderr ---\n${stderrText}\n[runner ${pipelineId}] error: ${String(e)}`);
       } catch {}
     } finally {
       running.delete(k);

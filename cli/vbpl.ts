@@ -14,7 +14,7 @@ const USAGE = `vbpl — vibe-pipeline CLI
 Usage:
   vbpl project  list|show|add|remove          [--project <hash>] [--project-path <path>]
   vbpl pipeline list|create|show|delete       [--project <hash>] [--project-path <path>]
-  vbpl pipeline run|stop|status|log <id>      [--project <hash>]
+  vbpl pipeline run|stop|status|log <id>      [--project <hash>] [--follow|-f]
   vbpl pipeline merge <id>                    [--project <hash>]   AI merge → base
   vbpl pipeline sync <id> [--ai|--cancel|--dismiss]                base → worktree
   vbpl ticket   list|show|add|update|remove   --pipeline <id>    [--project <hash>]
