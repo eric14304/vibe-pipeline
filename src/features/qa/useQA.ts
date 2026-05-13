@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import * as qaApi from "../../api/qa";
 import type { Draft, TicketSpec } from "../../api/qa";
+import { useApi } from "../../hooks/useApi";
 
 export type QAState = {
   open: boolean;
@@ -41,36 +42,32 @@ export function useQA(projectHash: string | null) {
 
   // 接續 QA 時:若 draft 最後一條是 user message(代表 AI 還在 backend 跑或沒回完),
   // poll getDraft 等 AI 寫進 disk;同時讓 UI 顯「AI 思考中」(由 derived isWaitingForAI 控)。
-  // 3 分鐘 timeout 安全網,避免 AI 失敗後永遠 spin。
+  // QA drawer 開關走 mount/unmount,不需要 visibilitychange / focus refetch。
   const draftId = state.draft?.draftId;
   const turnsLen = state.draft?.turns.length ?? 0;
   const lastRole =
     turnsLen > 0 ? state.draft?.turns[turnsLen - 1]?.role : undefined;
-  // biome-ignore lint/correctness/useExhaustiveDependencies: 用 derived deps 避免 state.draft ref 變動每次 re-poll
+  const shouldPoll = !!projectHash && !!draftId && lastRole === "user";
+  const { data: polledDraft } = useApi<Draft | null>(
+    async () => {
+      if (!shouldPoll || !projectHash || !draftId) return null;
+      return await qaApi.getDraft(projectHash, draftId);
+    },
+    {
+      intervalMs: 3000,
+      gate: shouldPoll,
+      refetchOnVisible: false,
+      refetchOnFocus: false,
+      deps: [projectHash, draftId, lastRole, turnsLen],
+    }
+  );
   useEffect(() => {
-    if (!projectHash || !draftId || lastRole !== "user") return;
-    let cancelled = false;
-    const poll = async () => {
-      try {
-        const d = await qaApi.getDraft(projectHash, draftId);
-        if (cancelled) return;
-        const newLast = d.turns[d.turns.length - 1];
-        if (newLast && newLast.role === "ai") {
-          setState((s) => (s.draft?.draftId === d.draftId ? { ...s, draft: d } : s));
-        }
-      } catch {}
-    };
-    const interval = setInterval(poll, 3000);
-    const timeout = setTimeout(() => {
-      cancelled = true;
-      clearInterval(interval);
-    }, 180_000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-      clearTimeout(timeout);
-    };
-  }, [projectHash, draftId, lastRole, turnsLen]);
+    if (!polledDraft) return;
+    const newLast = polledDraft.turns[polledDraft.turns.length - 1];
+    if (newLast && newLast.role === "ai") {
+      setState((s) => (s.draft?.draftId === polledDraft.draftId ? { ...s, draft: polledDraft } : s));
+    }
+  }, [polledDraft]);
 
   const draftFor = useCallback(
     (pipelineId: string) => drafts.find((d) => d.pipelineId === pipelineId) ?? null,
