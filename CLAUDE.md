@@ -17,7 +17,6 @@
 **Phase 6 候選**(尚未動工)
 - **iOS PWA push 實測** — iOS 16.4+ 已支援 Web Push 但需先「加入主畫面」,目前只在 Android 驗過
 - **`vbpl pipeline log --follow`** — log streaming(像 tail -f),debug pipeline 卡時最有用
-- **Self-dogfood guard(警告層,worktree isolation 的輕量替代)** — `/run` `/merge` route 偵測「target repo === backend cwd」+「`process.execArgv` 含 `--watch`」兩條件交集成立 → response 加 `warnings: string[]` envelope;Web UI 跳 toast / modal,CLI stderr 印警告。設計取捨候選:(A)Backend 拒啟動回 `needs_confirmation`,CLI exit 1 要 `--force-self-dogfood` re-run / Web UI 跳 modal 強制 ack(real mitigation,推薦);(B)Backend 仍啟動只回 warnings(soft warn,零 friction 但長期變雜訊)。工程量 ~35 行(backend detect + envelope + CLI api.ts post() 統一處理 + Web UI toast)。dismiss 持久化用 localStorage / `~/.vibe-pipeline/state.json`「30 天內不再提示」
 
 ## Repo 結構(物理路徑 single source of truth)
 
