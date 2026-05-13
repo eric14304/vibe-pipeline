@@ -70,6 +70,7 @@ function TaskModelRow({
   model,
   effort,
   disabled,
+  showProvider = false,
   onChange,
 }: {
   label: string;
@@ -78,6 +79,7 @@ function TaskModelRow({
   model: ModelName;
   effort: Effort;
   disabled?: boolean;
+  showProvider?: boolean;
   onChange: (patch: { provider?: Provider; model?: ModelName; effort?: Effort }) => void;
 }) {
   // .task-row 用 display:contents(desktop)讓 grid 認 4 個內容子元素;
@@ -100,18 +102,22 @@ function TaskModelRow({
         )}
       </span>
       <div className="task-row-selects">
-        <select
-          value={provider}
-          disabled={disabled}
-          onChange={(e) => onChange({ provider: e.target.value as Provider })}
-          style={PROVIDER_SELECT_STYLE}
-        >
-          {PROVIDERS.map((p) => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
+        {showProvider ? (
+          <select
+            value={provider}
+            disabled={disabled}
+            onChange={(e) => onChange({ provider: e.target.value as Provider })}
+            style={PROVIDER_SELECT_STYLE}
+          >
+            {PROVIDERS.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <span style={{ width: PROVIDER_SELECT_STYLE.width }} />
+        )}
         <select
           value={model}
           disabled={disabled}
@@ -896,8 +902,9 @@ export function SettingsPopover({
 
       {/* ─── AI 任務 tab ─── */}
       {activeTab === "ai" && <>
-      <div style={{ fontSize: 11, color: "var(--fg-faint)", marginBottom: 10 }}>
-        跨 project — provider / model
+      <div style={{ fontSize: 11, color: "var(--fg-faint)", marginBottom: 10, lineHeight: 1.5 }}>
+        <div>跨 project — provider / model</div>
+        <div>同 provider 最快最省 — claude 主走 Task tool / codex 主走 spawn_agent,皆 in-process + prompt cache 共享</div>
       </div>
       {userCfg ? (
         <div
@@ -920,6 +927,7 @@ export function SettingsPopover({
               provider={userCfg.defaults[tc].provider}
               model={userCfg.defaults[tc].model}
               effort={userCfg.defaults[tc].effort}
+              showProvider={tc === "runner"}
               onChange={(patch) => updateTask(tc, patch)}
             />
           ))}

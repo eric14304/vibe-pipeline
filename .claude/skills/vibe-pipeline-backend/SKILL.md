@@ -64,12 +64,12 @@ description: vibe-pipeline 後端 / 執行層的職責邊界、約定與 invaria
 
 ### Runner(`server/lib/runner/`)
 
-- 主 agent 永遠是 claude(`runnerPrompt.ts` 全是 claude-isms,不支援 codex 主 runner)
+- 主 agent 支援 claude 與 codex(provider 鏈一致化:主 = X → sub 也用 X)
 - **`--dangerously-skip-permissions` 永遠帶** — 跨 provider sub-agent 必要(codex sub-agent 內部 Bash 在 auto 模式會被擋)
-- 主 agent 工具白名單:Edit/Write 改 pipeline.json + worktree 外 tmp(commit message)+ Bash read-only + git add/commit;**source code 改動 100% 透過 Task 派 sub-agent**
+- 主 agent 工具白名單:Edit/Write 改 pipeline.json + worktree 外 tmp(commit message)+ Bash read-only + git add/commit;**source code 改動 100% 透過 sub-agent 派發**
 - Sub-agent 拆兩個 TaskClass:`executor`(改 code,高 capability)+ `critic`(讀 diff 判 PASS/FAIL,可便宜 model)
 - ticket commit 用 `git commit -F <tmpfile>` 多段 message,不用 `-m "...\n..."` 字面 \n
-- provider-aware dispatch:claude → Task tool;codex → Bash 直呼 `codex exec --json`(避開 plugin sandbox)
+- provider-aware dispatch:claude → Task tool;codex → 主 agent 用 `spawn_agent` → `wait_agent` → `close_agent` 三步 atomic in-process 序列(取代舊 Bash `codex exec` subprocess);`codexAdapter.spawnRunner` 自動加 `-c features.multi_agent=true`;工具限制走 sandbox 模式分流(executor / merge = `workspace-write`,critic = `read-only`)
 - `recoverStale` server boot 掃 stale `running`/`stopping` → paused;watchdog 抓死 PID
 
 ### Merge / Sync 二段式(`pipelineMerge.ts` + `syncJob.ts`)
