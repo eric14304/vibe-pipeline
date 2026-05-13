@@ -71,7 +71,6 @@ function TaskModelRow({
   effort,
   disabled,
   showProvider = false,
-  indented = false,
   onChange,
 }: {
   label: string;
@@ -81,12 +80,10 @@ function TaskModelRow({
   effort: Effort;
   disabled?: boolean;
   showProvider?: boolean;
-  indented?: boolean;
   onChange: (patch: { provider?: Provider; model?: ModelName; effort?: Effort }) => void;
 }) {
   // .task-row 用 display:contents(desktop)讓 grid 認 4 個內容子元素;
   // mobile breakpoint 內改 display:flex column 變成 card 卡式排版。
-  // indented:executor/critic/merge 視覺上縮排,表達「跟隨 Main Agent」附屬關係
   return (
     <div className="task-row">
       <span
@@ -97,7 +94,6 @@ function TaskModelRow({
           alignSelf: "center",
           whiteSpace: "nowrap",
           lineHeight: 1.25,
-          paddingLeft: indented ? 20 : 0,
         }}
       >
         <span style={{ fontSize: 12, color: "var(--fg)" }}>{label}</span>
@@ -910,19 +906,23 @@ export function SettingsPopover({
         跨 project — provider / model
       </div>
       {userCfg ? (
+        <>
+        {/* Group 1:獨立 agent(各自挑 provider) */}
         <div
           className="settings-popover-task-grid"
           style={{
             display: "grid",
-            // 第一欄 auto 撐到最長 label;model 欄要容 codex 較長名稱,給 max-content
             gridTemplateColumns: "auto max-content max-content max-content",
             columnGap: 8,
             rowGap: 8,
-            marginBottom: 12,
+            padding: 10,
+            background: "var(--panel)",
+            borderRadius: 8,
+            marginBottom: 8,
             alignItems: "center",
           }}
         >
-          {TASK_CLASSES.map((tc) => (
+          {(["qa", "split", "runner"] as const).map((tc) => (
             <TaskModelRow
               key={tc}
               label={TASK_CLASS_LABELS[tc]}
@@ -930,12 +930,47 @@ export function SettingsPopover({
               provider={userCfg.defaults[tc].provider}
               model={userCfg.defaults[tc].model}
               effort={userCfg.defaults[tc].effort}
-              showProvider={!["executor", "critic", "merge"].includes(tc)}
-              indented={["executor", "critic", "merge"].includes(tc)}
+              showProvider
               onChange={(patch) => updateTask(tc, patch)}
             />
           ))}
         </div>
+        {/* Group 2:跟主 agent(只挑 model / effort,provider 跟 runner) */}
+        <div
+          style={{
+            padding: 10,
+            background: "var(--panel-2)",
+            borderRadius: 8,
+            marginBottom: 12,
+          }}
+        >
+          <div style={{ fontSize: 11, color: "var(--fg-faint)", marginBottom: 8 }}>
+            ↑ 以下跟主 agent(provider 自動同步)
+          </div>
+          <div
+            className="settings-popover-task-grid"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "auto max-content max-content max-content",
+              columnGap: 8,
+              rowGap: 8,
+              alignItems: "center",
+            }}
+          >
+            {(["executor", "critic", "merge"] as const).map((tc) => (
+              <TaskModelRow
+                key={tc}
+                label={TASK_CLASS_LABELS[tc]}
+                hint={TASK_CLASS_HINTS[tc]}
+                provider={userCfg.defaults[tc].provider}
+                model={userCfg.defaults[tc].model}
+                effort={userCfg.defaults[tc].effort}
+                onChange={(patch) => updateTask(tc, patch)}
+              />
+            ))}
+          </div>
+        </div>
+        </>
       ) : (
         <div style={subhintStyle}>載入中…</div>
       )}
