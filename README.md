@@ -59,30 +59,9 @@ bun run cli:build:linux     # Linux x64
 
 ## 給 AI 安裝(讓你家的 AI 學會用 vbpl)
 
-主 SKILL source 在 `docs/SKILL.md`。把它複製進 user AI 的 skills 路徑,**任何 project 內**跟 AI 對話 AI 都能透過 SKILL 學會操作 vbpl(建 / 跑 / 看 / 合併 pipeline)。
+主 SKILL source 在 [`docs/SKILL.md`](docs/SKILL.md)。把它裝進 AI 的 skills 路徑(Claude Code → `~/.claude/skills/vibe-pipeline/SKILL.md`;codex → `~/.codex/skills/vibe-pipeline/SKILL.md`;其他平台看各自 docs)。AI 自己會 cp,你叫它「裝這個 SKILL」就行。
 
-**全域安裝**(所有 project 都可用):
-
-```bash
-# macOS / Linux:
-mkdir -p ~/.claude/skills/vibe-pipeline                            # Claude Code
-cp docs/SKILL.md ~/.claude/skills/vibe-pipeline/SKILL.md
-
-# 其他 AI 平台:cp 到對應 skills 路徑,e.g.
-# codex:  ~/.codex/skills/vibe-pipeline/SKILL.md
-
-# Windows PowerShell:
-New-Item -ItemType Directory -Force "$HOME\.claude\skills\vibe-pipeline"
-Copy-Item docs\SKILL.md "$HOME\.claude\skills\vibe-pipeline\SKILL.md"
-```
-
-**只在特定 project**(對某個工作 repo 限定):
-
-```bash
-cd /path/to/your-other-project
-mkdir -p .claude/skills/vibe-pipeline
-cp /path/to/vibe-pipeline/docs/SKILL.md .claude/skills/vibe-pipeline/SKILL.md
-```
+只想對某個 repo 限定,裝進 `<that-project>/.claude/skills/vibe-pipeline/SKILL.md`。
 
 驗證:在新 session 開 AI,問「我能用 vbpl 幹嘛?」AI 應該秒回 pipeline / ticket / executor / critic 心智 + 常用指令。
 
