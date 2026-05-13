@@ -47,7 +47,8 @@
 - **log/notif GC** 走 per-pipeline 10 / 全 project 500 上限,trigger 在 /run spawn 前
 - **Self-dogfood AI merge worktree isolation 不做** — 99% user(對別 project 用 VP)不會踩 `--watch` reload 殺 child 問題;只有 VP 改自己時要避免。研究紀錄見 [`docs/refs/merge-isolation-2026-05-11.md`](docs/refs/merge-isolation-2026-05-11.md);實作 ~150 行不划算
 - **Runner spawn `--setting-sources` 不砍** — 保留給 Task sub-agent 讀 user/project CLAUDE.md。砍掉省 ~13% cache 但 sub-agent 失去 context 繼承,得失不對稱
-- **Runner 主 agent 永遠是 claude(不支援 codex 主 runner)** — `runnerPrompt.ts` 全是 claude-isms(Task tool / subagent_type 規則),codex 跑會忽略 sub-agent 派發指令 iter 紀律破功。要 codex 主 runner 需 ~200-300 行 prompt 重寫成 provider-agnostic,投入產出不對稱。Phase 6 會從 UI 拿掉 codex runner 選項
+
+> 2026-05-13 update:原本「Runner 主 agent 永遠是 claude」被搬回 Phase 6 候選。理由:查 codex CLI 確認本體有 `spawn_agent` / `wait_agent` / `close_agent` 原語(需 `[features] multi_agent = true`),跟 claude Task tool 對等。若接起來,codex 主 + codex sub 可達到 claude-claude 同級 in-process 速度,「子跟隨主」原則才有性能依據。當前 runnerPrompt 全 claude-isms + Bash spawn codex sub 那條 fallback 設計也跟著要重寫。
 
 ---
 
