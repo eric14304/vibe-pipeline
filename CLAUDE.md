@@ -18,7 +18,6 @@
 - **Budget tracker UI** — backend `cost_limit_usd` 已強制執行 + 發 budget notif,UI 缺 dashboard 看「每天 / 每 pipeline / 每 task class burn 趨勢」
 - **iOS PWA push 實測** — iOS 16.4+ 已支援 Web Push 但需先「加入主畫面」,目前只在 Android 驗過
 - **背景 push 真實 pipeline 事件觸發** — `/api/push/test` 鎖屏可收;runner 真實 pipeline 完成事件 → push 還沒實機跑過(ticketWatcher 路徑已寫好,缺最後一哩驗證)
-- **Provider 鏈一致化(主跟 sub 同 provider)** — 設計原則「主 agent 是 X,sub-agent 跟著用 X」。claude 主 → Task tool(已落地);codex 主 → 接 codex CLI `spawn_agent` / `wait_agent`(需 `[features] multi_agent = true`)。要 ~200-300 行 prompt 重寫成 provider-agnostic + 派發機制從 Bash `codex exec` 改 `spawn_agent` tool。落地後 codex-codex 達 claude-claude 同級 in-process 速度
 - **CLI 細節** — shell completion / `vbpl pipeline log --follow` log streaming / CI release artifact 自動 build
 - **Transient retry 真正觸發測試** — 沒自然 fixture,需 fault injection;低優先,留 production 真踩到再補
 
