@@ -110,8 +110,7 @@ JSON 結構:
        - stage="critic" → executor 上次已跑完(worktree 有改動),**直接從 iter 步驟 3 派 critic**(不再花 token 重派 executor)。executorSummary 寫 "(resumed from pause; prior executor 工作保留在 worktree)" 即可,critic 仍照 acceptance 驗 worktree 現狀
        - stage="✓" 或 "done" → 此 round 已 PASS 但 ticket 沒收尾(罕見 race),直接視為 ticket done
      - paused step ticket → 重派 executor;worktree 上次的改動還在,executor 會接著做。
-   - status="failed_transient" → **立刻暫停 pipeline 結束 session**:標 pipeline.state = "paused",寫回 JSON,結束。**絕對不准跳過繼續跑下一張** — transient 意味暫時錯誤(rate limit / 配額 / 網路),立刻重試大概率同錯,user 要介入(等配額重置 / 切 provider / 改 config),由 user 點繼續(resume)再 retry。
-   - status="failed" / "failed_iter_limit" → 同上,立刻暫停 pipeline + 結束 session(這是被 critic 判死 / 達 iter 上限的 ticket,user 要決定要不要 reset + 改 spec 重跑)。
+   - status="failed" / "failed_iter_limit" / "failed_transient" → **立刻暫停 pipeline + 結束 session**(標 pipeline.state="paused" 寫回 JSON 後結束)。**絕對不准跳過繼續跑下一張**;user 要 reset / 改 spec / 等 quota / 切 provider 再點繼續。
    - status="running" → race condition(可能 crash 殘留),視同 paused 處理(走 paused 接續邏輯)。
 4. 掃完整個 tickets[] **沒遇到任何 draft/ready/paused 且也沒任何 failed_***、所有 ticket 都 done → 標 pipeline.state = "ready",寫回,結束(全部跑完,可以 merge)。
 5. 找到下一張 ticket → 標 ticket.status = "running",寫回 JSON
@@ -233,8 +232,7 @@ JSON 結構:
 
 ## 失敗處理
 
-- sub-agent transient error (rate limit / network) → retry 3 次 + 等 2s/4s/8s,都失敗才 ticket 標 "failed_transient" + pipeline 標 paused,結束
-- sub-agent judgment refuse → 標 ticket "failed",pipeline 標 paused,結束
+- sub-agent 失敗(judgment refuse / 主流程錯誤)→ 標 ticket "failed",pipeline state="paused",結束 session(transient API error 由 CLI 內部自動 retry,主 agent 通常看不到)
 
 ## 寫 pipeline.json
 
