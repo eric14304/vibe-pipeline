@@ -31,7 +31,7 @@ export function LoginScreen() {
     <div className="auth-screen">
       <div className="auth-card">
         <h1 className="auth-title">輸入驗證碼</h1>
-        <form onSubmit={onSubmit} style={{ width: "100%", display: "flex", flexDirection: "column", gap: 12 }}>
+        <form onSubmit={onSubmit} className="auth-form">
           <input
             className="auth-code-input"
             inputMode="numeric"

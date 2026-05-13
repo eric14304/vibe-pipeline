@@ -72,7 +72,7 @@ export function SetupScreen() {
         {data && (
           <div className="auth-qr" dangerouslySetInnerHTML={{ __html: data.qr_svg }} />
         )}
-        <form onSubmit={onSubmit} style={{ width: "100%", display: "flex", flexDirection: "column", gap: 12 }}>
+        <form onSubmit={onSubmit} className="auth-form">
           <input
             className="auth-code-input"
             inputMode="numeric"

@@ -316,43 +316,13 @@ export function BoardScreen({
   );
   // actionError 用右下角小 toast 浮現,別用 NotifBanner(那是 prototype 用,真 notif 走 inbox)
   const actionToast = actionError ? (
-    <div
-      role="alert"
-      className="action-toast"
-      style={{
-        position: "fixed",
-        right: 16,
-        bottom: 16,
-        zIndex: 2000,
-        maxWidth: 420,
-        padding: "10px 14px 10px 12px",
-        background: "var(--bg-elevated)",
-        border: "1px solid var(--failed)",
-        borderLeft: "3px solid var(--failed)",
-        borderRadius: 6,
-        boxShadow: "var(--shadow-lg)",
-        display: "flex",
-        alignItems: "flex-start",
-        gap: 10,
-        fontSize: 12.5,
-        lineHeight: 1.45,
-        color: "var(--fg)",
-      }}
-    >
-      <span style={{ flex: 1, wordBreak: "break-word" }}>{actionError}</span>
+    <div role="alert" className="action-toast">
+      <span className="action-toast-msg">{actionError}</span>
       <button type="button"
+        className="action-toast-close"
         onClick={() => setActionError(null)}
         title="關閉"
         aria-label="關閉"
-        style={{
-          background: "transparent",
-          border: 0,
-          padding: 0,
-          cursor: "pointer",
-          color: "var(--fg-faint)",
-          fontSize: 14,
-          lineHeight: 1,
-        }}
       >
         ×
       </button>

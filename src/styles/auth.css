@@ -86,3 +86,10 @@
   border-radius: 50%;
   animation: spin 0.9s linear infinite;
 }
+
+.auth-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}

@@ -1,0 +1,154 @@
+/* auth feature — SecurityTab + AddDeviceDialog */
+
+/* SecurityTab */
+.auth-bound-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 12.5px;
+}
+
+.auth-bound-check {
+  color: var(--done);
+  font-family: var(--font-mono);
+}
+
+.auth-bound-ts {
+  font-size: 11px;
+  color: var(--fg-faint);
+}
+
+.auth-section-label {
+  font-size: 11px;
+  color: var(--fg-mute);
+  font-weight: 600;
+  margin-top: 12px;
+  margin-bottom: 4px;
+}
+
+.auth-hint {
+  font-size: 11px;
+  color: var(--fg-faint);
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+.auth-session-list {
+  margin-bottom: 10px;
+}
+
+.auth-session-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+
+.auth-session-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.auth-session-ip {
+  color: var(--fg);
+  font-size: 12px;
+}
+
+.auth-session-ua {
+  color: var(--fg-faint);
+  font-size: 10.5px;
+  margin-top: 2px;
+  word-break: break-all;
+}
+
+.auth-session-last-active {
+  color: var(--fg-mute);
+  font-size: 10.5px;
+  margin-top: 2px;
+}
+
+.auth-revoke-btn {
+  font-size: 11px;
+  padding: 3px 8px;
+}
+
+.auth-error {
+  font-size: 11px;
+  color: var(--failed);
+  margin-bottom: 8px;
+  word-break: break-word;
+}
+
+.auth-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+/* AddDeviceDialog */
+.auth-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.auth-dialog-box {
+  background: var(--bg-elevated);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow-lg);
+  padding: 18px 20px 16px;
+  width: min(360px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+}
+
+.auth-dialog-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg);
+  margin-bottom: 10px;
+}
+
+.auth-dialog-desc {
+  font-size: 12px;
+  color: var(--fg-mute);
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+
+.auth-dialog-loading {
+  font-size: 12px;
+  color: var(--fg-faint);
+  text-align: center;
+  padding: 24px;
+}
+
+.auth-dialog-error {
+  font-size: 11px;
+  color: var(--failed);
+  margin-bottom: 10px;
+  word-break: break-word;
+}
+
+.auth-qr-wrapper {
+  display: flex;
+  justify-content: center;
+  padding: 12px;
+  background: #fff;
+  border-radius: var(--radius-sm);
+  margin-bottom: 14px;
+}
+
+.auth-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+}

@@ -264,10 +264,8 @@ export function TicketDrawer({
           {ticket.iter && (
             <Section label="迭代輪次">
               <div
-                className="mono"
+                className="mono tdrw-iter-summary"
                 style={{
-                  fontSize: 12,
-                  color: "var(--fg-mute)",
                   marginBottom: ticket.iter.rounds && ticket.iter.rounds.length > 0 ? 10 : 0,
                 }}
               >
@@ -330,7 +328,7 @@ function IterLimitField({
     if (n !== value) onChange?.(ticket.id, n);
   }
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+    <span className="tdrw-iter-limit-wrap">
       <span style={{ color: "var(--fg-mute)" }}>上限</span>
       <input
         type="number"
@@ -427,7 +425,7 @@ function IterRounds({ rounds }: { rounds: IterRound[] }) {
               {r.criticFeedback ? (
                 <div className="tdrw-text">{r.criticFeedback}</div>
               ) : (
-                <div className="tdrw-text" style={{ color: "var(--fg-faint)", fontStyle: "italic" }}>
+                <div className="tdrw-text tdrw-feedback-empty">
                   ({r.criticVerdict === "PASS" ? "通過,無補充意見" : "(無 feedback)"})
                 </div>
               )}

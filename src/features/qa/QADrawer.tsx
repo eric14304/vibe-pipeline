@@ -122,23 +122,11 @@ export function QADrawer({
           <>
             {/* spec 5/5 齊但 user 在 chat(被 override 或 backend complete=false)→ 顯示「回最終預覽」橫條 */}
             {specComplete && !showReview && (
-              <div
-                style={{
-                  padding: "8px 16px",
-                  background: "color-mix(in srgb, var(--accent, #d4956d) 12%, transparent)",
-                  borderBottom: "1px solid var(--line)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  fontSize: 12,
-                  color: "var(--fg-mute)",
-                }}
-              >
+              <div className="qadr-spec-ready-bar">
                 <span>spec 已備齊,聊完想送出時:</span>
                 <button
                   type="button"
-                  className="btn"
-                  style={{ marginLeft: "auto", padding: "4px 10px", fontSize: 12 }}
+                  className="btn qadr-spec-ready-bar-btn"
                   onClick={() => setViewOverride("review")}
                   disabled={busy}
                 >
@@ -519,14 +507,14 @@ function SpecReview({
               <li key={i}>
                 <span className="qadr-split-num mono">#{i + 1}</span>
                 <span>{s.title}</span>
-                <span className={"chip ticket-mode" + (s.mode === "iter" ? " is-iter" : "")} style={{ marginLeft: 6, fontSize: 10 }}>
+                <span className={"chip ticket-mode qadr-split-mode-chip" + (s.mode === "iter" ? " is-iter" : "")}>
                   {s.mode === "iter" ? "迭代" : "單次"}
                 </span>
               </li>
             ))}
           </ol>
           <div className="qadr-split-toggle">
-            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+            <label className="qadr-split-toggle-label">
               <input
                 type="checkbox"
                 checked={useSplit}
@@ -571,8 +559,8 @@ function SpecReview({
         />
       </Field>
       <Field label="模式">
-        <div className="qadr-choice-row" style={{ display: "flex", gap: 16, fontSize: 13 }}>
-          <label style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+        <div className="qadr-choice-row">
+          <label className="qadr-radio-label">
             <input
               type="radio"
               checked={edited.mode === "iter"}
@@ -580,7 +568,7 @@ function SpecReview({
             />
             迭代任務 (iter)
           </label>
-          <label style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <label className="qadr-radio-label">
             <input
               type="radio"
               checked={edited.mode === "step"}
@@ -607,8 +595,8 @@ function SpecReview({
             />
           </Field>
           <Field label="達上限後">
-            <div className="qadr-choice-row" style={{ display: "flex", gap: 16, fontSize: 13 }}>
-              <label style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <div className="qadr-choice-row">
+              <label className="qadr-radio-label">
                 <input
                   type="radio"
                   checked={(edited.iterStopAtLimit ?? true) === true}
@@ -616,7 +604,7 @@ function SpecReview({
                 />
                 整條 pipeline 暫停 (建議)
               </label>
-              <label style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <label className="qadr-radio-label">
                 <input
                   type="radio"
                   checked={(edited.iterStopAtLimit ?? true) === false}
@@ -647,7 +635,7 @@ function SpecReview({
         <button type="button" className="btn btn-primary" onClick={() => onFinalize(edited, useSplit ? splitInto : undefined)} disabled={busy}>
           {busy ? (
             <>
-              <span className="qadr-thinking-dots" style={{ display: "inline-flex", verticalAlign: "middle" }}>
+              <span className="qadr-thinking-dots">
                 <span /><span /><span />
               </span>{" "}
               送出中…
