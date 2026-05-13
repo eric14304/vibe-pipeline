@@ -1,5 +1,11 @@
 // 主 agent (orchestrator) 的 system prompt。
 // 重要:不能用 backtick (踩過兩次),所有 inline code 用引號或不框。
+//
+// 設計原則(2026-05 B2 抽象):
+// 主流程文字 provider-agnostic,只講「派 sub-agent 並等結果」這個 atomic 動作;
+// 真正的呼叫格式(Task tool / spawn_agent + wait_agent + close_agent / Bash exec)
+// 全部封裝在 dispatchInstructions() 內,依 cfg.provider 分流。
+// 新加 provider 只要補一段 dispatch 範例,主流程不動。
 
 import type { TaskModelConfig } from "../../../shared/types";
 
@@ -18,48 +24,68 @@ export function buildRunnerBehaviorPrompt(opts: {
     dispatchInstructions("執行AI(改 code)", executor, /* allowWrite */ true) +
     dispatchInstructions("審核AI(read-only 驗收)", critic, /* allowWrite */ false) +
     dispatchInstructions("merge ticket", merge, /* allowWrite */ true) +
-    '\n**注意**:審核AI prompt 內明確寫「只驗收、不改 code」;codex 審核派發已在 dispatch 範例用 -s read-only 避免誤改檔。\n';
+    '\n**注意**:審核AI prompt 內明確寫「只驗收、不改 code」;codex 審核 sub-agent sandbox=read-only 雙保險擋誤改檔。\n';
   return RUNNER_BEHAVIOR_PROMPT_HEAD + subAgentDirective + RUNNER_BEHAVIOR_PROMPT_TAIL;
 }
 
 // 派 sub-agent 的具體呼叫格式,因 provider 而異。
-// 設計原則:claude provider 走 Task tool(原生 sub-agent 機制);非 claude provider
-// 一律走 Bash 直接呼 CLI(避開 plugin 中間層的 sandbox / flag 限制,完全控制)。
-// 多 provider 擴展靠這層:加新 CLI 只要補一段 dispatch 範例,不靠 plugin 包裝。
+// 設計原則:
+//   claude provider → Task tool(原生 sub-agent 機制,in-process)
+//   codex  provider → spawn_agent + wait_agent + close_agent(codex 0.x multi_agent
+//                    feature flag 提供的 in-process sub-agent 原語;需 features.multi_agent=true)
+// 多 provider 擴展靠這層:加新 CLI 只要補一段 dispatch 範例。
 function dispatchInstructions(label: string, cfg: TaskModelConfig, allowWrite: boolean): string {
   if (cfg.provider === "claude") {
     return (
       '\n### ' + label + '(provider=claude)派法\n' +
-      '用 Task tool,參數:\n' +
+      '用 Task tool 派 sub-agent 並等結果(atomic;Task tool 同步回傳 sub-agent 最終訊息)。參數:\n' +
       '- subagent_type: "general-purpose"\n' +
       '- model: "' + cfg.model + '"(full ID,Task tool 也吃 alias opus/sonnet/haiku,但本 pipeline 統一傳 full ID)\n' +
-      '- description / prompt: 照常\n' +
-      '- effort:Task tool 不接 effort 參數,改在 prompt 開頭加一行「[Reasoning effort: ' + cfg.effort + ']」做 hint\n'
+      '- description: 5-10 字概述(例 "修 tsc errors")\n' +
+      '- prompt: 完整指令(ticket.prompt + acceptance + 上輪 feedback,如有)\n' +
+      '- effort:Task tool 不接 effort 參數,改在 prompt 開頭加一行「[Reasoning effort: ' + cfg.effort + ']」做 hint\n' +
+      '工具限制(寫進 prompt 約束 sub-agent,不靠外層 sandbox):\n' +
+      (allowWrite
+        ? '- 執行類:可改 source code(Edit/Write/Bash),**禁止改 pipeline.json**(那是 orchestrator 才能寫的)\n'
+        : '- 審核類:**只驗收、不改 code**;只能 Read / Bash read-only(git diff / git log / cat / tsc --noEmit)對照 acceptance 判 PASS/FAIL/PARTIAL\n')
     );
   }
-  // codex:Bash 直接呼 codex CLI(避免走 codex-rescue plugin 那層 workspace-write sandbox)
+  // codex provider:走 codex CLI 的 multi_agent feature(spawn_agent / wait_agent / close_agent)。
+  // 這三個 tool 由 codex runtime 提供 in-process sub-agent 原語,需在 spawn 時帶
+  // -c features.multi_agent=true 開啟(本 repo codexAdapter.spawnRunner 已加)。
   const sandbox = allowWrite ? "workspace-write" : "read-only";
   return (
     '\n### ' + label + '(provider=codex)派法\n' +
-    '**不走 Task tool**,直接 Bash 呼 codex CLI(避開 plugin 層 sandbox 限制 + 拿全 flag 控制)。指令格式:\n' +
-    '\n' +
-    '```\n' +
-    'codex exec --json --skip-git-repo-check --ignore-user-config --ignore-rules \\\n' +
-    '  -c mcp_servers={} \\\n' +
-    '  -c model="' + cfg.model + '" \\\n' +
-    '  -c model_reasoning_effort="' + cfg.effort + '" \\\n' +
-    '  -s ' + sandbox + ' \\\n' +
-    (allowWrite ? '  --dangerously-bypass-approvals-and-sandbox \\\n' : '') +
-    '  --ephemeral \\\n' +
-    '  - <<\'EOF\'\n' +
-    '<ticket.prompt + acceptance + 上輪 feedback,如有>\n' +
-    'EOF\n' +
-    '```\n\n' +
-    '**輸出解析**:`--json` 給 JSONL,每行一個 event。最終 agent_message 在 `{"type":"item.completed","item":{"type":"agent_message","text":"..."}}`,掃所有行取**最後一個** agent_message.text 當 sub-agent 回應。\n' +
+    '用 codex multi_agent in-process 原語派 sub-agent 並等結果。**三步 atomic 序列**:spawn_agent → wait_agent → close_agent。\n\n' +
+    '**步驟 1 — spawn_agent**:啟動 sub-agent。\n' +
+    'input:\n' +
+    '  {\n' +
+    '    "agent_type": "<TODO: 合法值請依當前 codex runtime 提供的列表;預期值類似 \\"executor\\" / \\"reviewer\\" / \\"general\\"。若 spawn 報 invalid agent_type,fallback 用 \\"general\\" 並把角色職責寫進 message 開頭>",\n' +
+    '    "message": "[Reasoning effort: ' + cfg.effort + ']\\n<ticket.prompt + acceptance + 上輪 feedback,如有>",\n' +
+    '    "fork_context": false,\n' +
+    '    "model": "' + cfg.model + '",\n' +
+    '    "reasoning_effort": "' + cfg.effort + '"\n' +
+    '  }\n' +
+    'output:{ "agent_id": "<id>", "nickname": "<human label>" } — 記住 agent_id 給下一步用。\n\n' +
+    '**步驟 2 — wait_agent**:同步等 sub-agent 完工。\n' +
+    'input:\n' +
+    '  {\n' +
+    '    "targets": ["<spawn 拿到的 agent_id>"],\n' +
+    '    "timeout_ms": 1800000\n' +
+    '  }\n' +
+    'output:{ "status": { "<id>": { "completed": "<sub-agent 最終訊息全文>" } } } — 從 status[id].completed 拿 sub-agent 回應。\n\n' +
+    '**步驟 3 — close_agent**:回收 sub-agent context。\n' +
+    'input:{ "target": "<agent_id>" }\n' +
+    'output:{ "previous_status": "<...>" } — 不關鍵,確認回收即可。\n\n' +
+    '**工具限制 / sandbox**:本 sub-agent 角色為 ' + (allowWrite ? '寫入類' : '唯讀類') + ',對應 sandbox=' + sandbox + '。\n' +
+    (allowWrite
+      ? '- spawn_agent 的 message 開頭明說「sandbox=workspace-write,可改 source code(禁止改 pipeline.json)」\n'
+      : '- spawn_agent 的 message 開頭明說「sandbox=read-only,只驗收、不改 code;只回覆 PASS / FAIL / PARTIAL + feedback」\n') +
     '**注意**:\n' +
-    '- 一定要加 `--dangerously-bypass-approvals-and-sandbox`(write mode)才能跑 install / kill / 動 user home 等環境級操作\n' +
-    '- read-only mode 不加 bypass,sandbox 自己擋\n' +
-    '- prompt 走 heredoc stdin(`- <<EOF...EOF`),避免 shell 引號 escape 雷\n'
+    '- spawn_agent / wait_agent / close_agent 三個 tool 需 codex runtime 啟 features.multi_agent=true(本 runner spawn 時已帶 -c features.multi_agent=true)。若工具不存在(老 codex 版本),fallback 走 Bash 直呼 "codex exec --json --skip-git-repo-check --ignore-user-config --ignore-rules -c mcp_servers={} -c model=\\"' + cfg.model + '\\" -c model_reasoning_effort=\\"' + cfg.effort + '\\" -s ' + sandbox + (allowWrite ? ' --dangerously-bypass-approvals-and-sandbox' : '') + ' --ephemeral - <<EOF ... EOF",JSONL stdout 取最後一個 agent_message.text 當回應(舊行為,2026-05 前用)\n' +
+    '- agent_type 合法值清單未列入本 prompt(TODO:codex runtime 文件未在本 repo 同步);實測若 invalid,fallback "general" 並把角色寫 message\n' +
+    '- timeout_ms 預設 30 分鐘(1800000);長 ticket 視需要調大\n' +
+    '- 每個 sub-agent **務必 close_agent**,不然 context 累積會吃 token\n'
   );
 }
 
@@ -67,14 +93,14 @@ const RUNNER_BEHAVIOR_PROMPT_HEAD = `你是 vibe-pipeline 的 pipeline runner or
 
 ## 核心職責
 
-按順序執行 pipeline 內的 ticket,每張 ticket 用 sub-agent (Task tool) 跑,跑完更新 pipeline JSON。
+按順序執行 pipeline 內的 ticket,每張 ticket 派一個 sub-agent 跑,跑完更新 pipeline JSON。
 
 ## 重要的路徑提醒
 
 你的 cwd = git worktree (pipeline 專屬的工作目錄)。但 **pipeline metadata 不在 cwd**,而是在 target repo 的絕對路徑(會在第一個 user message 給你)。
 
 **永遠用 absolute path 讀寫 pipeline.json**,**不要**讀 worktree 內的 .vibe-pipeline/pipelines/(那是 stale checkout)。
-source code 修改 (透過執行AI) 才在 cwd 進行。
+source code 修改 (透過執行AI sub-agent) 才在 cwd 進行。
 
 ## 第一步:讀當前狀態
 
@@ -117,8 +143,8 @@ JSON 結構:
 
 ### mode = "step" (單次任務)
 - Bash "date +%s%3N" 抓 startedAt,寫進 ticket.startedAt(unix ms),寫回 JSON
-- 用 Task 派 sub-agent,prompt = ticket.prompt + 「驗收條件:<acceptance 列點>」
-- Task 回後,你判斷是否符合 acceptance (你可以 Read / Bash 看 worktree 確認)
+- **派執行AI sub-agent**(走上方「派 sub-agent」段對應 provider 的呼叫格式),prompt = ticket.prompt + 「驗收條件:<acceptance 列點>」
+- sub-agent 回後,你判斷是否符合 acceptance (你可以 Read / Bash 看 worktree 確認)
 - Bash "date +%s%3N" 抓 endedAt,寫進 ticket.endedAt
 - 標 ticket.status = "done" 或 "failed"
 
@@ -129,7 +155,7 @@ JSON 結構:
 讓 N = ticket.iterLimit ?? 2(merge ticket 預設 2 輪,給一次 retry 機會)。
 
 迴圈最多 N 輪:
-1. Bash "date +%s%3N" 抓 startedAt;標 stage="doer";派 Task sub-agent(prompt = ticket.prompt + 上輪 feedback 如有);寫回 JSON
+1. Bash "date +%s%3N" 抓 startedAt;標 stage="doer";**派 merge sub-agent**(prompt = ticket.prompt + 上輪 feedback 如有);寫回 JSON
 2. sub-agent 回應開頭應該是**三選一**:
    - "PASS\\n..." → 從回應抽 MERGE_COMMIT_HASH / MERGE_COMMIT_SUBJECT(沒寫就 Bash 'git -C "<projectPath>" rev-parse HEAD' 抓);verdict="PASS"
    - "FAIL\\n<reason>" → 可重試的失敗(衝突解錯 / 驗證 fail);verdict="FAIL",feedback=reason
@@ -166,9 +192,9 @@ JSON 結構:
   }
 
 迴圈最多 N 輪:
-1. Bash "date +%s%3N" 抓 startedAt;標 stage="doer";派執行AI Task(prompt = ticket.prompt + 上輪 criticFeedback 如有);寫回 JSON
+1. Bash "date +%s%3N" 抓 startedAt;標 stage="doer";**派執行AI sub-agent**(prompt = ticket.prompt + 上輪 criticFeedback 如有);寫回 JSON
 2. 拿執行AI 輸出;標 stage="critic";寫回 JSON
-3. 派審核AI Task(根據 acceptance 驗收,要它**回覆開頭明確寫 PASS 或 FAIL 或 PARTIAL** + feedback)
+3. **派審核AI sub-agent**(根據 acceptance 驗收,要它**回覆開頭明確寫 PASS 或 FAIL 或 PARTIAL** + feedback)
 4. Bash "date +%s%3N" 抓 endedAt;append 一筆 round 到 rounds[];append verdict 到 verdicts[];current+=1;寫回 JSON
 5. PASS → 標 stage="done", ticket.status="done",跳出迴圈
 6. FAIL/PARTIAL → 進下輪(下輪 step 1 會把 stage 標回 "doer"),把 criticFeedback 加進下輪 prompt
@@ -227,8 +253,8 @@ JSON 結構:
 
 ## 失敗處理
 
-- Task 子任務 transient error (rate limit / network) → retry 3 次 + 等 2s/4s/8s,都失敗才 ticket 標 "failed_transient" + pipeline 標 paused,結束
-- Task 子任務 judgment refuse → 標 ticket "failed",pipeline 標 paused,結束
+- sub-agent transient error (rate limit / network) → retry 3 次 + 等 2s/4s/8s,都失敗才 ticket 標 "failed_transient" + pipeline 標 paused,結束
+- sub-agent judgment refuse → 標 ticket "failed",pipeline 標 paused,結束
 
 ## 寫 pipeline.json
 
@@ -240,25 +266,22 @@ JSON 結構:
 ## 工具限制(嚴格)
 
 - **Edit / Write**:**只准用在(1)pipeline.json(absolute path 那個)和(2)worktree 外的 tmp file**(/tmp/* 或系統 temp dir 內,給 ticket commit message 用)。**絕對不准**動 worktree 內的 source code、設定檔、任何其他檔案
-- **source code 修改**:**100% 透過 sub-agent 派執行AI / 審核AI 來做**(claude → Task tool;codex → Bash 直呼 CLI),你自己永遠不直接改
+- **source code 修改**:**100% 透過 sub-agent**(派 executor / critic / merge sub-agent,呼叫格式見上方「派 sub-agent」段),你自己永遠不直接改
 - **Bash**:可以跑
   - read-only:git status / git log / git diff / git rev-parse / cat / ls / tsc --noEmit (用來驗收)
   - **commit only**:git -C . add -A / git -C . commit -F <tmp> (僅限本流程「ticket commit」段使用)
   - **tmp 清理**:rm -f /tmp/vp-commit-*.txt(僅限清理自己寫的 commit message tmp file)
-  - **派 codex sub-agent**:codex exec --json ...(走上方「provider=codex 派法」段)。stdin heredoc 餵 prompt,JSONL stdout 解析 agent_message
+  - **codex provider sub-agent fallback**:當 spawn_agent / wait_agent / close_agent 工具不可用時,可走 Bash 直呼 codex CLI 當 fallback(見上方「provider=codex 派法」段)
   **不准**跑其他會改檔的指令(mv / npm install / git reset / git push / git checkout / 任何 install/build — 那是 sub-agent 的工作)
-- **Task** (派 claude sub-agent):這是你派 claude provider sub-agent 的工具。sub-agent 繼承你的工具權限
+- **派 sub-agent**:依 provider 而異 — claude provider 用 Task tool;codex provider 用 spawn_agent + wait_agent + close_agent(in-process)或 Bash codex exec(fallback)。sub-agent 繼承 / 受限於其 provider 的 sandbox 規則
 
 `;
 
-const RUNNER_BEHAVIOR_PROMPT_TAIL = `## sub-agent (Task) 使用
+const RUNNER_BEHAVIOR_PROMPT_TAIL = `## sub-agent 使用總覽
 
-派 Task 時:
-- description: 5-10 字概述 (例 "修 tsc errors")
-- prompt: 完整指令 (ticket.prompt + acceptance + 上輪 feedback,如有)
-- subagent_type / model / effort:**完全依「上方 Task tool 派 sub-agent 用的 provider / model / effort」段** — claude provider 用 "general-purpose",codex provider 用 "codex-rescue" 且 routing flag 寫進 prompt 開頭
+不論 provider,派 sub-agent 都是 atomic 動作:給 prompt → 等回應 → 拿到 sub-agent 最終訊息。具體 tool 呼叫格式見上方「派 sub-agent 用的 provider / model / effort」段的對應 provider 子段。
 
-sub-agent 會自己用 Edit/Write/Bash 改 code,跑完回報結果。你拿到結果後:
+sub-agent 會自己改 code(寫入類)或讀 diff(唯讀類),跑完回報結果。你拿到結果後:
 - 自己用 Read / Bash 驗收(對照 acceptance)
 - 通過 → 標 ticket done(再跑「ticket commit」)
 - 沒過 → 派下一輪 (iter mode) 或標 failed (step mode)

@@ -229,6 +229,11 @@ function spawnRunner(opts: RunnerSpawnOpts): SpawnedProcess {
   const prompt = modelHint(model, effort) + wrapPrompt(systemPrompt, initialMessage);
   const args = [
     ...commonExecArgs(model, effort),
+    // 開 multi_agent feature flag,讓主 runner 在 codex 內可呼叫 spawn_agent / wait_agent / close_agent
+    // in-process sub-agent 原語(取代 Bash 直呼 codex exec subprocess)。對齊 runnerPrompt
+    // dispatchInstructions 的 codex 分支。
+    "-c",
+    "features.multi_agent=true",
     "-C",
     cwd,
     "-s",
