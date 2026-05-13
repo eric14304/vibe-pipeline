@@ -309,20 +309,14 @@
     gap: 6px;
   }
 
-  /* 沒 provider 的 group(executor/critic/merge):placeholder 撐第一欄不渲染,
-     只剩 model + effort,grid 改 2fr 1fr 讓 model 較寬容下「sonnet-4-6」等 */
-  .task-row-selects--no-provider {
-    grid-template-columns: 2fr 1fr;
-  }
-
   .task-row-selects > select {
     width: 100% !important;
     min-width: 0;
   }
 
-  /* placeholder span 在沒 provider 場合不渲染,desktop / mobile 都不佔位 */
+  /* placeholder span 永遠撐第一欄(對齊 group 1 跟 group 2 的 model/effort 位置)— mobile 也不隱 */
   .task-row-placeholder {
-    display: none;
+    width: auto;
   }
 
   /* 右上關閉 icon — mobile 全螢幕,需要明顯的關閉入口 */
