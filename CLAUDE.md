@@ -36,22 +36,23 @@
 - Sub-agent 拆 executor / critic 兩個 TaskClass(2026-05-13):executor 真改 code 用高 capability,critic 讀 diff 判 PASS/FAIL 用便宜 model;`syncJob` 衝突解走 executor cfg
 - Auth 設計:loopback IP 永遠 bypass,只非 loopback 連線強制 TOTP;本機 dev 完全不受影響
 
-**還沒做(下個 iteration)**
-- Transient retry 真正觸發測試(沒自然 fixture,需 fault injection;低優先,留 production 真踩到再補)
-- Budget tracker UI(backend cost_limit_usd 已落地會擋 /run + 發 budget notif,UI 顯示「目前累積」之類的 dashboard 缺)
-- self-dogfood 不靠手動 merge 的方案 → merge worktree isolation,規模 ~150 行,看 [refs/merge-isolation-2026-05-11.md](docs/refs/merge-isolation-2026-05-11.md);99% user 不踩,當前不投入
-- runner spawn 的 `--setting-sources` 還沒砍(留給 Task sub-agent 讀 user/project CLAUDE.md);若日後把 sub-agent context 全 push 進 prompt,可拿 ~13% 額外 cache 改善
-- **CLI 後續**:`vbpl` 已落地 + `bun run cli:build` 打包成單檔 binary(Windows/macOS/Linux),`bun run vbpl ...` 或 binary 都可用。**還沒做**:shell completion / `vbpl pipeline log --follow` log streaming / CI release artifact 自動 build
-- **iOS PWA push 實測**:iOS 16.4+ 已支援 Web Push 但需先「加入主畫面」,目前只在 Android 驗過
-- **背景 push 待人工觸發測試**:測過 `/api/push/test` 鎖屏可收;runner 真實 pipeline 完成事件 → push 還沒實機跑過(ticketWatcher 路徑已寫好,缺最後一哩驗證)
-- **runner 主 agent 鎖 claude**:SettingsPopover 雖然 runner 欄位讓 user 可選 codex,實際上 `runnerPrompt.ts` 全是 claude-isms(Task tool / subagent_type / Edit/Write 規則),codex 主 runner 跑起來會忽略 sub-agent 派發指令,iter 紀律破功。要支援 codex 主 runner 需 rewrite prompt provider-agnostic(Task tool 換成 Bash 派下一層 CLI 統一寫法)或寫 codex-flavored 變體,~200-300 行 prompt 重設計。目前最務實做法是 UI 禁掉 runner=codex 選項 / backend `getTaskConfig("runner")` 強制 fallback claude,但暫不擋(待真正實作前看是否有 user 誤選)
+**還沒做(Phase 6 候選)**
+- **Budget tracker UI** — backend `cost_limit_usd` 已強制執行 + 發 budget notif,UI 缺 dashboard 看「每天 / 每 pipeline / 每 task class burn 趨勢」。user 最常抱怨「不知道燒多少」
+- **iOS PWA push 實測** — iOS 16.4+ 已支援 Web Push 但需先「加入主畫面」,目前只在 Android 驗過
+- **背景 push 真實 pipeline 事件觸發** — `/api/push/test` 鎖屏可收;runner 真實 pipeline 完成事件 → push 還沒實機跑過(ticketWatcher 路徑已寫好,缺最後一哩驗證)
+- **codex provider 收斂到只 sub-agent** — 從 SettingsPopover runner 欄位拿掉 codex 選項(主 runner 鎖死 claude,reason 見「已 final 決定」段);保留 codex 在 executor / critic / merge sub-agent 當配額 fallback
+- **CLI 細節** — shell completion / `vbpl pipeline log --follow` log streaming / CI release artifact 自動 build
+- **Transient retry 真正觸發測試** — 沒自然 fixture,需 fault injection;低優先,留 production 真踩到再補
 
-**已 final 決定**(不再討論)
+**已 final 決定**(不再討論,搬到這段表示不會做)
 - Theme 偏好 → localStorage(URL `?theme=` 仍 override)
 - Worktree 位置 → global `~/.vibe-pipeline/worktrees/<projHash>/<pipelineId>/`
 - vp-autotest project(`d:/sugarfungit/vp-autotest`,hash `cf94d1b2`)— Claude 跑 runner 測試專用,user 主 project 不污染
 - **Pixel-diff 不救**(2026-05-10 phase 3-5 砍):prototype variant routes(/init, /drawer, /qa, /notifications)+ NotifBanner / NotificationsScreen / DrawerStage / QAScreen / InitScreen 全刪,tests/ 整個刪,playwright/pixelmatch/pngjs 從 devDeps 移除,`bun run diff` script 移除。design/ 留作歷史紀錄不再對齊
 - log/notif GC 走 per-pipeline 10 / 全 project 500 上限,trigger 在 /run spawn 前
+- **Self-dogfood AI merge worktree isolation 不做** — 99% user(對別 project 用 VP)不會踩 `--watch` reload 殺 child 問題;只有 VP 改自己時要避免。研究紀錄見 [`merge-isolation-2026-05-11.md`](docs/refs/merge-isolation-2026-05-11.md);實作 ~150 行不划算
+- **Runner spawn `--setting-sources` 不砍** — 保留給 Task sub-agent 讀 user/project CLAUDE.md。砍掉省 ~13% cache 但 sub-agent 失去 context 繼承,得失不對稱
+- **Runner 主 agent 永遠是 claude(不支援 codex 主 runner)** — `runnerPrompt.ts` 全是 claude-isms(Task tool / subagent_type 規則),codex 跑會忽略 sub-agent 派發指令 iter 紀律破功。要 codex 主 runner 需 ~200-300 行 prompt 重寫成 provider-agnostic,投入產出不對稱。Phase 6 會從 UI 拿掉 codex runner 選項
 
 **計畫 ref**
 - [phase 1 plan(已落地)](docs/refs/archive/integration-plan-v1-2026-05-09.md)
@@ -276,35 +277,29 @@ routes:
 3. **theme class 用 `index.html` 的 inline script 設**,不靠 React useEffect — 否則第一個 frame 用 stale theme,有 1-frame flash。已配 localStorage 偏好(URL `?theme=` 仍 override)。
 4. **HIDE_CSS / fade-up 用 `animation: none` 不用 `0s`** — `0s` 會留下 fade-up 起始 opacity:0,整個元件透明。
 5. **跨畫面 state 用 URL query param**(refresh / bookmark 不掉),例外:active project hash 走 localStorage、theme 走 localStorage(URL override)。
-6. **server prompt template literal 內禁用 inline backtick** — `` `code` `` 在 backtick template literal 內會關閉外層字串。改寫純文字。踩過兩次。
-7. **改 `server/lib/qa/systemPrompt.ts` 或 `runnerPrompt.ts` 後 grep `\``** 確認沒殘留 inner backtick。Bun --watch reload 噴 syntax error 後 server 不會自己復活。
-8. **self-dogfood(vibe-pipeline 改 vibe-pipeline 自己)跑 AI merge 前要關 `--watch`** — AI 在 main repo 跑 `git merge` 會寫 conflict markers;若衝突落在 `server/` 檔,bun `--watch` reload backend 會連帶殺掉 spawn 出去的 claude child session,merge 中斷。`src/` 衝突只 vite 紅 overlay 但 child 不死(可忽略 overlay,F5 等做完)。解法:平常 `bun run server`(no watch)就好;只有改 server code 想熱 reload 才用 `bun run server:watch`,且 watch 模式下不要按 AI merge。end user 跑 VP 對別 project 不會有這問題(他不改 VP 自己 server code)。研究紀錄見 [`merge-isolation-2026-05-11.md`](docs/refs/merge-isolation-2026-05-11.md);徹底解只能上 merge worktree 隔離(~150 行,當前不投入)。
-9. **server 重啟會殺 spawn 的 claude child(running pipeline → recoverStale 標 paused)** — 改 server code 前先看有沒有 pipeline 在跑,否則 user 看到 pipeline 莫名暫停。recovery 自動標 paused 但 worktree 進度保留,user 按「繼續」會從 critic 階段接續(若 doer 已交,executor 不重派,省 token)。
-10. **vite 內部模組 map cache 卡 stale `.js` 副檔名** — 如果以前 src/ 有過 stale `.js`(已刪),vite 仍會把 import 解到 `.js` URL → 撞 SPA fallback HTML → board 空白。解:`rm -rf node_modules/.vite` + 重啟 vite。`tsconfig.json` 已加 `noEmit: true` 防再生 `.js`,但 vite cache 需手清。
-11. **Bun.serve default `idleTimeout` 10s 太短** — QA / split / claude CLI call 都 ≥ 10s,會被 Bun 砍掉連線。`server/index.ts` 設 `idleTimeout: 255`(bun 上限 ~4.25min)。
-12. **改 backend 後 backend stale 不自覺** — `bun run server` 是 no-watch default,改完要手動 kill + 重啟。watch 模式踩雷 #8,只有開發 server code 才開。
-13. **inline backtick 雷不只 systemPrompt.ts / runnerPrompt.ts** — 任何 template literal 內 `` `code` `` 都會炸。改完 grep 一下確認沒殘留 inner backtick。
-14. **vite 6+ `allowedHosts` 預設只認 localhost** — Tailscale hostname / IP 連進來會被「Blocked request. This host is not allowed」擋。`vite.config.ts` 設 `allowedHosts: true`(網路存取已由 Tailscale tailnet 邊界控)。
-15. **Service Worker `event.waitUntil(showNotification)` 必須自己寫** — 混合 `notification+data` payload 在 Android Chrome 上不會 auto-display。`public/firebase-messaging-sw.js` 的 push handler 必須自己 parse + 顯示。
-16. **Android Chrome 不認 `new Notification()` page constructor** — 前景訊息要 `ServiceWorkerRegistration.showNotification()`,desktop fallback 才用 page constructor。`src/App.tsx` 的 `useFcmBootstrap` 已先試 SW reg。
-17. **mobile drawer / 全螢幕用 `100dvh` 不要 `100vh`** — `100vh` 在 Android Chrome 算上 nav bar 區域,底部 input 被遮。需要 `viewport-fit=cover`(已在 index.html 設)+ CSS 用 `100dvh`(留 `100vh` 當 fallback)+ drawer-stage z-index ≥ 50(高過 `.board-mobile-tabs` 的 40)。
-18. **跨 provider sub-agent 需要 `--dangerously-skip-permissions`** — claude 主 agent 派 `Task({ subagent_type: "codex-rescue" })` 時,sub-agent 內部 Bash 跑 `node codex-companion.mjs` 在 `defaultMode: auto` 下會被 permission_denials 擋,主 agent 還會幻覺成功訊息。`orchestrator.ts` 偵測 `subAgent.provider===codex || merge.provider===codex` 自動加 flag。
-19. **改 SKILL 結構記得同步 [AGENTS.md](AGENTS.md)** — claude CLI 自動讀 SKILL.md,codex 等其他 AI 只讀 AGENTS.md(指向 CLAUDE.md + SKILL pointer 清單)。新增 / 重命名 / 刪除 SKILL 兩處都要改。
-20. **AI sync 成功判定靠 git 狀態,不靠 AI stdout firstLine** — `syncJob.ts:waitAndFinish` 第一版用 `stdout.split("\n")[0].startsWith("PASS")` 判成功,AI 常把 `PASS\nSYNC_DONE` 寫在中段(`tsc passed.\n\nPASS\nSYNC_DONE`),firstLine 不匹配 → 誤判失敗 → backend `git merge --abort`(merge 已 commit,abort 是 no-op)→ 最終 worktree 已同步但 UI 顯失敗。改用 git ground truth:`!MERGE_HEAD && !conflictMarkers && behindBaseCount===0` 三條都成立才 PASS。任何「AI 回傳成功訊號」型判定都要記得 backend 自己驗 git / 檔案系統實際狀態,別信 AI 自然語言。
-21. **HTML `title` 屬性 `\n` 在 Chrome / Firefox 多數版本被當空白** — multi-line tooltip 擠成一行(Firefox 較新版本會換行)。要正規 multi-line hover 必須自寫 Tooltip component;當前 sync chip / drawer 等仍用 `title` 屬性接受這視覺差。
-22. **QA forceChat 不能在送訊息時清** — race condition:user 送訊息瞬間清 forceChat,backend 處理中 frontend poll 看到 disk 上仍 `draft.complete=true`(舊狀態)→ SpecReview 又跳出。改 `viewOverride: 'chat' | 'review' | null` 雙向 sticky,user 用「→ 回最終預覽」按鈕主動切。對應 backend 也修兩處:claudeCli systemPrompt 加 reopen 規則(rule 6) + draftStore auto-complete 改成只在 `!wasComplete && reply.complete !== false && 5/5` 時 fire。
+6. **server prompt template literal 內禁用 inline backtick** — `` `code` `` 在 backtick template literal 內會關閉外層字串。任何 `.ts` 內的 template literal 都會炸,不只 `systemPrompt.ts` / `runnerPrompt.ts`。改完一律純文字 + grep 確認沒殘留 backtick。Bun `--watch` reload 噴 syntax error 後 server 不會自己復活。踩過 2 次。
+7. **self-dogfood(vibe-pipeline 改 vibe-pipeline 自己)跑 AI merge 前要關 `--watch`** — AI 在 main repo 跑 `git merge` 會寫 conflict markers;若衝突落在 `server/` 檔,bun `--watch` reload backend 會連帶殺掉 spawn 出去的 claude child session,merge 中斷。`src/` 衝突只 vite 紅 overlay 但 child 不死(可忽略 overlay,F5 等做完)。解法:平常 `bun run server`(no watch)就好;只有改 server code 想熱 reload 才用 `bun run server:watch`,且 watch 模式下不要按 AI merge。end user 跑 VP 對別 project 不會有這問題(他不改 VP 自己 server code)。研究紀錄見 [`merge-isolation-2026-05-11.md`](docs/refs/merge-isolation-2026-05-11.md);徹底解只能上 merge worktree 隔離(~150 行,當前不投入)。
+8. **server 重啟會殺 spawn 的 claude child(running pipeline → recoverStale 標 paused)** — 改 server code 前先看有沒有 pipeline 在跑,否則 user 看到 pipeline 莫名暫停。recovery 自動標 paused 但 worktree 進度保留,user 按「繼續」會從 critic 階段接續(若 doer 已交,executor 不重派,省 token)。`bun run server` 是 no-watch default,改完要手動 kill + 重啟。
+9. **vite 內部模組 map cache 卡 stale `.js` 副檔名**(已防再生,但 cache 偶發要清)— `tsconfig.json` 已 `noEmit:true` 防再生 `.js`,但若舊 cache 還在,vite 會把 import 解到 `.js` URL → 撞 SPA fallback HTML → board 空白。解:`rm -rf node_modules/.vite` 重啟 vite。
+10. **Android Chrome push 行為(SW + Notification 兩段)** — (1) 混合 `notification+data` payload **不會 auto-display**,`public/firebase-messaging-sw.js` push handler 必須自己 `event.waitUntil(showNotification(...))`;(2) 前景訊息用 `ServiceWorkerRegistration.showNotification()`,**不能**用 `new Notification()` page constructor(Android Chrome 不認)。`src/App.tsx` `useFcmBootstrap` 已先試 SW reg,desktop fallback 才用 page constructor。
+11. **mobile drawer / 全螢幕用 `100dvh` 不要 `100vh`** — `100vh` 在 Android Chrome 算上 nav bar 區域,底部 input 被遮。需要 `viewport-fit=cover`(已在 index.html 設)+ CSS 用 `100dvh`(留 `100vh` 當 fallback)+ drawer-stage z-index ≥ 50(高過 `.board-mobile-tabs` 的 40)。
+12. **跨 provider sub-agent 主 agent 永遠帶 `--dangerously-skip-permissions`** — claude 主 agent 派 codex sub-agent 時,sub-agent 內部 Bash 在 `defaultMode: auto` 下會被 permission_denials 擋(主 agent 還會幻覺成功訊息)。`orchestrator.ts` 改成主 agent 永遠帶 flag,不再條件式偵測 provider。
+13. **改 SKILL 結構記得同步 [AGENTS.md](AGENTS.md)** — claude CLI 自動讀 SKILL.md,codex 等其他 AI 只讀 AGENTS.md(指向 CLAUDE.md + SKILL pointer 清單)。新增 / 重命名 / 刪除 SKILL 兩處都要改。
+14. **AI sync 成功判定靠 git 狀態,不靠 AI stdout firstLine** — `syncJob.ts:waitAndFinish` 第一版用 `stdout.split("\n")[0].startsWith("PASS")` 判成功,AI 常把 `PASS\nSYNC_DONE` 寫在中段(`tsc passed.\n\nPASS\nSYNC_DONE`),firstLine 不匹配 → 誤判失敗 → backend `git merge --abort`(merge 已 commit,abort 是 no-op)→ 最終 worktree 已同步但 UI 顯失敗。改用 git ground truth:`!MERGE_HEAD && !conflictMarkers && behindBaseCount===0` 三條都成立才 PASS。任何「AI 回傳成功訊號」型判定都要記得 backend 自己驗 git / 檔案系統實際狀態,別信 AI 自然語言。
+15. **HTML `title` 屬性 `\n` 在 Chrome / Firefox 多數版本被當空白** — multi-line tooltip 擠成一行(Firefox 較新版本會換行)。要正規 multi-line hover 必須自寫 Tooltip component;當前 sync chip / drawer 等仍用 `title` 屬性接受這視覺差。
+16. **QA forceChat 不能在送訊息時清** — race condition:user 送訊息瞬間清 forceChat,backend 處理中 frontend poll 看到 disk 上仍 `draft.complete=true`(舊狀態)→ SpecReview 又跳出。改 `viewOverride: 'chat' | 'review' | null` 雙向 sticky,user 用「→ 回最終預覽」按鈕主動切。對應 backend 也修兩處:claudeCli systemPrompt 加 reopen 規則(rule 6) + draftStore auto-complete 改成只在 `!wasComplete && reply.complete !== false && 5/5` 時 fire。
 
 ## 設計信條(改 code 前對齊)
 
-跟「不踩的雷」(反面教材)對稱的正面原則 — 從 spec 蒸餾,改 code / 設計新 feature 時對齊這 7 條:
+跟「不踩的雷」(反面教材)對稱的正面原則 — 改 code / 設計新 feature 時對齊。只列**已實作**且**仍持續適用**的 5 條:
 
 1. **單一定義源** — Ticket / Pipeline / SKILL 只在 YAML / pipeline.json 一份;runtime state 是 cache。改一份能溯源到 source,不在 N 個地方各記一份各自漂走
 2. **Branch 是並行邊界** — 多 pipeline 平行靠 `git branch` + 獨立 worktree 隔離,**不靠 process lock / 不靠 mutex**。git 已是 mature 的並行語意,複用比自己發明強
 3. **人工 approve SKILL** — AI 永遠不直接寫 `SKILL.md`,只能 stage 候選 → user review → 人手 commit。SKILL 是行為手冊,被 AI 自己改會 drift
 4. **跨 pipeline 不直傳 context** — pipeline A 學到的東西要影響 pipeline B,**走 SKILL 中介**(寫進 SKILL,B 自己讀),不要直接把 A 的 state 丟給 B 看。維持邊界乾淨
 5. **Critic fail ≠ ticket fail** — Iter mode 內 critic 判 FAIL 是「下一輪繼續」的訊號,不是 ticket 死了。`failed_iter_limit` 才是死(N 輪 critic 都沒過)
-6. **Exclusive lock 永遠優先於並行** — Deploy / DB migration / 任何 side-effect-on-shared-resource 的操作,不管在哪 branch 都搶同把 lock,**絕不平行跑**。並行只給 idempotent 操作
-7. **無 `max_iter` 預設** — Iter 上限靠 stall detection(N 輪沒進展 / cost 超預算)而非寫死 N 輪數字。寫死的次數限制永遠 either 太鬆 either 太緊
+
+> 註:原 spec 還有「exclusive lock 優先於並行」「無 max_iter 預設靠 stall detection」兩條;前者因目前沒 deploy / DB migration 這類資源沒實作,後者仍寫死 `iterLimit=5`。等 Phase 6 stall detection 落地後再恢復。
 
 ## 手機遠端使用方式
 
