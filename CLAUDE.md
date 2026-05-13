@@ -15,7 +15,6 @@
 - Auth 設計:loopback IP 永遠 bypass,只非 loopback 連線強制 TOTP;本機 dev 完全不受影響
 
 **Phase 6 候選**(尚未動工)
-- **Budget tracker UI** — backend `cost_limit_usd` 已強制執行 + 發 budget notif,UI 缺 dashboard 看「每天 / 每 pipeline / 每 task class burn 趨勢」
 - **iOS PWA push 實測** — iOS 16.4+ 已支援 Web Push 但需先「加入主畫面」,目前只在 Android 驗過
 - **`vbpl pipeline log --follow`** — log streaming(像 tail -f),debug pipeline 卡時最有用
 - **Transient retry 機制驗證** — sub-agent 撞暫時錯誤(rate limit / 網路)時 prompt 設計上 retry 3 次(2s/4s/8s 指數退避),都失敗才標 `ticket.status=failed_transient` + pipeline pause 等 user。這 retry 邏輯沒實測過 — production 不會主動降配額丟 429,要 fault injection(攔截 sub-agent spawn 假回 transient error)才能驗。低優先,留 production 真踩到再補
