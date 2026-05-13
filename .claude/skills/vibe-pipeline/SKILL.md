@@ -5,7 +5,14 @@ description: vibe-pipeline 操作手冊 — 給 AI 看的「怎麼用 vbpl 替 u
 
 # vibe-pipeline — AI 操作手冊
 
-User 在這台機器裝了 **vibe-pipeline**(多 AI agent 的 ticket / pipeline 編排器)。完整功能介紹在 https://github.com/eric14304/vibe-pipeline 的 README。本檔只教你「怎麼操作」。
+User 在這台機器**可能裝了** **vibe-pipeline**(多 AI agent 的 ticket / pipeline 編排器)。完整功能介紹在 https://github.com/eric14304/vibe-pipeline 的 README。本檔教你「怎麼判斷有沒有裝 + 怎麼裝 + 裝了怎麼操作」。
+
+## 先確認:vbpl 裝了沒?
+
+跑 `vbpl --version`。
+
+- **回版本號** → 已裝,跳到「心智模型」
+- **`command not found`** → 引導 user 看 repo README §CLI(build + install to PATH per-OS + trouble),完事後 `vbpl --version` 驗
 
 ## 心智模型
 
