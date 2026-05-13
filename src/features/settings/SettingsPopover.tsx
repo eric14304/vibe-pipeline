@@ -912,7 +912,9 @@ export function SettingsPopover({
           className="settings-popover-task-grid"
           style={{
             display: "grid",
-            gridTemplateColumns: "auto max-content max-content max-content",
+            // 第一欄寫死 fixed-width,讓兩個 group(qa/split/runner 跟 executor/critic/merge)
+            // 的 selects 對齊;選 160 容得下中文最長 hint 「大任務拆分 Ticket」
+            gridTemplateColumns: "160px max-content max-content max-content",
             columnGap: 8,
             rowGap: 8,
             padding: 10,
@@ -951,7 +953,9 @@ export function SettingsPopover({
             className="settings-popover-task-grid"
             style={{
               display: "grid",
-              gridTemplateColumns: "auto max-content max-content max-content",
+              // 第一欄寫死 fixed-width,讓兩個 group(qa/split/runner 跟 executor/critic/merge)
+            // 的 selects 對齊;選 160 容得下中文最長 hint 「大任務拆分 Ticket」
+            gridTemplateColumns: "160px max-content max-content max-content",
               columnGap: 8,
               rowGap: 8,
               alignItems: "center",
