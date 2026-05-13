@@ -178,20 +178,6 @@ function PushNotificationsSection({
     }
   }
 
-  const hint: React.CSSProperties = {
-    fontSize: 11,
-    color: "var(--fg-faint)",
-    lineHeight: 1.5,
-    marginBottom: 8,
-  };
-  const statusRow: React.CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 8,
-    fontSize: 12.5,
-  };
-
   let statusIcon = "○";
   let statusText = "尚未啟用";
   let statusColor: string = "var(--fg-faint)";
@@ -215,16 +201,16 @@ function PushNotificationsSection({
 
   return (
     <div>
-      <div style={statusRow}>
-        <span style={{ color: statusColor, fontFamily: "var(--font-mono)" }}>{statusIcon}</span>
-        <span style={{ color: "var(--fg)" }}>{statusText}</span>
+      <div className="push-status-row">
+        <span className="push-status-icon" style={{ color: statusColor }}>{statusIcon}</span>
+        <span className="push-status-text">{statusText}</span>
       </div>
       {supported === false ? (
-        <div style={hint}>此瀏覽器不支援 Web Push,改用桌面通知或行動 App。</div>
+        <div className="push-hint">此瀏覽器不支援 Web Push,改用桌面通知或行動 App。</div>
       ) : permission === "denied" ? (
-        <div style={hint}>已封鎖,請到瀏覽器網址列設定中重新允許後再回到此頁啟用。</div>
+        <div className="push-hint">已封鎖,請到瀏覽器網址列設定中重新允許後再回到此頁啟用。</div>
       ) : token ? (
-        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+        <div className="push-action-row">
           <button
             type="button"
             className="btn"
@@ -235,7 +221,7 @@ function PushNotificationsSection({
           </button>
         </div>
       ) : (
-        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+        <div className="push-action-row">
           <button
             type="button"
             className="btn"
@@ -246,22 +232,10 @@ function PushNotificationsSection({
           </button>
         </div>
       )}
-      <div style={hint}>啟用後 pipeline 完成 / 失敗會推到此裝置(背景或前景皆可)。</div>
+      <div className="push-hint">啟用後 pipeline 完成 / 失敗會推到此裝置(背景或前景皆可)。</div>
 
       {lastError && (
-        <div
-          className="mono"
-          style={{
-            fontSize: 11,
-            color: "var(--failed)",
-            marginTop: 8,
-            padding: 8,
-            background: "color-mix(in srgb, var(--failed) 8%, transparent)",
-            border: "1px solid color-mix(in srgb, var(--failed) 30%, var(--line))",
-            borderRadius: 4,
-            wordBreak: "break-all",
-          }}
-        >
+        <div className="mono push-error">
           {lastError}
         </div>
       )}
@@ -616,60 +590,12 @@ export function SettingsPopover({
 
   if (!open) return null;
 
-  const inputStyle: React.CSSProperties = {
-    padding: "4px 8px",
-    border: "1px solid var(--line)",
-    borderRadius: 4,
-    background: "var(--panel)",
-    color: "var(--fg)",
-    fontSize: 13,
-  };
-
-  const labelStyle: React.CSSProperties = {
-    display: "block",
-    marginBottom: 4,
-    fontWeight: 500,
-  };
-
-  const fieldRowStyle: React.CSSProperties = {
-    display: "grid",
-    gridTemplateColumns: "112px 1fr",
-    alignItems: "center",
-    gap: 10,
-    marginBottom: 6,
-  };
-
-  const subhintStyle: React.CSSProperties = {
-    fontSize: 10.5,
-    color: "var(--fg-faint)",
-    lineHeight: 1.5,
-    marginLeft: 122,
-    marginBottom: 10,
-  };
-
   return (
     <div
       ref={wrapRef}
       className="settings-popover"
       role="dialog"
       aria-label="設定"
-      style={{
-        position: "absolute",
-        top: "calc(100% + 6px)",
-        right: 0,
-        // 固定寬度,各 tab 切換時 popover 不會抖動 / shift
-        // 480px 容得下 AI Tasks grid(label auto + 86 + 150 + 95 + gaps + padding),其他 tab 共用此寬
-        width: "min(480px, calc(100vw - 32px))",
-        maxHeight: "calc(100vh - 80px)",
-        overflowY: "auto",
-        background: "var(--bg-elevated)",
-        border: "1px solid var(--line)",
-        borderRadius: 8,
-        boxShadow: "var(--shadow-lg)",
-        padding: "14px 16px 12px",
-        zIndex: 1500,
-        fontSize: 13,
-      }}
     >
       {/* 手機右上關閉按鈕 — desktop 隱藏(點外面 / Esc 已夠) */}
       <button
@@ -685,16 +611,7 @@ export function SettingsPopover({
       </button>
 
       {/* ─── Tab bar + 全域「已儲存」chip ─── */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 4,
-          marginBottom: 14,
-          borderBottom: "1px solid var(--line)",
-          paddingBottom: 0,
-        }}
-      >
+      <div className="settings-popover-tabs">
         {(
           [
             { key: "project", label: "Project" },
@@ -711,36 +628,17 @@ export function SettingsPopover({
               key={t.key}
               type="button"
               onClick={() => setActiveTab(t.key)}
-              style={{
-                padding: "7px 12px",
-                marginBottom: -1,
-                background: "transparent",
-                border: "none",
-                borderBottom: isActive ? "2px solid var(--accent)" : "2px solid transparent",
-                color: isActive ? "var(--fg)" : "var(--fg-mute)",
-                fontSize: 12.5,
-                fontWeight: isActive ? 600 : 500,
-                cursor: "pointer",
-                transition: "color 120ms",
-              }}
+              className={"settings-popover-tab" + (isActive ? " is-active" : "")}
             >
               {t.label}
             </button>
           );
         })}
-        <span style={{ flex: 1 }} />
+        <span className="settings-popover-tabs-spacer" />
         {savedVisible && (
           <span
-            className="chip"
+            className={"chip settings-popover-saved" + (savedFading ? " is-fading" : "")}
             onTransitionEnd={onSavedTransitionEnd}
-            style={{
-              color: "var(--done)",
-              background: "var(--done-soft)",
-              borderColor: "var(--done-soft)",
-              opacity: savedFading ? 0 : 1,
-              transition: "opacity 350ms ease",
-              marginBottom: 6,
-            }}
           >
             已儲存 ✓
           </span>
@@ -749,9 +647,9 @@ export function SettingsPopover({
 
       {/* ─── Project tab ─── */}
       {activeTab === "project" && <>
-      <div style={fieldRowStyle}>
-        <label style={labelStyle}>平行上限</label>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div className="settings-field-row">
+        <label className="settings-field-label">平行上限</label>
+        <div className="settings-field-controls">
           <input
             type="number"
             min={MIN}
@@ -773,18 +671,17 @@ export function SettingsPopover({
               );
             }}
             disabled={!cfg}
-            className="mono"
-            style={{ ...inputStyle, width: 64 }}
+            className="mono settings-input settings-input--w-narrow"
           />
-          <span className="mono" style={{ fontSize: 11, color: "var(--fg-faint)" }}>
+          <span className="mono settings-inline-unit">
             {MIN}–{MAX} 條
           </span>
         </div>
       </div>
-      <div style={subhintStyle}>達到上限後新 Run 排隊,前面跑完自動接棒。</div>
+      <div className="settings-subhint">達到上限後新 Run 排隊,前面跑完自動接棒。</div>
 
-      <div style={fieldRowStyle}>
-        <label style={labelStyle}>Base branch</label>
+      <div className="settings-field-row">
+        <label className="settings-field-label">Base branch</label>
         <input
           type="text"
           value={draftBaseBranch}
@@ -803,15 +700,14 @@ export function SettingsPopover({
           }}
           disabled={!cfg}
           placeholder={cfg?.defaults.base_branch || "main"}
-          className="mono"
-          style={{ ...inputStyle, width: "100%", boxSizing: "border-box" }}
+          className="mono settings-input settings-input--w-full"
         />
       </div>
-      <div style={subhintStyle}>新 pipeline 預設從這個 branch 切。</div>
+      <div className="settings-subhint">新 pipeline 預設從這個 branch 切。</div>
 
-      <div style={fieldRowStyle}>
-        <label style={labelStyle}>Cost 上限</label>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div className="settings-field-row">
+        <label className="settings-field-label">Cost 上限</label>
+        <div className="settings-field-controls">
           <input
             type="number"
             min={0}
@@ -832,16 +728,15 @@ export function SettingsPopover({
             }}
             disabled={!cfg}
             placeholder="0"
-            className="mono"
-            style={{ ...inputStyle, width: 100 }}
+            className="mono settings-input settings-input--w-mid"
           />
-          <span className="mono" style={{ fontSize: 11, color: "var(--fg-faint)" }}>USD,0 = 無限</span>
+          <span className="mono settings-inline-unit">USD,0 = 無限</span>
         </div>
       </div>
-      <div style={subhintStyle}>超過上限會擋下新 /run 並發 notif。</div>
+      <div className="settings-subhint">超過上限會擋下新 /run 並發 notif。</div>
 
-      <div style={{ ...fieldRowStyle, marginBottom: 4 }}>
-        <span style={labelStyle}>自動合併</span>
+      <div className="settings-field-row settings-field-row--tight">
+        <span className="settings-field-label">自動合併</span>
         <label
           className={"toggle-pill mono" + (draftAutoMerge ? " is-on" : "")}
           title="全 ticket done → backend 自動 append merge ticket 走 runner 流程"
@@ -871,12 +766,12 @@ export function SettingsPopover({
           新 pipeline 預設啟用
         </label>
       </div>
-      <div style={subhintStyle}>每條 pipeline 也可單獨切換。</div>
+      <div className="settings-subhint">每條 pipeline 也可單獨切換。</div>
       </>}
 
       {/* ─── AI 任務 tab ─── */}
       {activeTab === "ai" && <>
-      <div style={{ fontSize: 11, color: "var(--fg-faint)", marginBottom: 10 }}>
+      <div className="settings-subhint settings-subhint--top">
         跨 project — provider / model
       </div>
       {userCfg ? (
@@ -917,34 +812,14 @@ export function SettingsPopover({
         </div>
         </>
       ) : (
-        <div style={subhintStyle}>載入中…</div>
+        <div className="settings-subhint">載入中…</div>
       )}
       {userCfgError && (
-        <div
-          className="mono"
-          style={{
-            fontSize: 11,
-            color: "var(--failed)",
-            marginBottom: 8,
-            wordBreak: "break-word",
-          }}
-        >
-          {userCfgError}
-        </div>
+        <div className="mono settings-error">{userCfgError}</div>
       )}
 
       {error && (
-        <div
-          className="mono"
-          style={{
-            fontSize: 11,
-            color: "var(--failed)",
-            marginBottom: 8,
-            wordBreak: "break-word",
-          }}
-        >
-          {error}
-        </div>
+        <div className="mono settings-error">{error}</div>
       )}
       </>}
 
