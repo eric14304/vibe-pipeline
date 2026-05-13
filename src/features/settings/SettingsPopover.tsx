@@ -82,28 +82,35 @@ function TaskModelRow({
   showProvider?: boolean;
   onChange: (patch: { provider?: Provider; model?: ModelName; effort?: Effort }) => void;
 }) {
-  // .task-row 用 display:contents(desktop)讓 grid 認 4 個內容子元素;
-  // mobile breakpoint 內改 display:flex column 變成 card 卡式排版。
+  // 新 layout(2026-05-13 update):
+  //   row1: label(左)+ selects(右,grid 對齊兩 group)
+  //   row2: hint(獨立一行,full width,長文字可自由換行不裁字)
+  // 廢掉之前的 display:contents grid 4-col 攤平,改成 row 自包含的 flex column。
   return (
-    <div className="task-row">
-      <span
-        className="task-row-label"
+    <div
+      className="task-row"
+      style={{ display: "flex", flexDirection: "column", gap: 2 }}
+    >
+      <div
         style={{
-          display: "flex",
-          flexDirection: "column",
-          alignSelf: "center",
-          whiteSpace: "nowrap",
-          lineHeight: 1.25,
-          minWidth: 0,
-          overflow: "hidden",
+          display: "grid",
+          gridTemplateColumns: `minmax(0, 1fr) ${PROVIDER_SELECT_STYLE.width}px ${MODEL_SELECT_STYLE.width}px ${EFFORT_SELECT_STYLE.width}px`,
+          columnGap: 8,
+          alignItems: "center",
         }}
       >
-        <span style={{ fontSize: 12, color: "var(--fg)" }}>{label}</span>
-        {hint && (
-          <span style={{ fontSize: 10.5, color: "var(--fg-faint)", marginTop: 1 }}>{hint}</span>
-        )}
-      </span>
-      <div className="task-row-selects">
+        <span
+          style={{
+            fontSize: 12,
+            color: "var(--fg)",
+            minWidth: 0,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {label}
+        </span>
         {showProvider ? (
           <select
             value={provider}
@@ -145,6 +152,11 @@ function TaskModelRow({
           ))}
         </select>
       </div>
+      {hint && (
+        <div style={{ fontSize: 10.5, color: "var(--fg-faint)", lineHeight: 1.4 }}>
+          {hint}
+        </div>
+      )}
     </div>
   );
 }
@@ -913,17 +925,13 @@ export function SettingsPopover({
         <div
           className="settings-popover-task-grid"
           style={{
-            display: "grid",
-            // 第一欄用 minmax(0, 1fr) 自適應剩餘空間,select 三欄 fixed width;
-            // 兩個 group 共用同 popover 寬 + 同 fixed select widths → label 1fr 相等對齊
-            gridTemplateColumns: "minmax(0, 1fr) max-content max-content max-content",
-            columnGap: 8,
-            rowGap: 8,
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
             padding: 10,
             background: "var(--panel)",
             borderRadius: 8,
             marginBottom: 8,
-            alignItems: "center",
           }}
         >
           {(["qa", "split", "runner"] as const).map((tc) => (
@@ -954,13 +962,9 @@ export function SettingsPopover({
           <div
             className="settings-popover-task-grid"
             style={{
-              display: "grid",
-              // 第一欄用 minmax(0, 1fr) 自適應剩餘空間,select 三欄 fixed width;
-            // 兩個 group 共用同 popover 寬 + 同 fixed select widths → label 1fr 相等對齊
-            gridTemplateColumns: "minmax(0, 1fr) max-content max-content max-content",
-              columnGap: 8,
-              rowGap: 8,
-              alignItems: "center",
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
             }}
           >
             {(["executor", "critic", "merge"] as const).map((tc) => (
