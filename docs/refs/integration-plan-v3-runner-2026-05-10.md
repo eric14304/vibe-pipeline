@@ -1,7 +1,7 @@
 # 串接計畫 v3:Pipeline runner(2026-05-10)
 
 > Phase 3 = 真正執行 ticket。Pipeline 從「靜態 metadata」變「會跑的 agent 任務」。
-> 物理路徑 → root [`CLAUDE.md`](../../../../CLAUDE.md)。
+> 物理路徑 → root [`CLAUDE.md`](../../CLAUDE.md)。
 
 ## 1. 7 個決策(已對焦)
 

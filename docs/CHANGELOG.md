@@ -24,7 +24,7 @@
 
 ## 2026-05-13 大改動(Phase 5 後續打磨期)
 
-- **Sync 重構(Plan C)**:`Pipeline.syncJob` 寄生欄位取代舊 `mode=sync` ticket;git-first → 衝突才 AI;新 4 endpoints `/sync` `/sync/ai` `/sync/cancel` `/sync/dismiss`。細節 → [`docs/refs/sync-redesign-2026-05-13.md`](docs/refs/sync-redesign-2026-05-13.md)
+- **Sync 重構(Plan C)**:`Pipeline.syncJob` 寄生欄位取代舊 `mode=sync` ticket;git-first → 衝突才 AI;新 4 endpoints `/sync` `/sync/ai` `/sync/cancel` `/sync/dismiss`。細節 → [`refs/sync-redesign-2026-05-13.md`](refs/sync-redesign-2026-05-13.md)
 - **`subAgent` 拆 `executor` + `critic`**:兩個獨立 TaskClass,critic 可挑便宜 model(sonnet+medium)省 token 5-10x;userConfig 自動 migrate(舊 subAgent → executor,critic 走 default)
 - **Client-side folder browser**:新 `GET /api/projects/browse?path=` endpoint,瀏覽器內導覽 host 上目錄;Tailscale 遠端開 project 走這個(native picker 跑在 host user 看不到 dialog)
 - **`vbpl` CLI 落地**:`cli/` 內,reuse `server/lib/*` 直接讀寫 fs(no HTTP)。4 nouns(project/pipeline/ticket/config)+ `--json` mode。`bun run vbpl <noun> <verb>`。約定見 [`vibe-pipeline-cli` SKILL](.claude/skills/vibe-pipeline-cli/SKILL.md)
@@ -54,7 +54,7 @@
 - **vp-autotest project**(`d:/sugarfungit/vp-autotest`,hash `cf94d1b2`)— Claude 跑 runner 測試專用,user 主 project 不污染
 - **Pixel-diff 不救**(2026-05-10 phase 3-5 砍):prototype variant routes(/init, /drawer, /qa, /notifications)+ NotifBanner / NotificationsScreen / DrawerStage / QAScreen / InitScreen 全刪,tests/ 整個刪,playwright/pixelmatch/pngjs 從 devDeps 移除,`bun run diff` script 移除。design/ 留作歷史紀錄不再對齊
 - **log/notif GC** 走 per-pipeline 10 / 全 project 500 上限,trigger 在 /run spawn 前
-- **Self-dogfood AI merge worktree isolation 目前不做(等需求訊號)** — 觸發條件三項交集:(a) target repo 是 VP 本身、(b) backend `server:watch` / `dev:all` watch mode、(c) AI 改到 `server/**/*.ts`;少任一條不踩。99% end-user(對別 project 用 VP)不會踩 — `bun run server` no-watch default + 雷區 #7/#8 文件化規避是 free mitigation。實作 worktree isolation ~150 行只半解 merge 階段(平常 ticket exec 改 backend code 仍踩);完整解要 process group detach 動 Bun.spawn internals。研究紀錄見 [`docs/refs/merge-isolation-2026-05-11.md`](docs/refs/merge-isolation-2026-05-11.md)。**等需求訊號**(VP fork 變多 + user 抱怨累積)再回頭做
+- **Self-dogfood AI merge worktree isolation 目前不做(等需求訊號)** — 觸發條件三項交集:(a) target repo 是 VP 本身、(b) backend `server:watch` / `dev:all` watch mode、(c) AI 改到 `server/**/*.ts`;少任一條不踩。99% end-user(對別 project 用 VP)不會踩 — `bun run server` no-watch default + 雷區 #7/#8 文件化規避是 free mitigation。實作 worktree isolation ~150 行只半解 merge 階段(平常 ticket exec 改 backend code 仍踩);完整解要 process group detach 動 Bun.spawn internals。研究紀錄見 [`refs/merge-isolation-2026-05-11.md`](refs/merge-isolation-2026-05-11.md)。**等需求訊號**(VP fork 變多 + user 抱怨累積)再回頭做
 - **Runner spawn `--setting-sources` 不砍** — 保留給 Task sub-agent 讀 user/project CLAUDE.md。砍掉省 ~13% cache 但 sub-agent 失去 context 繼承,得失不對稱
 
 > 2026-05-13 update:原本「Runner 主 agent 永遠是 claude」被搬回 Phase 6 候選。理由:查 codex CLI 確認本體有 `spawn_agent` / `wait_agent` / `close_agent` 原語(需 `[features] multi_agent = true`),跟 claude Task tool 對等。若接起來,codex 主 + codex sub 可達到 claude-claude 同級 in-process 速度,「子跟隨主」原則才有性能依據。當前 runnerPrompt 全 claude-isms + Bash spawn codex sub 那條 fallback 設計也跟著要重寫。
@@ -63,13 +63,13 @@
 
 ## 計畫 ref(歷史 spec / 設計文件)
 
-- [phase 1 plan(已落地)](docs/refs/archive/integration-plan-v1-2026-05-09.md)
-- [phase 2 QA plan(已落地)](docs/refs/archive/integration-plan-v2-qa-2026-05-09.md)
-- [phase 3 runner plan(進行中)](docs/refs/integration-plan-v3-runner-2026-05-10.md)
-- [git design](docs/refs/git-design-2026-05-09.md)
-- [完整功能 spec](docs/refs/spec-2026-05-09.md)
-- [state matrix](docs/refs/state-matrix-2026-05-10.md)
-- [claude CLI spawn perf](docs/refs/claude-cli-spawn-perf-2026-05-11.md)
-- [sync 重構](docs/refs/sync-redesign-2026-05-13.md)
-- [merge worktree isolation 研究(不做)](docs/refs/merge-isolation-2026-05-11.md)
-- [競品對照](docs/refs/competitor-refs.md)
+- [phase 1 plan(已落地)](refs/archive/integration-plan-v1-2026-05-09.md)
+- [phase 2 QA plan(已落地)](refs/archive/integration-plan-v2-qa-2026-05-09.md)
+- [phase 3 runner plan(進行中)](refs/integration-plan-v3-runner-2026-05-10.md)
+- [git design](refs/git-design-2026-05-09.md)
+- [完整功能 spec](refs/spec-2026-05-09.md)
+- [state matrix](refs/state-matrix-2026-05-10.md)
+- [claude CLI spawn perf](refs/claude-cli-spawn-perf-2026-05-11.md)
+- [sync 重構](refs/sync-redesign-2026-05-13.md)
+- [merge worktree isolation 研究(不做)](refs/merge-isolation-2026-05-11.md)
+- [競品對照](refs/competitor-refs.md)

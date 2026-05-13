@@ -4,7 +4,7 @@
 
 ## 當前狀態
 
-**Phase 1-5 全套已落地 + 2026-05 後續打磨**。Phase 表、歷次大改動、已 final 決定不做的清單在 [`CHANGELOG.md`](CHANGELOG.md);本檔不再追歷史,只保留現狀規則。
+**Phase 1-5 全套已落地 + 2026-05 後續打磨**。Phase 表、歷次大改動、已 final 決定不做的清單在 [`docs/CHANGELOG.md`](docs/CHANGELOG.md);本檔不再追歷史,只保留現狀規則。
 
 **架構決策**(現狀):
 - Bun local server + browser(前端 Vite 5173 / 後端 Bun 3001 / `/api/*` 透過 Vite proxy)

@@ -5,7 +5,7 @@ description: vibe-pipeline 操作手冊 — 給 AI 看的「怎麼用 vbpl 替 u
 
 # vibe-pipeline — AI 操作手冊
 
-User 在這台機器**可能裝了** **vibe-pipeline**(多 AI agent 的 ticket / pipeline 編排器)。完整功能介紹在 https://github.com/eric14304/vibe-pipeline 的 README。本檔教你「怎麼判斷有沒有裝 + 怎麼裝 + 裝了怎麼操作」。
+User 在這台機器**可能裝了** **vibe-pipeline**(多 AI agent 的 ticket / pipeline 編排器)。完整功能介紹在 repo 的 [`README.md`](../README.md)。本檔教你「怎麼判斷有沒有裝 + 怎麼裝 + 裝了怎麼操作」。
 
 ## 先確認:vbpl 裝了沒?
 
@@ -110,7 +110,7 @@ vbpl pipeline sync <id> --cancel                       # 取消同步
 
 ## 完整參考
 
-- **README**:https://github.com/eric14304/vibe-pipeline — 安裝 / 完整功能 / Tailscale 遠端
+- **README**:repo 的 [`README.md`](../README.md) — 安裝 / 完整功能 / Tailscale 遠端
 - **CLAUDE.md**(repo 內):repo 結構 / 雷區 / 設計信條 — 改 vibe-pipeline 自己的 code 才需要看
 - **子 SKILL**(repo 內 `.claude/skills/`):改 frontend / backend / cli / e2e code 才看
 - **`vbpl --help`** 看每個 verb 的 flag,新功能比這份手冊新

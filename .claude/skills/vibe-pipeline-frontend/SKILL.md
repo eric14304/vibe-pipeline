@@ -6,7 +6,7 @@ description: vibe-pipeline 前端開發規範 — shell 結構、設計 token、
 ## 開工前
 
 1. root [`CLAUDE.md`](../../../CLAUDE.md) — repo 結構 / 雷區 / 設計信條 / 架構決策
-2. 歷次大改動 / Phase 進度 → [`CHANGELOG.md`](../../../CHANGELOG.md)
+2. 歷次大改動 / Phase 進度 → [`CHANGELOG.md`](../../../docs/CHANGELOG.md)
 
 Phase 5 後 `src/` 加了 `features/auth/`(TOTP)+ `lib/fcm.ts`(Web Push)+ Settings 4-tab UI + 全套 mobile RWD(`@media (max-width:767.98px)`)。改這些段前看現有檔案,別憑記憶。
 

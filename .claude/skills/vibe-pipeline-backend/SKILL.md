@@ -6,7 +6,7 @@ description: vibe-pipeline 後端 / 執行層的職責邊界、約定與 invaria
 ## 開工前
 
 1. 看 root [`CLAUDE.md`](../../../CLAUDE.md) — repo 結構 / 雷區 / 設計信條 / 架構決策
-2. 歷次大改動 / 已 final 不做 / Phase 進度 → [`CHANGELOG.md`](../../../CHANGELOG.md)
+2. 歷次大改動 / 已 final 不做 / Phase 進度 → [`CHANGELOG.md`](../../../docs/CHANGELOG.md)
 3. 動非 trivial 改動前回報 scope(預估 N 行 / 影響哪些 routes / 是否動 schema)
 
 ## 技術選型(現狀)
@@ -129,7 +129,7 @@ description: vibe-pipeline 後端 / 執行層的職責邊界、約定與 invaria
 
 ## Phase 6 候選(動到的話走 ScopeReport)
 
-清單在 [`CHANGELOG.md`](../../../CHANGELOG.md) §Phase 6 候選。backend 相關:budget tracker UI 配套 endpoint / SQLite log 改造 / transient retry fixture / codex provider 收斂(從 runner 拿掉)。
+清單在 [`CHANGELOG.md`](../../../docs/CHANGELOG.md) §Phase 6 候選。backend 相關:budget tracker UI 配套 endpoint / SQLite log 改造 / transient retry fixture / codex provider 收斂(從 runner 拿掉)。
 
 ## 觸發本 SKILL 的場景
 
