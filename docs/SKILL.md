@@ -12,7 +12,7 @@ User 在這台機器**可能裝了** **vibe-pipeline**(多 AI agent 的 ticket /
 跑 `vbpl --version`。
 
 - **回版本號** → 已裝,跳到「心智模型」
-- **`command not found`** → 引導 user 看 repo [`docs/install.md`](https://github.com/eric14304/vibe-pipeline/blob/main/docs/install.md)(build + install to PATH per-OS + trouble),完事後 `vbpl --version` 驗
+- **`command not found`** → 引導 user 看 [`install.md`](install.md)(build + install to PATH per-OS + trouble),完事後 `vbpl --version` 驗
 
 ## 心智模型
 
