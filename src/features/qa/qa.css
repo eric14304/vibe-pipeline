@@ -462,10 +462,6 @@
     max-width: 100%;
   }
 
-  .qadr-spec-actions {
-    flex-wrap: wrap;
-  }
-
   .qadr-field {
     flex-direction: column;
     align-items: stretch;
@@ -475,9 +471,5 @@
     flex-direction: column !important;
     align-items: flex-start;
     gap: 8px !important;
-  }
-
-  .qadr-spec-actions .btn-primary {
-    width: 100%;
   }
 }
