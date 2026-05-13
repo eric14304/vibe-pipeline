@@ -14,6 +14,7 @@ import { SettingsPopover } from "../settings/SettingsPopover";
 import { GearIcon } from "../../ui/icons";
 import type { NotifItem } from "../../types/notif";
 import { useActiveProjectHash } from "../../hooks/useActiveProject";
+import { useApi } from "../../hooks/useApi";
 import * as api from "../../api/projects";
 import * as qaApi from "../../api/qa";
 import type { Pipeline, Ticket } from "../../types/pipeline";
@@ -88,36 +89,19 @@ export function BoardScreen({
   }, [highlightId]);
 
   // Fetch notifs every 3s while project is open + visibility/focus refetch
+  const notifsResult = useApi(
+    async () => (hash ? await api.listNotifs(hash) : null),
+    { intervalMs: 3000, gate: !!hash, deps: [hash] }
+  );
   useEffect(() => {
     if (!hash) {
       setItems([]);
       return;
     }
-    let cancelled = false;
-    function fetchNotifs() {
-      if (!hash) return;
-      api
-        .listNotifs(hash)
-        .then((records) => {
-          if (cancelled) return;
-          setItems(records.map(toNotifItem));
-        })
-        .catch(() => {});
+    if (notifsResult.data) {
+      setItems(notifsResult.data.map(toNotifItem));
     }
-    fetchNotifs();
-    const id = setInterval(fetchNotifs, 3000);
-    const onVis = () => {
-      if (!document.hidden) fetchNotifs();
-    };
-    document.addEventListener("visibilitychange", onVis);
-    window.addEventListener("focus", fetchNotifs);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-      document.removeEventListener("visibilitychange", onVis);
-      window.removeEventListener("focus", fetchNotifs);
-    };
-  }, [hash]);
+  }, [hash, notifsResult.data]);
 
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 1000);
@@ -217,67 +201,50 @@ export function BoardScreen({
 
   // max_parallel 只在 hash / hasInit 變動時抓一次。Settings 儲存完透過 onConfigSaved
   // 或 reloadKey 也會 trigger,不另開 polling(避免 1.5s 衝撞 listPipelines)
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reloadKey is a force-refetch trigger
+  const configResult = useApi(
+    async () => (project?.hasInit ? await api.getConfig(project.hash) : null),
+    { deps: [project, reloadKey] }
+  );
   useEffect(() => {
     if (!project?.hasInit) {
       setMaxParallel(0);
       return;
     }
-    let cancelled = false;
-    api
-      .getConfig(project.hash)
-      .then((c) => {
-        if (cancelled) return;
-        setMaxParallel(c.defaults.max_parallel);
-        setDefaultAutoMerge(!!c.defaults.auto_merge);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [project, reloadKey]);
+    if (configResult.data) {
+      setMaxParallel(configResult.data.defaults.max_parallel);
+      setDefaultAutoMerge(!!configResult.data.defaults.auto_merge);
+    }
+  }, [project, configResult.data]);
 
   // reloadKey 同上 — force-refetch trigger
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reloadKey is a force-refetch trigger
+  const pipelinesResult = useApi<Pipeline[] | null>(
+    async () => {
+      if (!project?.hasInit) return null;
+      const arr = await api.listPipelines(project.hash);
+      // 按 createdAt 倒序(新建在上)。backend listPipelines 已 sort 過,
+      // 這裡保險再排一次,避免 backend 改邏輯時 UI 順序漂走。
+      // 沒 createdAt(極舊資料)→ fallback 用 id 內嵌 hex timestamp
+      const tsOf = (p: Pipeline): number => {
+        if (typeof p.createdAt === "number") return p.createdAt;
+        const tsHex = (p.id ?? "").split("-")[0];
+        return tsHex && /^[0-9a-f]+$/i.test(tsHex) ? parseInt(tsHex, 16) : 0;
+      };
+      const sorted = [...((arr as Pipeline[]) ?? [])].sort((a, b) => tsOf(b) - tsOf(a));
+      return sorted;
+    },
+    { intervalMs: 1500, gate: !!project?.hasInit, deps: [project, reloadKey] }
+  );
   useEffect(() => {
     if (!project?.hasInit) {
       setPipelines([]);
       return;
     }
-    let cancelled = false;
-    const fetchPipelines = () => {
-      api
-        .listPipelines(project.hash)
-        .then((arr) => {
-          if (cancelled) return;
-          // 按 createdAt 倒序(新建在上)。backend listPipelines 已 sort 過,
-          // 這裡保險再排一次,避免 backend 改邏輯時 UI 順序漂走。
-          // 沒 createdAt(極舊資料)→ fallback 用 id 內嵌 hex timestamp
-          const tsOf = (p: Pipeline): number => {
-            if (typeof p.createdAt === "number") return p.createdAt;
-            const tsHex = (p.id ?? "").split("-")[0];
-            return tsHex && /^[0-9a-f]+$/i.test(tsHex) ? parseInt(tsHex, 16) : 0;
-          };
-          const sorted = [...((arr as Pipeline[]) ?? [])].sort((a, b) => tsOf(b) - tsOf(a));
-          setPipelines(sorted);
-          if (sorted.length > 0) setActiveId((id) => id || sorted[0].id);
-        })
-        .catch(() => {});
-    };
-    fetchPipelines();
-    const id = setInterval(fetchPipelines, 1500);
-    const onVis = () => {
-      if (!document.hidden) fetchPipelines();
-    };
-    document.addEventListener("visibilitychange", onVis);
-    window.addEventListener("focus", fetchPipelines);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-      document.removeEventListener("visibilitychange", onVis);
-      window.removeEventListener("focus", fetchPipelines);
-    };
-  }, [project, reloadKey]);
+    const sorted = pipelinesResult.data;
+    if (sorted) {
+      setPipelines(sorted);
+      if (sorted.length > 0) setActiveId((id) => id || sorted[0].id);
+    }
+  }, [project, pipelinesResult.data]);
 
   const active = useMemo(
     () => pipelines.find((p) => p.id === activeId) || pipelines[0],
