@@ -6,6 +6,7 @@ import { CheckIconSm, ChevronIcon, FolderIcon, MoonIcon, PlusIcon, SunIcon } fro
 import * as api from "../api/projects";
 import { useActiveProjectHash } from "../hooks/useActiveProject";
 import type { Project } from "../../shared/types";
+import "./topbar.css";
 
 export function TopBar({
   runningCount = 0,
@@ -185,7 +186,7 @@ export function TopBar({
             <div className="proj-menu fade-up" role="menu">
               <div className="proj-menu-label mono">最近專案</div>
               {recents.length === 0 && (
-                <div className="proj-menu-label mono" style={{ opacity: 0.6 }}>
+                <div className="proj-menu-label mono proj-menu-label--empty">
                   (還沒開過任何專案)
                 </div>
               )}
@@ -226,15 +227,12 @@ export function TopBar({
               >
                 <PlusIcon />
                 <span>選擇其他資料夾…</span>
-                <span className="kbd mono" style={{ marginLeft: "auto" }}>
+                <span className="kbd mono proj-menu-shortcut">
                   {isMac() ? "⌘O" : "Ctrl+O"}
                 </span>
               </button>
               {error && (
-                <div
-                  className="proj-menu-label mono"
-                  style={{ color: "var(--accent)", padding: "8px 12px" }}
-                >
+                <div className="proj-menu-label mono proj-menu-error">
                   {error}
                 </div>
               )}
@@ -249,7 +247,7 @@ export function TopBar({
                 className="chip mono topbar-current-branch"
                 title={active.currentBranch ? `當前 branch: ${active.currentBranch}` : "detached HEAD"}
               >
-                <span style={{ color: "var(--fg-mute)" }}>⎇</span>{" "}
+                <span className="topbar-branch-icon">⎇</span>{" "}
                 {active.currentBranch ?? "(detached)"}
               </span>
             )}
@@ -257,7 +255,6 @@ export function TopBar({
               className="chip topbar-reveal-folder"
               title="在檔案總管中開啟"
               onClick={() => api.reveal(active.hash).catch(() => {})}
-              style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}
             >
               <FolderIcon />
               <span>開啟專案資料夾</span>
@@ -288,7 +285,7 @@ export function TopBar({
                     className="chip mono topbar-overflow-chip"
                     title={active.currentBranch ? `當前 branch: ${active.currentBranch}` : "detached HEAD"}
                   >
-                    <span style={{ color: "var(--fg-mute)" }}>⎇</span>{" "}
+                    <span className="topbar-branch-icon">⎇</span>{" "}
                     {active.currentBranch ?? "(detached)"}
                   </span>
                 )}
@@ -334,34 +331,13 @@ export function TopBar({
             }
           }}
         >
-          <div className="modal-card" style={{ maxWidth: 600, width: "100%" }}>
+          <div className="modal-card browse-modal-card">
             <div className="modal-title">瀏覽資料夾</div>
             <div className="modal-body">
-              <div
-                className="mono"
-                style={{
-                  fontSize: 12,
-                  color: "var(--fg-mute)",
-                  padding: "8px 10px",
-                  background: "var(--panel-2, var(--bg))",
-                  border: "1px solid var(--line)",
-                  borderRadius: 6,
-                  wordBreak: "break-all",
-                  marginBottom: 10,
-                }}
-                title="當前路徑"
-              >
+              <div className="mono browse-current-path" title="當前路徑">
                 {browseData?.path ?? "(loading…)"}
               </div>
-              <div
-                style={{
-                  display: "flex",
-                  gap: 8,
-                  marginBottom: 8,
-                  flexWrap: "wrap",
-                  alignItems: "center",
-                }}
-              >
+              <div className="browse-toolbar">
                 <button
                   type="button"
                   className="btn"
@@ -382,35 +358,16 @@ export function TopBar({
                 </button>
                 {(browseData?.drives.length ?? 0) > 0 && (
                   <>
-                    <span
-                      style={{
-                        fontSize: 11,
-                        color: "var(--fg-faint)",
-                        marginLeft: 4,
-                      }}
-                    >
-                      磁碟:
-                    </span>
+                    <span className="browse-drives-label">磁碟:</span>
                     {browseData!.drives.map((d) => {
                       const active = browseData?.path.toUpperCase().startsWith(d.toUpperCase());
                       return (
                         <button
                           key={d}
                           type="button"
-                          className="btn"
+                          className={"btn browse-drive-btn" + (active ? " is-active" : "")}
                           onClick={() => void loadBrowse(d)}
                           disabled={browseLoading}
-                          style={{
-                            padding: "4px 10px",
-                            fontFamily: "var(--font-mono)",
-                            fontSize: 12,
-                            ...(active
-                              ? {
-                                  borderColor: "var(--accent)",
-                                  color: "var(--accent)",
-                                }
-                              : {}),
-                          }}
                           title={`切到 ${d}`}
                         >
                           {d.replace("\\", "")}
@@ -420,21 +377,13 @@ export function TopBar({
                   </>
                 )}
               </div>
-              <div
-                style={{
-                  height: 280,
-                  overflowY: "auto",
-                  border: "1px solid var(--line)",
-                  borderRadius: 6,
-                  background: "var(--bg)",
-                }}
-              >
+              <div className="browse-list">
                 {browseLoading ? (
-                  <div style={{ padding: 16, color: "var(--fg-mute)" }}>載入中…</div>
+                  <div className="browse-list-placeholder">載入中…</div>
                 ) : !browseData ? (
-                  <div style={{ padding: 16, color: "var(--fg-mute)" }}>—</div>
+                  <div className="browse-list-placeholder">—</div>
                 ) : browseData.entries.length === 0 ? (
-                  <div style={{ padding: 16, color: "var(--fg-mute)" }}>(空資料夾)</div>
+                  <div className="browse-list-placeholder">(空資料夾)</div>
                 ) : (
                   browseData.entries.map((e) => (
                     <button
@@ -446,44 +395,16 @@ export function TopBar({
                         void loadBrowse(next);
                       }}
                       disabled={!e.isDir || browseLoading}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        width: "100%",
-                        padding: "8px 12px",
-                        border: 0,
-                        background: "transparent",
-                        color: e.isDir ? "var(--fg)" : "var(--fg-faint)",
-                        cursor: e.isDir ? "pointer" : "default",
-                        fontSize: 13,
-                        textAlign: "left",
-                        borderBottom: "1px solid var(--line-faint, var(--line))",
-                      }}
-                      onMouseEnter={(ev) => {
-                        if (e.isDir) ev.currentTarget.style.background = "var(--hover, rgba(0,0,0,0.04))";
-                      }}
-                      onMouseLeave={(ev) => {
-                        ev.currentTarget.style.background = "transparent";
-                      }}
+                      className="browse-entry"
                     >
                       <span aria-hidden>{e.isDir ? "📁" : "📄"}</span>
-                      <span style={{ wordBreak: "break-all" }}>{e.name}</span>
+                      <span className="browse-entry-name">{e.name}</span>
                     </button>
                   ))
                 )}
               </div>
               {error && (
-                <div
-                  style={{
-                    marginTop: 10,
-                    fontSize: 12,
-                    color: "var(--failed)",
-                    wordBreak: "break-word",
-                  }}
-                >
-                  {error}
-                </div>
+                <div className="browse-error">{error}</div>
               )}
             </div>
             <div className="modal-actions">
@@ -529,17 +450,17 @@ function ParallelChip({ running, max }: { running: number; max: number }) {
     : "var(--fg-mute)";
   return (
     <span
-      className="chip mono"
+      className="chip mono parallel-chip"
       title={
         overload
           ? `running ${running} 條已超過 max_parallel ${max}(改小不會 kill 既有的)`
           : `同時跑 ${running} / ${max} 條`
       }
-      style={{ color, borderColor: "var(--line)" }}
+      style={{ color }}
     >
-      <span style={{ color: "var(--fg-mute)" }}>▶</span>
+      <span className="topbar-branch-icon">▶</span>
       {running}/{max}
-      {overload && <span style={{ color: "var(--failed)" }}>!</span>}
+      {overload && <span className="parallel-chip-overload">!</span>}
     </span>
   );
 }

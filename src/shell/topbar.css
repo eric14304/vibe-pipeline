@@ -1,0 +1,132 @@
+/* TopBar 專用 CSS — 集中管理 inline style 搬出來的塊狀樣式。
+   非 TopBar 共用的 chip / proj-menu / topbar-* base styles 仍在 src/styles/board.css。 */
+
+/* ─── proj-menu 內元素 ────────────────────────────────────────── */
+
+.proj-menu-label--empty {
+  opacity: 0.6;
+}
+
+.proj-menu-shortcut {
+  margin-left: auto;
+}
+
+.proj-menu-error {
+  color: var(--accent);
+  padding: 8px 12px;
+}
+
+/* ─── 共用小元素 ──────────────────────────────────────────────── */
+
+.topbar-branch-icon {
+  color: var(--fg-mute);
+}
+
+.topbar-reveal-folder {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ─── Folder browse modal ────────────────────────────────────── */
+
+.browse-modal-card {
+  max-width: 600px;
+  width: 100%;
+}
+
+.browse-current-path {
+  font-size: 12px;
+  color: var(--fg-mute);
+  padding: 8px 10px;
+  background: var(--panel-2, var(--bg));
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  word-break: break-all;
+  margin-bottom: 10px;
+}
+
+.browse-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.browse-drives-label {
+  font-size: 11px;
+  color: var(--fg-faint);
+  margin-left: 4px;
+}
+
+.browse-drive-btn {
+  padding: 4px 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.browse-drive-btn.is-active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.browse-list {
+  height: 280px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+.browse-list-placeholder {
+  padding: 16px;
+  color: var(--fg-mute);
+}
+
+.browse-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+  font-size: 13px;
+  text-align: left;
+  border-bottom: 1px solid var(--line-faint, var(--line));
+}
+
+.browse-entry:disabled {
+  color: var(--fg-faint);
+  cursor: default;
+}
+
+.browse-entry:hover:not(:disabled) {
+  background: var(--hover, rgba(0, 0, 0, 0.04));
+}
+
+.browse-entry-name {
+  word-break: break-all;
+}
+
+.browse-error {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--failed);
+  word-break: break-word;
+}
+
+/* ─── ParallelChip(右上 running/max chip)──────────────────── */
+
+.parallel-chip {
+  /* color 動態(inline);border 統一灰線 */
+  border-color: var(--line);
+}
+
+.parallel-chip-overload {
+  color: var(--failed);
+}
