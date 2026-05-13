@@ -173,7 +173,7 @@ root [`CLAUDE.md`](../../../CLAUDE.md) 雷區 #1-16 是全 repo 公用,本段只
 **不引 react-query / SWR / Redux**(避免架構爆炸)。第一刀走最簡:
 - 建 `src/api/` 目錄,每個 endpoint 一個 `fetchXxx()` 函式回 `Promise<T>`
 - 在 component 用 `useEffect + useState` 自管 loading / error
-- 重複出現的模式抽 `useApi(fetcher)` custom hook
+- polling / refetch 重複模式 → 用 `src/hooks/useApi.ts`(已存在)。簽名:`useApi(fetcher, { intervalMs?, gate?, idleMs?, refetchOnVisible?, refetchOnFocus?, deps? })`,回 `{ data, error, refetch }`。已在 BoardScreen(notifs / pipelines / config)、FocusColumn(diffStat / syncStatus)、useQA(draft poll)用,新 polling component **先 reuse 別重發明**
 
 之後若 cache invalidation / refetch / optimistic update 變痛了,**再考慮**引 react-query。**不要預先設計**。
 

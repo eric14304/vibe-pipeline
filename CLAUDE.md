@@ -249,6 +249,7 @@ routes:
 14. **AI sync 成功判定靠 git 狀態,不靠 AI stdout firstLine** — `syncJob.ts:waitAndFinish` 第一版用 `stdout.split("\n")[0].startsWith("PASS")` 判成功,AI 常把 `PASS\nSYNC_DONE` 寫在中段(`tsc passed.\n\nPASS\nSYNC_DONE`),firstLine 不匹配 → 誤判失敗 → backend `git merge --abort`(merge 已 commit,abort 是 no-op)→ 最終 worktree 已同步但 UI 顯失敗。改用 git ground truth:`!MERGE_HEAD && !conflictMarkers && behindBaseCount===0` 三條都成立才 PASS。任何「AI 回傳成功訊號」型判定都要記得 backend 自己驗 git / 檔案系統實際狀態,別信 AI 自然語言。
 15. **HTML `title` 屬性 `\n` 在 Chrome / Firefox 多數版本被當空白** — multi-line tooltip 擠成一行(Firefox 較新版本會換行)。要正規 multi-line hover 必須自寫 Tooltip component;當前 sync chip / drawer 等仍用 `title` 屬性接受這視覺差。
 16. **QA forceChat 不能在送訊息時清** — race condition:user 送訊息瞬間清 forceChat,backend 處理中 frontend poll 看到 disk 上仍 `draft.complete=true`(舊狀態)→ SpecReview 又跳出。改 `viewOverride: 'chat' | 'review' | null` 雙向 sticky,user 用「→ 回最終預覽」按鈕主動切。對應 backend 也修兩處:claudeCli systemPrompt 加 reopen 規則(rule 6) + draftStore auto-complete 改成只在 `!wasComplete && reply.complete !== false && 5/5` 時 fire。
+17. **codex CLI spawn 不要加 `--ignore-user-config`** — 該 flag 把 `~/.codex/config.toml` 內 `provider = codex_local_access`(ChatGPT auth)設定 ignore 掉,fallback default OpenAI API 模式 → 用 `auth.json` 內 internal/beta key(`agt_codex_...`)撞 401 Unauthorized,主 runner 起不來。`codexAdapter.commonExecArgs` 已移除該 flag,保留 `--ignore-rules` + `-c mcp_servers={}` 維持隔離(不引 user MCP / rules 干擾)。Performance 損失極小 vs auth 全壞,得失不對稱。
 
 ## 設計信條(改 code 前對齊)
 
