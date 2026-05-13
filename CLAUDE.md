@@ -19,7 +19,7 @@
 - **iOS PWA push 實測** — iOS 16.4+ 已支援 Web Push 但需先「加入主畫面」,目前只在 Android 驗過
 - **背景 push 真實 pipeline 事件觸發** — `/api/push/test` 鎖屏可收;runner 真實 pipeline 完成事件 → push 還沒實機跑過(ticketWatcher 路徑已寫好,缺最後一哩驗證)
 - **CLI 細節** — shell completion / `vbpl pipeline log --follow` log streaming / CI release artifact 自動 build
-- **Transient retry 真正觸發測試** — 沒自然 fixture,需 fault injection;低優先,留 production 真踩到再補
+- **Transient retry 機制驗證** — sub-agent 撞暫時錯誤(rate limit / 網路)時 prompt 設計上 retry 3 次(2s/4s/8s 指數退避),都失敗才標 `ticket.status=failed_transient` + pipeline pause 等 user。這 retry 邏輯沒實測過 — production 不會主動降配額丟 429,要 fault injection(攔截 sub-agent spawn 假回 transient error)才能驗。低優先,留 production 真踩到再補
 - **Self-dogfood guard(警告層,worktree isolation 的輕量替代)** — `/run` `/merge` route 偵測「target repo === backend cwd」+「`process.execArgv` 含 `--watch`」兩條件交集成立 → response 加 `warnings: string[]` envelope;Web UI 跳 toast / modal,CLI stderr 印警告。設計取捨候選:(A)Backend 拒啟動回 `needs_confirmation`,CLI exit 1 要 `--force-self-dogfood` re-run / Web UI 跳 modal 強制 ack(real mitigation,推薦);(B)Backend 仍啟動只回 warnings(soft warn,零 friction 但長期變雜訊)。工程量 ~35 行(backend detect + envelope + CLI api.ts post() 統一處理 + Web UI toast)。dismiss 持久化用 localStorage / `~/.vibe-pipeline/state.json`「30 天內不再提示」
 
 ## Repo 結構(物理路徑 single source of truth)
