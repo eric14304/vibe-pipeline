@@ -27,7 +27,7 @@ cli/
 
 ## 設計信條
 
-### 1. Read 直 fs,mutate spawn / kill 走 HTTP(2026-05-13 拆分)
+### 1. Read 直 fs,mutate spawn / kill 走 HTTP
 
 **Read 操作**(list / show / status / log / config get):直接 `import * as pipelineDir from "../../server/lib/pipelineDir"` 然後 `pipelineDir.readPipeline(path, id)`。理由:
 - backend server 沒起也能用 CLI(state.json / pipeline.json 都在 fs)
@@ -124,7 +124,7 @@ cli/
 - 預期 `--json` 行為 → 跑 `bun run vbpl <noun> <verb> --json | jq .` 驗
 - 跨平台:Windows / macOS / Linux 都該過,path / spawn 都要小心(`node:path` + Bun.spawn array form)
 
-## 打包成 binary(2026-05-13 落地)
+## 打包成 binary
 
 `bun build --compile --minify` 把 CLI + Bun runtime + 全 deps 打成單檔 executable。三個 script 在 package.json:
 
