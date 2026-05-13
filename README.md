@@ -176,14 +176,18 @@ src/         前端(Vite + React)
 server/      Bun 後端(routes 純 dispatch,lib/ 純邏輯)
 cli/         vbpl CLI(reuse server/lib/*)
 shared/      跨前後端持久化型別
-.claude/     給編輯本 repo 的 AI 用的 SKILL / refs
+.claude/     repo maintainer SKILL(改 src/server/cli/tests 用)
+docs/        SKILL(主)/ install.md / CHANGELOG.md / refs/ 設計文件
 public/      靜態(PWA manifest、service worker、icons)
 tests/e2e/   Playwright(mock CI 模式 + real 模式)
 ```
 
-每層有對應 SKILL 文件在 `.claude/skills/` 內描述慣例 — 動非 trivial 改動前先讀:
+SKILL 文件分兩種,動非 trivial 改動前先讀:
 
-- [vibe-pipeline](docs/SKILL.md) — 產品定位 / scope / 外部對照(主 SKILL,enduser 可裝進 AI skills 路徑)
+**主 SKILL**(enduser-facing artifact,可裝進 AI 的 skills 路徑):
+- [vibe-pipeline](docs/SKILL.md) — 產品定位 / scope / vbpl 操作手冊
+
+**maintainer SKILL**(`.claude/skills/`,只給改 vibe-pipeline 自己 code 的 AI 用):
 - [vibe-pipeline-frontend](.claude/skills/vibe-pipeline-frontend/SKILL.md) — UI 慣例
 - [vibe-pipeline-backend](.claude/skills/vibe-pipeline-backend/SKILL.md) — server / runner / sync
 - [vibe-pipeline-cli](.claude/skills/vibe-pipeline-cli/SKILL.md) — CLI 慣例
