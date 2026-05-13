@@ -72,6 +72,27 @@ EmptyShell (src/shell/EmptyShell.tsx)    ← Init 用
 - **`api/`** 每 endpoint 一個 `fetchXxx(): Promise<T>` 函式。**別在 component 裡 fetch URL 字面值**
 - **`router/`** 集中 route 構造 helper(`buildPath.toBoard({project, pipeline})`),別讓字串散落各處
 
+## Inline style 政策(對齊社群共識)
+
+React 本身不禁 inline style,但社群有清楚的優先序:
+
+**普遍禁止(universal anti-pattern)**:magic value
+- `marginTop: 8`、`color: '#abc'`、`gridTemplateColumns: "130px ..."`
+- 不論 inline 或 CSS class 都該走 token(`var(--space-2)` / `var(--accent)` 等)
+- 違反本條 = 違反本 repo SKILL 既定政策(line 下方「設計 token」段)
+
+**強烈建議走 CSS class**:多 property 堆積
+- `style={{ display: 'flex', padding: 10, background: '...' }}` 這種 ≥ 3 properties 的塊狀 style
+- 理由:可讀性、可重用、可 hover/focus/media query、render 不 churn 物件
+- 抽進 feature 資料夾內 `<Feature>.css`,元件最上方 `import "./<Feature>.css"`
+
+**允許 inline 的場景**:
+1. **動態計算值**(由 props / state 算出,無法 class 靜態表達)— e.g. `style={{ transform: \`translateX(${offset}px)\` }}`
+2. **單一 / 兩個 token 值的微調**— e.g. `style={{ color: 'var(--accent)' }}`、`style={{ marginTop: 'var(--space-3)' }}`
+3. **conditional style 不便用 class 表達** — 但能 class swap 就 class swap
+
+class 命名走 BEM-ish 或 feature prefix(避雷 #1 prototype 命名空間殘留),不 reuse prototype 留下的 class。
+
 ## 設計 token
 
 `src/styles/tokens.css` 是從 prototype 1:1 移植過來的。**所有顏色、字型、spacing 都走 CSS 變數**,別寫 hex / px 原值。
