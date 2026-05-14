@@ -16,7 +16,6 @@
 
 **Phase 6 候選**(尚未動工)
 - **iOS PWA push 實測** — iOS 16.4+ 已支援 Web Push 但需先「加入主畫面」,目前只在 Android 驗過
-- **`vbpl pipeline log --follow`** — log streaming(像 tail -f),debug pipeline 卡時最有用
 
 ## Repo 結構(物理路徑 single source of truth)
 

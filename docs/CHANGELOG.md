@@ -47,6 +47,11 @@
 - **`coerceConfig` silent snap migration**:讀 user config 時自動把 executor / critic / merge 的 `provider` snap 成 `runner.provider`;PUT 進來若 mismatch 也擋掉(server 端強制一致)
 - **codex 主 runner e2e 驗證通過**:vp-autotest `codex-runner-smoke` pipeline 跑 step ticket,log 內多次 `spawn_agent` 出現,確認用 in-process API(非 Bash fallback);ticket commit + pipeline 收 ready 都正常。順帶修一個雷:`codexAdapter.commonExecArgs` 內 `--ignore-user-config` flag 會把 `~/.codex/config.toml` 內 `provider = codex_local_access`(ChatGPT auth)設定 ignore 掉,fallback default OpenAI API 模式,用 `auth.json` 內 internal/beta key 撞 401 Unauthorized。移除該 flag,保留 `--ignore-rules` + `-c mcp_servers={}` 維持隔離
 - **背景 push 真實 pipeline 事件觸發 e2e 驗證通過**:vp-autotest `push-verify` 跑一張 step ticket,手機鎖屏收到「✅ Ticket 完成 / 建一個 push verify file」FCM push。確認 ticketWatcher 的 fs.watch → diff status → fanoutPush 全鏈路 work;之前只測過 `/api/push/test` 直接 fanout(底層 OK 但沒驗 watcher 觸發路徑)
+- **Push event per-type toggle**:user config 加 `pushEvents`(4 個 key:ticket_done / ticket_failed / pipeline_paused / auto_merge_conflict,預設全 true),SettingsPopover 通知 tab 加 toggle;backend fanoutPush 前查 config gate,關掉的 event 不推
+- **`vbpl pipeline log --follow`**:像 tail -f,印出最新 run log 現有 content 後 fs.watch 增量串流,Ctrl+C 收尾;log 檔未生時 poll 等候。debug pipeline 卡 / 觀察 runner 進度用
+- **runner prompt 重構 + 修**:(1)iter step 1 寫 partial round `{n, startedAt}` 進 rounds(修 UI elapsed 00:00 假象,step 4 改 update in-place);(2)dispatchProtocol 抽共通段(利用 cascade 同 provider,不再 3 角色各印一份),~20KB → ~17.6KB;(3)砍 transient retry dead code(CLI 內部已自動 retry,主 agent 永遠看不到 transient error,prompt retry 段從未觸發)
+- **Phase 6 候選大幅收斂**:Provider 鏈一致化 / codex 主 runner / 背景 push 三項驗證落地;Budget dashboard / shell completion / CI release / Transient retry 驗證 / Self-dogfood guard 五項評估後砍除(個人 vibe 工具不需 / 邏輯矛盾 / free mitigation 已夠);剩 iOS PWA push 實測(等 iPhone 設備)
+- **雜項修**:cascade 整套對稱 runner(provider+model+effort,不再降 effort 到 default);SettingsPopover updateTask 拿 PUT response 覆寫 local state(修 cascade 後 UI 顯示漂掉);Rail commits null entry 防禦;QA sendTurn optimistic user turn 被 polledDraft race 蓋掉的修(turns.length 嚴格比較);mobile QA spec-actions 維持單列;SettingsPopover inline style 31→2 / FocusColumn 40→10 / TopBar 21→1 搬 CSS
 
 ---
 
