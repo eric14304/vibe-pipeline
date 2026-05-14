@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { projectHash } from "../hash";
 import { vibeHome } from "../paths";
@@ -33,6 +33,7 @@ async function spawnGit(args: string[], cwd?: string): Promise<{ ok: boolean; ou
 
 // 建/重用 worktree。已存在直接回 path,沒有就 add。
 // branch 不存在 → -b 建新 branch from baseBranch;branch 存在 → checkout 到該 branch
+// add 成功後跑一次 .worktreeinclude copy(只在新建那次,resume 不重複)。
 export async function ensure(
   projectPath: string,
   pipelineId: string,
@@ -61,7 +62,43 @@ export async function ensure(
   if (!res.ok) {
     throw new Error(`git worktree add failed: ${res.err || res.out}`);
   }
+
+  await copyWorktreeIncludes(projectPath, wt);
   return wt;
+}
+
+// 讀 <projectPath>/.worktreeinclude,把列出的 gitignored 檔複製進新 worktree。
+// git worktree add 只帶 tracked 檔,.env 等 gitignored 憑證不會進 worktree → AI 找不到會 hardcode。
+// 慣例對齊 Claude Code 的 .worktreeinclude:.gitignore 語法,只複製「match pattern 且本身被 gitignore」的檔
+// (tracked 檔被 git check-ignore 過濾掉,不會重複複製)。
+// best-effort:複製失敗不 throw,worktree 本身已建好,copy 只是加分。
+async function copyWorktreeIncludes(projectPath: string, wt: string): Promise<void> {
+  try {
+    const wtiPath = join(projectPath, ".worktreeinclude");
+    if (!existsSync(wtiPath)) return;
+    const content = await Bun.file(wtiPath).text();
+    const patterns = content
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0 && !l.startsWith("#"));
+
+    for (const pat of patterns) {
+      // 目錄 pattern(尾 /)→ 展成遞迴 glob;其餘原樣
+      const globPat = pat.endsWith("/") ? pat + "**" : pat;
+      const glob = new Bun.Glob(globPat);
+      for await (const rel of glob.scan({ cwd: projectPath, dot: true, onlyFiles: true })) {
+        // 確認該檔真的被 gitignore — tracked 檔(check-ignore exit 1)直接跳過,維持安全性質
+        const ci = await spawnGit(["check-ignore", "-q", rel], projectPath);
+        if (!ci.ok) continue;
+        const src = join(projectPath, rel);
+        const dst = join(wt, rel);
+        mkdirSync(dirname(dst), { recursive: true });
+        await Bun.write(dst, Bun.file(src));
+      }
+    }
+  } catch {
+    // best-effort:吞掉。worktree 已建好,缺 .env 的話 runner prompt 防禦條會擋(AI 不該 hardcode)
+  }
 }
 
 export async function remove(projectPath: string, pipelineId: string): Promise<void> {
