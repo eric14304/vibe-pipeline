@@ -196,6 +196,7 @@ vibe-pipeline/
 | [`claude-cli-spawn-perf-2026-05-11.md`](docs/refs/claude-cli-spawn-perf-2026-05-11.md) | claude CLI spawn 加速 — QA/split/runner 三處 flag 改動量測(QA/split 省 80-90% cost)+ 風險 + 衍生 |
 | [`sync-redesign-2026-05-13.md`](docs/refs/sync-redesign-2026-05-13.md) | Sync 重構(Plan C)— 從 mode=sync ticket 拆成 pipeline.syncJob;state machine + 4 endpoints + AI 衝突解 prompt 設計 + 「靠 git 判定不靠 AI stdout」雷紀錄 |
 | [`skill-injection-2026-05-14.md`](docs/refs/skill-injection-2026-05-14.md) | Phase 7「引用重點 SKILL」設計討論(規劃中)— pointer vs inline 取捨、三來源、不拆 per-AI、plugin 不自動列舉、未定項清單 + plugin cache 雷 |
+| [`worktree-env-2026-05-15.md`](docs/refs/worktree-env-2026-05-15.md) | worktree gitignored 檔複製(採 `.worktreeinclude` 慣例)+ 漏設提醒 + merge 前 secret 洩漏偵測設計(規劃中)|
 
 **Archive(已落地或一次性閱讀)**:`docs/refs/archive/` 下 — phase 1/2 計畫已落地;`docs/refs/competitor-refs.md` 是 vibe-kanban / symphony / composio-ao 競品對照合集(設計初期一次性參考)。
 
