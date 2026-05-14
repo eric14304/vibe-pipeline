@@ -39,6 +39,7 @@ vbpl pipeline list --project <hash>                    # 列該 project 的 pipe
 vbpl pipeline status <pipelineId>                      # 看 pipeline 跟 ticket 即時狀態
 vbpl pipeline log <pipelineId>                         # 過往 run 摘要(cost / duration / result)
 vbpl ticket list --pipeline <pipelineId>               # 列 ticket
+vbpl ticket show --pipeline <id> --ticket <n>          # 看單張 ticket 細節
 vbpl config list                                       # 看 user 的 per-task-class model 配置
 ```
 
@@ -47,6 +48,8 @@ vbpl config list                                       # 看 user 的 per-task-c
 ```bash
 vbpl pipeline create <name> [--auto-merge] [--base-branch main]
 vbpl ticket add --pipeline <id> --title "..." --mode iter
+vbpl ticket update --pipeline <id> --ticket <n> [--title/--goal/--prompt/--acceptance/--mode/--status/--iter-limit ...]
+vbpl ticket remove --pipeline <id> --ticket <n>
 vbpl config set <key> <value>                          # e.g. runner.model claude-opus-4-7
 ```
 

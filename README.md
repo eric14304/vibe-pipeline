@@ -146,7 +146,11 @@ vbpl pipeline list --project <hash>
 vbpl pipeline status <id>
 vbpl pipeline run <id>                                          # 啟動 runner(需要 backend)
 vbpl pipeline log <id>                                          # 過往 run 摘要
+vbpl ticket list --pipeline <id>                                # 列 ticket
+vbpl ticket show --pipeline <id> --ticket <n>                   # 看單張 ticket 細節
 vbpl ticket add --pipeline <id> --title "..." --mode iter
+vbpl ticket update --pipeline <id> --ticket <n> --status done   # 改 title/goal/prompt/acceptance/mode/status/iter-limit
+vbpl ticket remove --pipeline <id> --ticket <n>
 vbpl config set runner.model claude-opus-4-7
 vbpl pipeline sync <id>                                         # git merge base → worktree
 vbpl pipeline sync <id> --ai                                    # 讓 AI 解衝突
