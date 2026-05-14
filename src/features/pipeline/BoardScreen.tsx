@@ -221,10 +221,11 @@ export function BoardScreen({
   }, [project, configResult.data]);
 
   // reloadKey 同上 — force-refetch trigger
-  const pipelinesResult = useApi<Pipeline[] | null>(
+  const pipelinesResult = useApi<{ projectHash: string; pipelines: Pipeline[] } | null>(
     async () => {
       if (!project?.hasInit) return null;
-      const arr = await api.listPipelines(project.hash);
+      const projectHash = project.hash;
+      const arr = await api.listPipelines(projectHash);
       // 按 createdAt 倒序(新建在上)。backend listPipelines 已 sort 過,
       // 這裡保險再排一次,避免 backend 改邏輯時 UI 順序漂走。
       // 沒 createdAt(極舊資料)→ fallback 用 id 內嵌 hex timestamp
@@ -234,26 +235,27 @@ export function BoardScreen({
         return tsHex && /^[0-9a-f]+$/i.test(tsHex) ? parseInt(tsHex, 16) : 0;
       };
       const sorted = [...((arr as Pipeline[]) ?? [])].sort((a, b) => tsOf(b) - tsOf(a));
-      return sorted;
+      return { projectHash, pipelines: sorted };
     },
     { intervalMs: 1500, gate: !!project?.hasInit, deps: [project, reloadKey] }
   );
   useEffect(() => {
-    if (!project?.hasInit) {
+    if (!project?.hasInit || project.hash !== hash) {
       setPipelines([]);
       return;
     }
-    const sorted = pipelinesResult.data;
-    if (sorted) {
+    const result = pipelinesResult.data;
+    if (result?.projectHash === project.hash) {
+      const sorted = result.pipelines;
       setPipelines(sorted);
       if (sorted.length > 0) setActiveId((id) => id || sorted[0].id);
     }
-  }, [project, pipelinesResult.data]);
+  }, [hash, project, pipelinesResult.data]);
 
-  const active = useMemo(
-    () => pipelines.find((p) => p.id === activeId) || pipelines[0],
-    [activeId, pipelines]
-  );
+  const active = useMemo(() => {
+    if (project?.hash !== hash) return undefined;
+    return pipelines.find((p) => p.id === activeId) || pipelines[0];
+  }, [activeId, hash, pipelines, project?.hash]);
 
   async function handleCreate({
     name,
@@ -615,6 +617,8 @@ export function BoardScreen({
             hint="點左邊「+ 新 pipeline」建立第一條。"
             pointToTopBar={false}
           />
+        ) : !active ? (
+          <EmptyProject message="載入中…" hint="" pointToTopBar={false} />
         ) : (
           <FocusColumn
             pipeline={active}
