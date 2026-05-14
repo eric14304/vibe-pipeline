@@ -4,7 +4,21 @@ import type { ParsedArgs } from "../lib/args";
 import { fail, isJsonMode, okJson, print, printLines, table } from "../lib/output";
 import type { Ticket, TicketMode, TicketStatus } from "../../shared/types";
 
+const TICKET_USAGE = `vbpl ticket — manage tickets within a pipeline
+
+  vbpl ticket list   --pipeline <id>
+  vbpl ticket show   --pipeline <id> --ticket <n|id>
+  vbpl ticket add    --pipeline <id> --title <t> [--goal ...] [--acceptance "a;b"] [--prompt ...] [--mode step|iter] [--iter-limit <n>]
+  vbpl ticket update --pipeline <id> --ticket <n|id> [--title ...] [--goal ...] [--prompt ...] [--acceptance "a;b"] [--mode step|iter] [--status ...] [--iter-limit <n>]
+  vbpl ticket remove --pipeline <id> --ticket <n|id>
+
+  --pipeline / --ticket also accept first / second positional arg.`;
+
 export async function runTicket(sub: string | undefined, args: ParsedArgs): Promise<void> {
+  if (sub === "help" || args.flags["help"] === true) {
+    print(TICKET_USAGE);
+    return;
+  }
   switch (sub) {
     case "list":   return ticketList(args);
     case "show":   return ticketShow(args);
@@ -12,7 +26,7 @@ export async function runTicket(sub: string | undefined, args: ParsedArgs): Prom
     case "update": return ticketUpdate(args);
     case "remove": return ticketRemove(args);
     default:
-      fail("INVALID_ARGS", `Unknown ticket subcommand: ${sub ?? "(none)"}. Use list|show|add|update|remove`);
+      fail("INVALID_ARGS", `Unknown ticket subcommand: ${sub ?? "(none)"}. Use list|show|add|update|remove (or 'vbpl ticket help')`);
   }
 }
 

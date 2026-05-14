@@ -10,7 +10,26 @@ import type { ParsedArgs } from "../lib/args";
 import { fail, isJsonMode, okJson, print, printLines, table } from "../lib/output";
 import type { Pipeline, RunSummary } from "../../shared/types";
 
+const PIPELINE_USAGE = `vbpl pipeline — manage pipelines (fs ops local; run/stop/merge/sync need backend up)
+
+  vbpl pipeline list                          [--project <hash>]
+  vbpl pipeline show   <id>                   [--project <hash>]
+  vbpl pipeline create <name>                 [--auto-merge] [--base-branch <branch>]
+  vbpl pipeline delete <id>
+  vbpl pipeline run    <id>                   (needs backend)
+  vbpl pipeline stop   <id>
+  vbpl pipeline status <id>
+  vbpl pipeline log    <id>                   [--follow|-f]
+  vbpl pipeline merge  <id>                   AI merge → base
+  vbpl pipeline sync   <id>                   [--ai|--cancel|--dismiss]   base → worktree
+
+  <id> also accepts first positional arg.`;
+
 export async function runPipeline(sub: string | undefined, args: ParsedArgs): Promise<void> {
+  if (sub === "help" || args.flags["help"] === true) {
+    print(PIPELINE_USAGE);
+    return;
+  }
   switch (sub) {
     case "list":   return pipelineList(args);
     case "show":   return pipelineShow(args);
@@ -23,7 +42,7 @@ export async function runPipeline(sub: string | undefined, args: ParsedArgs): Pr
     case "merge":  return pipelineMerge(args);
     case "sync":   return pipelineSync(args);
     default:
-      fail("INVALID_ARGS", `Unknown pipeline subcommand: ${sub ?? "(none)"}. Use list|create|show|delete|run|stop|status|log|merge|sync`);
+      fail("INVALID_ARGS", `Unknown pipeline subcommand: ${sub ?? "(none)"}. Use list|create|show|delete|run|stop|status|log|merge|sync (or 'vbpl pipeline help')`);
   }
 }
 

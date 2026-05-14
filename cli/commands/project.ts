@@ -6,7 +6,19 @@ import type { ParsedArgs } from "../lib/args";
 import { fail, isJsonMode, okJson, print, printLines, table } from "../lib/output";
 import type { Project } from "../../shared/types";
 
+const PROJECT_USAGE = `vbpl project — manage known projects
+
+  vbpl project list
+  vbpl project show   [--project <hash> | --project-path <path>]   (defaults to last opened)
+  vbpl project add    <path>
+  vbpl project init   <path> | --here
+  vbpl project remove <hash|path>`;
+
 export async function runProject(sub: string | undefined, args: ParsedArgs): Promise<void> {
+  if (sub === "help" || args.flags["help"] === true) {
+    print(PROJECT_USAGE);
+    return;
+  }
   switch (sub) {
     case "list": return projectList();
     case "show": return projectShow(args);
@@ -14,7 +26,7 @@ export async function runProject(sub: string | undefined, args: ParsedArgs): Pro
     case "remove": return projectRemove(args);
     case "init": return projectInit(args);
     default:
-      fail("INVALID_ARGS", `Unknown project subcommand: ${sub ?? "(none)"}. Use list|show|add|remove|init`);
+      fail("INVALID_ARGS", `Unknown project subcommand: ${sub ?? "(none)"}. Use list|show|add|remove|init (or 'vbpl project help')`);
   }
 }
 

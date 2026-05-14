@@ -3,13 +3,25 @@ import type { ParsedArgs } from "../lib/args";
 import { fail, isJsonMode, okJson, print, printLines, table } from "../lib/output";
 import { TASK_CLASSES } from "../../shared/types";
 
+const CONFIG_USAGE = `vbpl config — user-level per-task-class model defaults (~/.vibe-pipeline/config.json)
+
+  vbpl config list
+  vbpl config get <key>             e.g. runner.model
+  vbpl config set <key> <value>     e.g. runner.model claude-opus-4-7
+
+  key 形式:<taskClass>.<field>,taskClass = qa|split|runner|executor|critic|merge,field = provider|model|effort`;
+
 export async function runConfig(sub: string | undefined, args: ParsedArgs): Promise<void> {
+  if (sub === "help" || args.flags["help"] === true) {
+    print(CONFIG_USAGE);
+    return;
+  }
   switch (sub) {
     case "list": return configList();
     case "get":  return configGet(args);
     case "set":  return configSet(args);
     default:
-      fail("INVALID_ARGS", `Unknown config subcommand: ${sub ?? "(none)"}. Use list|get|set`);
+      fail("INVALID_ARGS", `Unknown config subcommand: ${sub ?? "(none)"}. Use list|get|set (or 'vbpl config help')`);
   }
 }
 
