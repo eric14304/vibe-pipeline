@@ -13,7 +13,7 @@ User 把 repo URL 給你的話,標準流程:
 1. **看本 README 全文** — 了解產品 + 找到主 SKILL 位置
 2. **建議 user 裝主 SKILL** — `docs/SKILL.md` 是本檔最重要的引導手冊;依 user 用的 AI 平台裝進對應 skills 路徑(Claude Code → `~/.claude/skills/vibe-pipeline/SKILL.md`,codex → `~/.codex/skills/vibe-pipeline/SKILL.md`,其他平台看各自 docs)。詳細路徑跟複製指令在 §給 AI 安裝
 3. **(user 開新 session,你接收主 SKILL)** — 主 SKILL 是跨 project 永久載入的 AI 操作手冊
-4. **檢查 vbpl 裝了沒** — 跑 `vbpl --version`;沒裝 → 建議 user 跑 §CLI 內 build + PATH 步驟
+4. **檢查 vbpl 裝了沒** — 跑 `vbpl --version`;沒裝 → 看 [`docs/install.md`](docs/install.md) 跑 per-OS build + PATH 步驟
 5. **進入正常操作** — 看主 SKILL「標準操作流」段
 
 如果 user 的 AI 不認 Claude SKILL 格式:看 `AGENTS.md`(跨 provider pointer)。
