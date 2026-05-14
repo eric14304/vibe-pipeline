@@ -138,7 +138,7 @@ async function ticketUpdate(args: ParsedArgs): Promise<void> {
   const pipelineId = typeof args.flags["pipeline"] === "string" ? args.flags["pipeline"] : args.positional[0];
   const ticketRef = typeof args.flags["ticket"] === "string" ? args.flags["ticket"] : args.positional[1];
   if (!pipelineId || !ticketRef) {
-    fail("INVALID_ARGS", "Usage: vbpl ticket update --pipeline <id> --ticket <n|id> [--title ...] [--goal ...] [--status ...] [--mode step|iter]");
+    fail("INVALID_ARGS", "Usage: vbpl ticket update --pipeline <id> --ticket <n|id> [--title ...] [--goal ...] [--prompt ...] [--acceptance \"a;b\"] [--mode step|iter] [--status ...] [--iter-limit <n>]");
   }
 
   const pipeline = await readPipeline(proj.path, pipelineId!);
