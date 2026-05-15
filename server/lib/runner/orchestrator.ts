@@ -808,6 +808,93 @@ export async function stop(opts: {
   return { ok: true };
 }
 
+// Immediate stop:對 spawn 的主 agent ChildProcess SIGKILL(Windows ChildProcess.kill() = terminate),
+// 然後同步把 pipeline.state = "paused" + 把仍 running 的 ticket 標 "paused"。
+// 已死 process / 找不到 handle → 視同成功,只校正 pipeline.json 狀態。
+// 跟 graceful stop() 對稱:後者標 stopping 等主 agent 自收,前者直接砍 + 同步善後。
+// state guard:pipeline 不在 running/stopping 才報 state_guard;在 stopping 也接受(user 先按
+// graceful、後按 immediate 升級)。
+export async function stopImmediate(opts: {
+  projectPath: string;
+  projectHash: string;
+  pipelineId: string;
+}): Promise<{ ok: true } | { ok: false; error: string; code?: "state_guard" | "not_found" }> {
+  const { projectPath, projectHash, pipelineId } = opts;
+  const k = key(projectHash, pipelineId);
+
+  const pipeline = (await pipelineDir.readPipeline(projectPath, pipelineId)) as {
+    state?: string;
+    tickets?: Array<{ status?: string; [k: string]: unknown }>;
+    [k: string]: unknown;
+  } | null;
+  if (!pipeline) {
+    return { ok: false, error: `Pipeline not found: ${pipelineId}`, code: "not_found" };
+  }
+  if (pipeline.state !== "running" && pipeline.state !== "stopping") {
+    return {
+      ok: false,
+      error: `Pipeline 不在 running/stopping 狀態(當前: ${pipeline.state})`,
+      code: "state_guard",
+    };
+  }
+
+  // 砍 child process(若還在)。Bun.Subprocess.kill() 在 Windows 等同 terminate,
+  // POSIX 預設 SIGTERM;這裡傳 "SIGKILL" 強制不可捕捉。kill 失敗 / 沒 handle 都吞掉,
+  // 改用後段 fs 善後當 ground truth。
+  const entry = running.get(k);
+  if (entry && entry.proc) {
+    try {
+      entry.proc.kill("SIGKILL");
+    } catch (e) {
+      console.warn(`[runner ${pipelineId}] SIGKILL failed (likely already exited):`, e);
+    }
+    // 等 exit 確認 — proc.exited 在已死的 process 上會立刻 resolve
+    try {
+      await Promise.race([
+        entry.proc.exited,
+        new Promise<void>((resolve) => setTimeout(resolve, 3000)),
+      ]);
+    } catch {
+      // ignore
+    }
+  }
+
+  // 確保 in-memory entry 清掉(exit handler 通常也會清,但我們已經 SIGKILL,搶在前面或補)
+  running.delete(k);
+  ticketWatcher.stop({ projectHash, pipelineId });
+
+  // 重讀 pipeline(exit handler 可能已寫一輪)→ 校正狀態
+  const cur = (await pipelineDir.readPipeline(projectPath, pipelineId)) as {
+    state?: string;
+    name?: string;
+    tickets?: Array<{ status?: string; [k: string]: unknown }>;
+    [k: string]: unknown;
+  } | null;
+  if (cur) {
+    const tickets = (cur.tickets ?? []).map((t) =>
+      t.status === "running" ? { ...t, status: "paused" } : t
+    );
+    await pipelineDir.writePipeline(projectPath, pipelineId, {
+      ...cur,
+      state: "paused",
+      tickets,
+    });
+    notifs.emit(projectPath, {
+      type: "pipeline_paused",
+      title: `${cur.name || pipelineId} 已立即停止`,
+      sub: "主 agent 被強制終止",
+      pipelineId,
+    });
+  }
+
+  // slot 釋出,queue 接棒
+  dispatch(projectPath, projectHash).catch((e) =>
+    console.error(`[runner ${pipelineId}] dispatch after immediate stop failed:`, e)
+  );
+
+  return { ok: true };
+}
+
 // ─── Mock runner ──────────────────────────────────────────────────────
 // VP_TEST_MODE=mock 時走這條,模擬 runner 寫 pipeline.json 的時間軸,
 // 不 spawn 真 claude。fs.watch / notif emit / state 機照常,只是訊息流變 deterministic。

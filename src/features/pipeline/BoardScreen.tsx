@@ -639,14 +639,20 @@ export function BoardScreen({
                 setActionError(`開始運行失敗: ${e instanceof Error ? e.message : String(e)}`);
               }
             }}
-            onPause={async (pid) => {
+            onPause={async (pid, mode) => {
               if (!project) return;
+              const stopMode = mode ?? "graceful";
               try {
-                await api.pausePipeline(project.hash, pid);
+                await api.pausePipeline(project.hash, pid, stopMode);
                 setReloadKey((k) => k + 1);
-                setActionError("✓ 已送出暫停請求(等 ticket 收完)");
+                setActionError(
+                  stopMode === "immediate"
+                    ? "✓ 已立即停止 pipeline(runner child 已殺)"
+                    : "✓ 已送出暫停請求(等 ticket 收完)"
+                );
               } catch (e) {
-                setActionError(`暫停失敗: ${e instanceof Error ? e.message : String(e)}`);
+                const label = stopMode === "immediate" ? "立即停止" : "暫停";
+                setActionError(`${label}失敗: ${e instanceof Error ? e.message : String(e)}`);
               }
             }}
             onDelete={async (pid) => {

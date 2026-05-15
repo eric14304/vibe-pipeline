@@ -160,12 +160,13 @@ async function handle(req: Request): Promise<Response> {
       if (method === "DELETE") return projects.deletePipeline(hash, id);
     }
 
-    const pipelineRunMatch = rest.match(/^\/pipelines\/([a-z0-9_-]+)\/(run|pause|merge|sync)$/);
+    const pipelineRunMatch = rest.match(/^\/pipelines\/([a-z0-9_-]+)\/(run|pause|stop|merge|sync)$/);
     if (pipelineRunMatch && method === "POST") {
       const id = pipelineRunMatch[1];
       const action = pipelineRunMatch[2];
       if (action === "run") return projects.runPipeline(hash, id);
-      if (action === "pause") return projects.pausePipeline(hash, id);
+      // pause 與 stop 共用 handler;body { mode } 區分 graceful / immediate
+      if (action === "pause" || action === "stop") return projects.pausePipeline(hash, id, req);
       if (action === "merge") return projects.mergePipeline(hash, id);
       if (action === "sync") return projects.syncPipeline(hash, id);
     }
