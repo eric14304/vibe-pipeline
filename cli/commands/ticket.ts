@@ -119,8 +119,8 @@ async function ticketAdd(args: ParsedArgs): Promise<void> {
   const iterLimit = typeof args.flags["iter-limit"] === "string" ? Number(args.flags["iter-limit"]) : undefined;
 
   const pipeline = await readPipeline(proj.path, pipelineId!);
-  const tickets = pipeline.tickets ?? [];
-  const n = tickets.reduce((m, t) => Math.max(m, typeof t.n === "number" ? t.n : 0), 0) + 1;
+  const existingTickets = pipeline.tickets ?? [];
+  const n = existingTickets.reduce((m, t) => Math.max(m, typeof t.n === "number" ? t.n : 0), 0) + 1;
   const ts = Date.now().toString(16).padStart(12, "0");
 
   const ticket: Ticket = {
@@ -135,8 +135,10 @@ async function ticketAdd(args: ParsedArgs): Promise<void> {
     ...(iterLimit != null && !isNaN(iterLimit) ? { iterLimit } : {}),
   };
 
-  tickets.push(ticket);
-  await pipelineDir.writePipeline(proj.path, pipelineId!, { ...pipeline, tickets });
+  await pipelineDir.mutatePipeline(proj.path, pipelineId!, (p) => ({
+    ...p,
+    tickets: [...(p.tickets ?? []), ticket],
+  }));
 
   if (isJsonMode()) {
     okJson(ticket);
@@ -181,8 +183,12 @@ async function ticketUpdate(args: ParsedArgs): Promise<void> {
     if (!isNaN(n)) updated.iterLimit = n;
   }
 
-  tickets[idx] = updated;
-  await pipelineDir.writePipeline(proj.path, pipelineId!, { ...pipeline, tickets });
+  await pipelineDir.mutatePipeline(proj.path, pipelineId!, (p) => {
+    const arr = [...(p.tickets ?? [])];
+    const i = arr.findIndex((t) => String(t.n) === ticketRef || t.id === ticketRef);
+    if (i !== -1) arr[i] = updated;
+    return { ...p, tickets: arr };
+  });
 
   if (isJsonMode()) {
     okJson(updated);
@@ -207,8 +213,10 @@ async function ticketRemove(args: ParsedArgs): Promise<void> {
   if (idx === -1) fail("NO_TICKET", `Ticket ${ticketRef} not found`);
 
   const removed = tickets[idx];
-  tickets.splice(idx, 1);
-  await pipelineDir.writePipeline(proj.path, pipelineId!, { ...pipeline, tickets });
+  await pipelineDir.mutatePipeline(proj.path, pipelineId!, (p) => ({
+    ...p,
+    tickets: (p.tickets ?? []).filter((t) => !(String(t.n) === ticketRef || t.id === ticketRef)),
+  }));
 
   if (isJsonMode()) {
     okJson({ removed: true, id: removed.id, n: removed.n });
