@@ -8,6 +8,7 @@ import {
   renameSync,
 } from "node:fs";
 import { currentBranch } from "./git";
+import type { Pipeline } from "../../shared/types";
 
 const DIR = ".vibe-pipeline";
 // pipelines/*.json + .runtime/ 都是 runtime data,不該 commit;config.json 才 git tracked
@@ -251,6 +252,30 @@ export async function readPipeline(projectPath: string, id: string): Promise<unk
 
 export async function writePipeline(projectPath: string, id: string, data: unknown): Promise<void> {
   await writeJson(pipelineFile(projectPath, id), data);
+}
+
+// pipeline.json read-modify-write 的 race-safe helper:read → 同步 mutator → write,
+// **中間零 await**。pipeline.json 是 user PUT + runner / route handler 多處同時寫的共享狀態,
+// 任何「讀 snapshot → await 慢操作 → 寫回 snapshot」pattern 都會吃掉中間 user 改的欄位。
+//
+// 紀律:
+//   - mutator 必須宣告 sync ((p: Pipeline) => Pipeline),不接受 async / Promise。
+//   - 任何慢操作(git / spawn / fetch / 其他 fs)寫在 helper **外面**,callsite 自己處理。
+//   - mutator 內只做純資料轉換(set status / push ticket / 改 iter 計數等)。
+//
+// 為何不接受 async mutator:async function 即便 body 沒 await,return type 仍是 Promise,
+// 強制 await 等於恢復 race window。寫死 sync 簽名是讓「中間插 await」變成型別錯誤,
+// 後人改錯時 tsc 就會擋下(防呆 by type system)。
+export async function mutatePipeline(
+  projectPath: string,
+  id: string,
+  mutator: (p: Pipeline) => Pipeline,
+): Promise<Pipeline> {
+  const cur = (await readPipeline(projectPath, id)) as Pipeline | null;
+  if (!cur) throw new Error("Pipeline not found: " + id);
+  const next = mutator(cur);
+  await writePipeline(projectPath, id, next);
+  return next;
 }
 
 // Append 一張 synthetic merge ticket 到 pipeline 末尾,用來給 runner 派 sub-agent 處理 AI 合併。
