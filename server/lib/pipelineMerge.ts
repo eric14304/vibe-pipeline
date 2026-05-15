@@ -102,15 +102,14 @@ export async function triggerMerge(opts: {
   });
   if (!startRes.ok) {
     // 補救:append 了但 spawn 失敗 → 把 merge ticket 拔掉避免之後干擾
-    const cur = (await pipelineDir.readPipeline(projectPath, pipelineId)) as {
-      tickets?: Array<{ id?: string; mode?: string }>;
-      [k: string]: unknown;
-    } | null;
-    if (cur?.tickets) {
-      const filtered = cur.tickets.filter(
-        (t) => t.mode !== "merge" || t.id !== appendRes.ticket.id
-      );
-      await pipelineDir.writePipeline(projectPath, pipelineId, { ...cur, tickets: filtered });
+    const appendedId = appendRes.ticket.id as string;
+    try {
+      await pipelineDir.mutatePipeline(projectPath, pipelineId, (p) => ({
+        ...p,
+        tickets: (p.tickets ?? []).filter((t) => t.mode !== "merge" || t.id !== appendedId),
+      }));
+    } catch {
+      // pipeline 不見就算了,反正 spawn 也失敗
     }
     return { ok: false, reason: "spawn_failed", error: `append OK but spawn failed: ${startRes.error}` };
   }
@@ -181,24 +180,30 @@ export async function autoMergeNoAI(opts: {
   if (ahead.ok && ahead.out === "0") {
     // pipeline branch 沒任何 commit 在 base 之外 — git 層已 merge 完,把 pipeline state 補成 merged
     // 同時清掉殘存的 failed/paused merge ticket(那是之前 AI 嘗試失敗留的,不該繼續觸發 banner 顯「重試」)
-    const cur = (await pipelineDir.readPipeline(projectPath, pipelineId)) as
-      | (Record<string, unknown> & { tickets?: Array<Record<string, unknown> & { mode?: string; status?: string }> })
-      | null;
-    if (cur && cur.state !== "merged") {
-      const tickets = (cur.tickets ?? []).map((t) => {
-        if (t.mode === "merge" &&
-          (t.status === "failed" || t.status === "failed_iter_limit" || t.status === "failed_transient" || t.status === "paused")
-        ) {
-          return { ...t, status: "done" };
-        }
-        return t;
+    try {
+      await pipelineDir.mutatePipeline(projectPath, pipelineId, (p) => {
+        if (p.state === "merged") return p;
+        const tickets = (p.tickets ?? []).map((t) => {
+          if (
+            t.mode === "merge" &&
+            (t.status === "failed" ||
+              t.status === "failed_iter_limit" ||
+              t.status === "failed_transient" ||
+              t.status === "paused")
+          ) {
+            return { ...t, status: "done" as const };
+          }
+          return t;
+        });
+        return {
+          ...p,
+          tickets,
+          state: "merged",
+          lastAutoMergeError: undefined,
+        };
       });
-      await pipelineDir.writePipeline(projectPath, pipelineId, {
-        ...cur,
-        tickets,
-        state: "merged",
-        lastAutoMergeError: undefined,
-      });
+    } catch {
+      // pipeline 不見就算了
     }
     return { ok: true, alreadyMerged: true };
   }
@@ -226,15 +231,16 @@ export async function autoMergeNoAI(opts: {
       ts,
     };
     // 寫 pipeline state=merged + mergeCommit + mergedAt
-    const cur = (await pipelineDir.readPipeline(projectPath, pipelineId)) as Record<string, unknown> | null;
-    if (cur) {
-      await pipelineDir.writePipeline(projectPath, pipelineId, {
-        ...cur,
+    try {
+      await pipelineDir.mutatePipeline(projectPath, pipelineId, (p) => ({
+        ...p,
         state: "merged",
         mergedAt: ts,
         mergeCommit,
         lastAutoMergeError: undefined,
-      });
+      }));
+    } catch {
+      // pipeline 不見就算了,git 已 merge 成功
     }
     const aheadNum = Number(ahead.out) || 0;
     return { ok: true, mergeCommit, behindCount: aheadNum };
