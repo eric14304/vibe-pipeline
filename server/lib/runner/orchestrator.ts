@@ -386,10 +386,10 @@ export async function start(opts: {
   const max = await pipelineDir.getMaxParallel(projectPath);
   if (runningCount(projectHash) >= max) {
     enqueue({ projectPath, projectHash, pipelineId, enqueuedAt: Date.now() });
-    await pipelineDir.writePipeline(projectPath, pipelineId, {
-      ...pipeline,
+    await pipelineDir.mutatePipeline(projectPath, pipelineId, (p) => ({
+      ...p,
       state: "queued",
-    });
+    }));
     const pos = queuePosition(projectHash, pipelineId);
     notifs.emit(projectPath, {
       type: "pipeline_queued",
