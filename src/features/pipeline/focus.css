@@ -186,3 +186,21 @@
   margin-left: 6px;
   font-size: 11px;
 }
+
+/* running 狀態:暫停(graceful)+ 立即停止(immediate)雙按鈕並排 */
+.run-btn-pair {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+/* 立即停止 — danger 色但比 btn-danger 弱(預設按下去太刺眼,且預期 user 多用 graceful) */
+.run-btn-stop-now {
+  background: transparent;
+  color: var(--failed);
+  border: 1px solid color-mix(in srgb, var(--failed) 45%, transparent);
+}
+.run-btn-stop-now:hover {
+  background: var(--failed-soft);
+  border-color: var(--failed);
+}
