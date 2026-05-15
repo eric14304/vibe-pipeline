@@ -401,9 +401,33 @@ export async function pipelineDiff(hash: string, pipelineId: string): Promise<Re
   return ok(diff);
 }
 
-export async function pausePipeline(hash: string, pipelineId: string): Promise<Response> {
+// /pause 跟 /stop 共用本 handler。
+// body { mode?: "graceful" | "immediate" }(預設 graceful)。
+//   graceful  → orchestrator.stop()(標 stopping,主 agent 跑完當前 ticket 自己收尾)
+//   immediate → orchestrator.stopImmediate()(SIGKILL 主 agent + 同步標 paused)
+// queued 狀態無論 mode 都走 cancelQueued(沒有 process 可砍,行為一致)。
+// 預期沒 body / 不是 JSON 也容忍 — 老 caller(只 POST 不帶 body)維持 graceful 行為。
+export async function pausePipeline(
+  hash: string,
+  pipelineId: string,
+  req?: Request
+): Promise<Response> {
   const project = await projectStore.findByHash(hash);
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);
+
+  let mode: "graceful" | "immediate" = "graceful";
+  if (req) {
+    const ct = req.headers.get("content-type") ?? "";
+    if (ct.toLowerCase().includes("application/json")) {
+      const body = await readJson(req);
+      const raw = body.mode;
+      if (raw === "immediate" || raw === "graceful") mode = raw;
+      else if (raw !== undefined) {
+        return err("invalid_path", `Invalid mode: ${String(raw)}`, 400);
+      }
+    }
+  }
+
   // queued 狀態走 cancelQueued(直接從 queue 拔 + 標 paused);running 走原 stop 流程
   if (orchestrator.isQueued(hash, pipelineId)) {
     const r = await orchestrator.cancelQueued({
@@ -414,13 +438,30 @@ export async function pausePipeline(hash: string, pipelineId: string): Promise<R
     if (!r.ok) return err("invalid_path", r.error, 409);
     return ok({ ok: true, cancelled: true });
   }
+
+  if (mode === "immediate") {
+    const r = await orchestrator.stopImmediate({
+      projectPath: project.path,
+      projectHash: hash,
+      pipelineId,
+    });
+    if (!r.ok) {
+      const code: ApiErrorCode = r.code === "state_guard" ? "state_guard"
+        : r.code === "not_found" ? "not_found"
+        : "invalid_path";
+      const status = code === "not_found" ? 404 : 409;
+      return err(code, r.error, status);
+    }
+    return ok({ ok: true, mode: "immediate" as const });
+  }
+
   const r = await orchestrator.stop({
     projectPath: project.path,
     projectHash: hash,
     pipelineId,
   });
   if (!r.ok) return err("invalid_path", r.error, 409);
-  return ok({ ok: true });
+  return ok({ ok: true, mode: "graceful" as const });
 }
 
 // AI merge(ticket-based):append 一張 mode=merge synthetic ticket 進 pipeline,
