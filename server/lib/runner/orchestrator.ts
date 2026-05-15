@@ -386,10 +386,10 @@ export async function start(opts: {
   const max = await pipelineDir.getMaxParallel(projectPath);
   if (runningCount(projectHash) >= max) {
     enqueue({ projectPath, projectHash, pipelineId, enqueuedAt: Date.now() });
-    await pipelineDir.writePipeline(projectPath, pipelineId, {
-      ...pipeline,
+    await pipelineDir.mutatePipeline(projectPath, pipelineId, (p) => ({
+      ...p,
       state: "queued",
-    });
+    }));
     const pos = queuePosition(projectHash, pipelineId);
     notifs.emit(projectPath, {
       type: "pipeline_queued",
@@ -434,11 +434,11 @@ async function spawnDirect(opts: {
     return { ok: false, error: `worktree 失敗: ${String(e)}` };
   }
 
-  // 2. 標 pipeline running 寫回
-  await pipelineDir.writePipeline(projectPath, pipelineId, {
-    ...pipeline,
+  // 2. 標 pipeline running 寫回(用 mutatePipeline 避免覆蓋 worktree.ensure 期間 user 改的欄位)
+  await pipelineDir.mutatePipeline(projectPath, pipelineId, (p) => ({
+    ...p,
     state: "running",
-  });
+  }));
 
   // GC:每次 /run 順便修剪累積。logs per-pipeline 留 10、notifs 全 project 留 500。
   // 失敗安靜忽略,GC 不該擋 runner 起跑。
