@@ -323,22 +323,14 @@ export async function runPipeline(hash: string, pipelineId: string): Promise<Res
   // 否則 runner 主迴圈規則「遇 failed_transient 立刻暫停」會讓 pipeline 秒退。
   // 設計初衷是「不自動重試燒 token」,但 user 主動點繼續就是 explicit consent。
   try {
-    const p = (await pipelineDir.readPipeline(project.path, pipelineId)) as {
-      tickets?: Array<{ status?: string; [k: string]: unknown }>;
-      [k: string]: unknown;
-    } | null;
-    if (p?.tickets) {
-      let changed = false;
-      for (const t of p.tickets) {
+    await pipelineDir.mutatePipeline(project.path, pipelineId, (p) => {
+      for (const t of p.tickets ?? []) {
         if (t.status === "failed_transient") {
           t.status = "paused";
-          changed = true;
         }
       }
-      if (changed) {
-        await pipelineDir.writePipeline(project.path, pipelineId, p);
-      }
-    }
+      return p;
+    });
   } catch (e) {
     console.warn(`[runPipeline] reset failed_transient skipped: ${String(e)}`);
   }
