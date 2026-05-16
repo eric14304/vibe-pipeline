@@ -66,6 +66,53 @@ vbpl pipeline sync <id> --cancel                       # 取消同步
 
 **所有指令吃 `--json`**,給你結構化資料用 JSON.parse 後判斷;沒 `--json` 印給 human 看。
 
+## 進階:REPL 主 agent 模式(省 Agent SDK 額度)
+
+**背景**:2026-06-15 後 Anthropic 把 `claude -p`(non-interactive CLI)拆出獨立 Agent SDK 額度桶(Pro $20 / Max 5x $100 / Max 20x $200 / 月),用完按 full API rate。VP 預設的 `vbpl pipeline run` 走 backend orchestrator,backend spawn `claude -p` 跑主 agent + sub-agent → 全吃這個 Agent SDK 桶。
+
+**替代路徑**:讓**另一個 claude REPL session**(`claude --dangerously-skip-permissions`)扮演主 agent — REPL 屬 interactive,走 plan 互動池(大、補貼)。Task 派的 sub-agent 也算同 session,**整條 pipeline 走 interactive 池,不動 Agent SDK 桶**。
+
+### 何時建議走 REPL 模式
+
+- user 有 CC 在旁(像你正在跟他對話)、願意盯著看
+- 想省 Agent SDK 額度(尤其 Pro / Max 5x 桶小)
+- pipeline 不是過夜 / 遠端跑
+
+### 何時仍用 backend(`vbpl pipeline run`)
+
+- 過夜 / 長 pipeline / 無人值守
+- user 在手機 / 遠端、要 FCM push 通知
+- 需要平行多 pipeline(REPL 一次只能跑一條)
+- e2e mock 測試
+
+### 怎麼跑(只是 CC 的你,離手讓 user 操作)
+
+1. **你自己用 vbpl 建 pipeline / ticket**(`vbpl pipeline create` + `vbpl ticket add` × N),**不要按 run**
+2. 告訴 user「pipeline 已備好,我幫你開 REPL 視窗」,然後用 Bash 跑:
+   ```bash
+   powershell -Command "Start-Process cmd -ArgumentList '/k claude --dangerously-skip-permissions' -WindowStyle Normal"
+   ```
+   (macOS / Linux 上換對應 terminal launcher;確認 user OS 後再執行)
+3. 給 user **4 行 paste-ready** 指令(替換成實際絕對路徑):
+   ```
+   Read <repo>/docs/repl-runner.md
+   PIPELINE_JSON: <target-project>/.vibe-pipeline/pipelines/<pipelineId>.json
+   WORKTREE: ~/.vibe-pipeline/worktrees/<projHash>/<pipelineId>
+   開始
+   ```
+4. user 貼進新 cmd 視窗 Enter → REPL 自己 Read 兩個檔(`repl-runner.md` 框架 + `server/lib/runner/runnerPrompt.ts` 主 agent 行為)→ Task 派 sub-agent 跑完
+5. 跑完 user 回來告訴你結果,你決定下一步(看 diff / commit / merge / 啟新 pipeline)
+
+`docs/repl-runner.md` 是 paste-ready 指令的標準範本,絕對路徑替換時兩個 placeholder(`__FILL_ME__`)很明顯。
+
+### 注意事項
+
+- REPL 那個 session 跟你**完全隔離**,不知道你跟 user 聊過什麼。Prompt 內所有它需要的 path 都要寫絕對路徑
+- pipeline.json 仍是 source of truth,REPL 寫,web UI 跟你照樣讀得到 state
+- **backend 的 `running` Map 不會有這條** → web UI 不會顯示「running indicator」、watchdog 不救;但 disk 真實狀態 OK
+- Pause = 直接 Ctrl+C 那個 REPL,不是 API
+- 長 pipeline 撐不撐得住看 REPL context window(超過 200k token 會出問題)
+
 ## 標準操作流(常見 user 意圖)
 
 1. **「幫我建一條 pipeline 做 X」**
@@ -74,8 +121,9 @@ vbpl pipeline sync <id> --cancel                       # 取消同步
    - 用 `vbpl ticket add` 或建議 user 開 web UI 走 QA 對話讓 AI 收斂規格(複雜需求建議走 QA,簡單一張可用 CLI)
 
 2. **「跑這條 pipeline」**
-   - `vbpl pipeline run <id>` — backend 沒起會回 `NO_BACKEND` error,告訴 user 跑 `bun run server`
-   - 啟動後**不等完成**,CLI 即返回,告訴 user「已啟動,看 `vbpl pipeline status <id>` 或 web UI」
+   - **首選**:走 backend — `vbpl pipeline run <id>`(backend 沒起會回 `NO_BACKEND` error,告訴 user 跑 `bun run server`)
+   - **替代(省 Agent SDK 額度)**:走 REPL 主 agent 模式 — 見上方「進階」段,適合 dogfood / CC 配 VP / 不過夜
+   - 啟動後**不等完成**,告訴 user「已啟動,看 `vbpl pipeline status <id>` 或 web UI」
    - 不要 polling status 一直問;user 真要進度自己會問
 
 3. **「進度?」/「跑完了嗎?」**
