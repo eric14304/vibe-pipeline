@@ -507,6 +507,12 @@
 .ticket.is-draft { opacity: 0.6; }
 .ticket.is-draft:hover { opacity: 1; }
 
+/* status tint(不搶眼,只給視覺上 quick scan)— hover 仍走 panel-2 */
+.ticket.is-running { background: color-mix(in srgb, var(--running) 7%, var(--panel)); }
+.ticket.is-paused  { background: color-mix(in srgb, var(--paused)  6%, var(--panel)); }
+.ticket.is-done    { background: color-mix(in srgb, var(--done)    5%, var(--panel)); }
+.ticket.is-failed  { background: color-mix(in srgb, var(--failed)  8%, var(--panel)); }
+
 /* AI 拆分中 — accent 邊框 pulse,提示「卡片正在被處理」 */
 .ticket.is-splitting {
   border-color: color-mix(in srgb, var(--accent) 50%, var(--line-2));

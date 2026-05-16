@@ -1227,14 +1227,20 @@ function TicketCard({
     }
   }
   const iterCurrentLabel = ticket.iter ? Math.max(1, ticket.iter.current) : 0;
-  const accent = STATE_COLOR[ticket.status] || "var(--draft)";
+  const accent = TICKET_STATUS_COLOR[ticket.status] || "var(--draft)";
 
   return (
     // ticket card 內含 chips + action button,不能用 <button> wrap(invalid HTML),
     // 改 div + role="button" + onKeyDown 已具備鍵盤可達性
     // biome-ignore lint/a11y/noStaticElementInteractions: clickable card with nested buttons
     <div
-      className={"ticket" + (isDraft ? " is-draft" : "") + (isPaused ? " is-paused" : "") + (isSplitting ? " is-splitting" : "")}
+      className={"ticket"
+        + (isDraft ? " is-draft" : "")
+        + (isPaused ? " is-paused" : "")
+        + (isRunning ? " is-running" : "")
+        + (ticket.status === "done" ? " is-done" : "")
+        + (ticket.status === "failed" || ticket.status === "failed_iter_limit" || ticket.status === "failed_transient" ? " is-failed" : "")
+        + (isSplitting ? " is-splitting" : "")}
       style={{ animationDelay: `${index * 40}ms`, cursor: onClick ? "pointer" : undefined }}
       onClick={onClick}
       role={onClick ? "button" : undefined}

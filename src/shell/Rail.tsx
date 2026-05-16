@@ -121,7 +121,7 @@ function railSecondary(p: Pipeline): string {
   }
   // planning(或未知 state):只顯時間,branch 跟 name 不同才補 branch
   if (branchSuffix !== p.name) return `⎇ ${branchSuffix}${agoSuffix}`;
-  return ago ?? "草稿";
+  return ago ?? "未執行";
 }
 
 function lastActivityAt(p: Pipeline): number | null {
