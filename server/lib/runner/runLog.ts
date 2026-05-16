@@ -8,7 +8,7 @@
 //
 // 也支援沒寫完整(crash 等)的部分檔案 — best effort parse。
 
-import { readdirSync, existsSync, unlinkSync } from "node:fs";
+import { readdirSync, existsSync, unlinkSync, statSync } from "node:fs";
 import { join } from "node:path";
 import * as pipelineDir from "../pipelineDir";
 
@@ -116,35 +116,52 @@ function parseFullLog(filename: string, logPath: string, text: string): RunDetai
   let tokens: RunSummary["tokens"] = null;
 
   if (stdout) {
-    try {
-      const j = JSON.parse(stdout) as {
-        total_cost_usd?: number;
-        duration_ms?: number;
-        num_turns?: number;
-        result?: string;
-        session_id?: string;
-        usage?: {
-          input_tokens?: number;
-          output_tokens?: number;
-          cache_read_input_tokens?: number;
-          cache_creation_input_tokens?: number;
-        };
-      };
-      costUsd = j.total_cost_usd ?? null;
-      durationMs = j.duration_ms ?? null;
-      numTurns = j.num_turns ?? null;
-      result = j.result ?? null;
-      sessionId = j.session_id ?? null;
-      if (j.usage) {
-        tokens = {
-          input: j.usage.input_tokens ?? 0,
-          output: j.usage.output_tokens ?? 0,
-          cacheRead: j.usage.cache_read_input_tokens ?? 0,
-          cacheCreate: j.usage.cache_creation_input_tokens ?? 0,
-        };
+    const firstNonEmpty = stdout.split(/\r?\n/).find((l) => l.trim().length > 0) ?? "";
+    const isCodex = /"type"\s*:\s*"thread\.started"/.test(firstNonEmpty);
+    if (isCodex) {
+      const parsed = parseCodexJsonl(stdout);
+      sessionId = parsed.sessionId;
+      numTurns = parsed.numTurns;
+      result = parsed.result;
+      tokens = parsed.tokens;
+      costUsd = null;
+      try {
+        const mtimeMs = statSync(logPath).mtimeMs;
+        durationMs = Math.max(0, Math.round(mtimeMs - startedAt));
+      } catch {
+        durationMs = null;
       }
-    } catch {
-      // not parseable — leave nulls
+    } else {
+      try {
+        const j = JSON.parse(stdout) as {
+          total_cost_usd?: number;
+          duration_ms?: number;
+          num_turns?: number;
+          result?: string;
+          session_id?: string;
+          usage?: {
+            input_tokens?: number;
+            output_tokens?: number;
+            cache_read_input_tokens?: number;
+            cache_creation_input_tokens?: number;
+          };
+        };
+        costUsd = j.total_cost_usd ?? null;
+        durationMs = j.duration_ms ?? null;
+        numTurns = j.num_turns ?? null;
+        result = j.result ?? null;
+        sessionId = j.session_id ?? null;
+        if (j.usage) {
+          tokens = {
+            input: j.usage.input_tokens ?? 0,
+            output: j.usage.output_tokens ?? 0,
+            cacheRead: j.usage.cache_read_input_tokens ?? 0,
+            cacheCreate: j.usage.cache_creation_input_tokens ?? 0,
+          };
+        }
+      } catch {
+        // not parseable — leave nulls
+      }
     }
   }
 
@@ -162,5 +179,67 @@ function parseFullLog(filename: string, logPath: string, text: string): RunDetai
     hasStderr: stderr.length > 0,
     stdout,
     stderr,
+  };
+}
+
+type CodexParsed = {
+  sessionId: string | null;
+  numTurns: number | null;
+  result: string | null;
+  tokens: RunSummary["tokens"];
+};
+
+function parseCodexJsonl(stdout: string): CodexParsed {
+  let sessionId: string | null = null;
+  let numTurns = 0;
+  let result: string | null = null;
+  let input = 0;
+  let output = 0;
+  let cacheRead = 0;
+  let reasoning = 0;
+  let sawTurn = false;
+  let sawUsage = false;
+
+  for (const line of stdout.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      const ev = JSON.parse(trimmed) as {
+        type?: string;
+        thread_id?: string;
+        item?: { type?: string; text?: string };
+        usage?: {
+          input_tokens?: number;
+          cached_input_tokens?: number;
+          output_tokens?: number;
+          reasoning_output_tokens?: number;
+        };
+      };
+      if (ev.type === "thread.started" && typeof ev.thread_id === "string") {
+        sessionId = ev.thread_id;
+      } else if (ev.type === "turn.started") {
+        numTurns++;
+        sawTurn = true;
+      } else if (ev.type === "turn.completed" && ev.usage) {
+        input += ev.usage.input_tokens ?? 0;
+        cacheRead += ev.usage.cached_input_tokens ?? 0;
+        output += ev.usage.output_tokens ?? 0;
+        reasoning += ev.usage.reasoning_output_tokens ?? 0;
+        sawUsage = true;
+      } else if (ev.type === "item.completed" && ev.item?.type === "agent_message") {
+        if (typeof ev.item.text === "string") result = ev.item.text;
+      }
+    } catch {
+      // skip non-JSON
+    }
+  }
+
+  return {
+    sessionId,
+    numTurns: sawTurn ? numTurns : null,
+    result,
+    tokens: sawUsage
+      ? { input, output, cacheRead, cacheCreate: 0, reasoning }
+      : null,
   };
 }
