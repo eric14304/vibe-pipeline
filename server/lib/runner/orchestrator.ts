@@ -125,7 +125,7 @@ async function watchdogTick(): Promise<void> {
           } catch (e) {
             console.error(`[watchdog ${entry.pipelineId}] sync abort failed:`, e);
           }
-          if (p && p.syncJob && p.syncJob.state === "ai_running") {
+          if (p?.syncJob && p.syncJob.state === "ai_running") {
             await pipelineDir.writePipeline(project.path, entry.pipelineId, {
               ...p,
               syncJob: {
@@ -819,7 +819,7 @@ export async function stopImmediate(opts: {
   // POSIX 預設 SIGTERM;這裡傳 "SIGKILL" 強制不可捕捉。kill 失敗 / 沒 handle 都吞掉,
   // 改用後段 fs 善後當 ground truth。
   const entry = running.get(k);
-  if (entry && entry.proc) {
+  if (entry?.proc) {
     try {
       entry.proc.kill("SIGKILL");
     } catch (e) {
@@ -921,7 +921,7 @@ async function startMockRunner(opts: {
     const isCancelled = () => !running.has(k);
     try {
       const tickets = pipeline.tickets ?? [];
-      let pausedMid = false;
+      const pausedMid = false;
       // mock 模式下若最後一張是 merge ticket 且沒對應 script 條目,自動帶過
       // (auto-merge / 手動 /merge 都會 append synthetic merge ticket,spec 不需也不該另設它的劇本)
       let mockMergeDone = false;
