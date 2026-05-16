@@ -5,7 +5,7 @@ description: vibe-pipeline 操作手冊 — 給 AI 看的「怎麼用 vbpl 替 u
 
 # vibe-pipeline — AI 操作手冊
 
-User 在這台機器**可能裝了** **vibe-pipeline**(多 AI agent 的 ticket / pipeline 編排器)。完整功能介紹在 repo 的 [`README.md`](../README.md)。本檔教你「怎麼判斷有沒有裝 + 怎麼裝 + 裝了怎麼操作」。
+User 在這台機器**可能裝了** **vibe-pipeline**(多 AI agent 的 ticket / pipeline 編排器)。完整功能介紹在 repo 的 [`README.md`](../../README.md)。本檔教你「怎麼判斷有沒有裝 + 怎麼裝 + 裝了怎麼操作」。
 
 ## 先確認:vbpl 裝了沒?
 
@@ -95,7 +95,7 @@ vbpl pipeline sync <id> --cancel                       # 取消同步
    (macOS / Linux 上換對應 terminal launcher;確認 user OS 後再執行)
 3. 給 user **4 行 paste-ready** 指令(替換成實際絕對路徑):
    ```
-   Read <repo>/docs/repl-runner.md
+   Read <repo>/docs/vibe-pipeline/repl-runner.md
    PIPELINE_JSON: <target-project>/.vibe-pipeline/pipelines/<pipelineId>.json
    WORKTREE: ~/.vibe-pipeline/worktrees/<projHash>/<pipelineId>
    開始
@@ -103,7 +103,7 @@ vbpl pipeline sync <id> --cancel                       # 取消同步
 4. user 貼進新 cmd 視窗 Enter → REPL 自己 Read 兩個檔(`repl-runner.md` 框架 + `server/lib/runner/runnerPrompt.ts` 主 agent 行為)→ Task 派 sub-agent 跑完
 5. 跑完 user 回來告訴你結果,你決定下一步(看 diff / commit / merge / 啟新 pipeline)
 
-`docs/repl-runner.md` 是 paste-ready 指令的標準範本,絕對路徑替換時兩個 placeholder(`__FILL_ME__`)很明顯。
+`docs/vibe-pipeline/repl-runner.md` 是 paste-ready 指令的標準範本,絕對路徑替換時兩個 placeholder(`__FILL_ME__`)很明顯。
 
 ### 注意事項
 
@@ -161,7 +161,7 @@ vbpl pipeline sync <id> --cancel                       # 取消同步
 
 ## 完整參考
 
-- **README**:repo 的 [`README.md`](../README.md) — 安裝 / 完整功能 / Tailscale 遠端
+- **README**:repo 的 [`README.md`](../../README.md) — 安裝 / 完整功能 / Tailscale 遠端
 - **CLAUDE.md**(repo 內):repo 結構 / 雷區 / 設計信條 — 改 vibe-pipeline 自己的 code 才需要看
 - **子 SKILL**(repo 內 `.claude/skills/`):改 frontend / backend / cli / e2e code 才看
 - **`vbpl --help`** 看每個 verb 的 flag,新功能比這份手冊新

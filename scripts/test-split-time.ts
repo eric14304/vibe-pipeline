@@ -49,7 +49,7 @@ const spec = {
 - **順手發現但未動的問題清單**:含位置 + 描述。
 
 ## 參考
-參考 \`docs/SKILL.md\`(產品定位)、\`vibe-pipeline-frontend\` SKILL(src/ 約定)、\`vibe-pipeline-backend\` SKILL(server/ 職責邊界)、\`vibe-pipeline-e2e\` SKILL(e2e 不可破壞語意)。`,
+參考 \`docs/vibe-pipeline/SKILL.md\`(產品定位)、\`vibe-pipeline-frontend\` SKILL(src/ 約定)、\`vibe-pipeline-backend\` SKILL(server/ 職責邊界)、\`vibe-pipeline-e2e\` SKILL(e2e 不可破壞語意)。`,
   mode: "iter" as const,
 };
 

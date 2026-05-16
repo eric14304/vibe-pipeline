@@ -11,9 +11,9 @@
 User 把 repo URL 給你的話,標準流程:
 
 1. **看本 README 全文** — 了解產品 + 找到主 SKILL 位置
-2. **建議 user 裝主 SKILL** — `docs/SKILL.md` 是本檔最重要的引導手冊;依 user 用的 AI 平台裝進對應 skills 路徑(Claude Code → `~/.claude/skills/vibe-pipeline/SKILL.md`,codex → `~/.codex/skills/vibe-pipeline/SKILL.md`,其他平台看各自 docs)。詳細路徑跟複製指令在 §給 AI 安裝
+2. **建議 user 裝主 SKILL** — `docs/vibe-pipeline/SKILL.md` 是本檔最重要的引導手冊;source dir(`docs/vibe-pipeline/`)直接 cp 進 AI 的 skills 路徑(Claude Code → `~/.claude/skills/vibe-pipeline/`,codex → `~/.codex/skills/vibe-pipeline/`,其他平台看各自 docs)。詳細路徑跟複製指令在 §給 AI 安裝
 3. **(user 開新 session,你接收主 SKILL)** — 主 SKILL 是跨 project 永久載入的 AI 操作手冊
-4. **檢查 vbpl 裝了沒** — 跑 `vbpl --version`;沒裝 → 看 [`docs/install.md`](docs/install.md) 跑 per-OS build + PATH 步驟
+4. **檢查 vbpl 裝了沒** — 跑 `vbpl --version`;沒裝 → 看 [`docs/vibe-pipeline/install.md`](docs/vibe-pipeline/install.md) 跑 per-OS build + PATH 步驟
 5. **進入正常操作** — 看主 SKILL「標準操作流」段
 
 如果 user 的 AI 不認 Claude SKILL 格式:看 `AGENTS.md`(跨 provider pointer)。
@@ -59,9 +59,9 @@ bun run cli:build:linux     # Linux x64
 
 ## 給 AI 安裝(讓你家的 AI 學會用 vbpl)
 
-主 SKILL source 在 [`docs/SKILL.md`](docs/SKILL.md)。把它裝進 AI 的 skills 路徑(Claude Code → `~/.claude/skills/vibe-pipeline/SKILL.md`;codex → `~/.codex/skills/vibe-pipeline/SKILL.md`;其他平台看各自 docs)。AI 自己會 cp,你叫它「裝這個 SKILL」就行。
+主 SKILL bundle 在 [`docs/vibe-pipeline/`](docs/vibe-pipeline/)(含 `SKILL.md` + `install.md` + `repl-runner.md` 三個檔)。把**整個 dir** cp 進 AI 的 skills 路徑(Claude Code → `~/.claude/skills/vibe-pipeline/`;codex → `~/.codex/skills/vibe-pipeline/`;其他平台看各自 docs)。AI 自己會 cp,你叫它「裝這個 SKILL」就行。
 
-只想對某個 repo 限定,裝進 `<that-project>/.claude/skills/vibe-pipeline/SKILL.md`。
+只想對某個 repo 限定,cp 進 `<that-project>/.claude/skills/vibe-pipeline/`。
 
 驗證:在新 session 開 AI,問「我能用 vbpl 幹嘛?」AI 應該秒回 pipeline / ticket / executor / critic 心智 + 常用指令。
 
@@ -135,7 +135,7 @@ bun run cli:build:mac       # macOS arm64 → dist-cli/vbpl-mac
 bun run cli:build:linux     # Linux x64   → dist-cli/vbpl-linux
 ```
 
-裝 PATH:`vbpl --version` 驗即可。**完整 install per-OS + trouble 看 [`docs/install.md`](docs/install.md)**。
+裝 PATH:`vbpl --version` 驗即可。**完整 install per-OS + trouble 看 [`docs/vibe-pipeline/install.md`](docs/vibe-pipeline/install.md)**。
 
 ### 常用指令
 
@@ -189,7 +189,7 @@ tests/e2e/   Playwright(mock CI 模式 + real 模式)
 SKILL 文件分兩種,動非 trivial 改動前先讀:
 
 **主 SKILL**(enduser-facing artifact,可裝進 AI 的 skills 路徑):
-- [vibe-pipeline](docs/SKILL.md) — 產品定位 / scope / vbpl 操作手冊
+- [vibe-pipeline](docs/vibe-pipeline/SKILL.md) — 產品定位 / scope / vbpl 操作手冊
 
 **maintainer SKILL**(`.claude/skills/`,只給改 vibe-pipeline 自己 code 的 AI 用):
 - [vibe-pipeline-frontend](.claude/skills/vibe-pipeline-frontend/SKILL.md) — UI 慣例
