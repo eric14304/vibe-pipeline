@@ -17,7 +17,7 @@ const PIPELINE_USAGE = `vbpl pipeline — manage pipelines (fs ops local; run/st
   vbpl pipeline create <name>                 [--auto-merge] [--base-branch <branch>]
   vbpl pipeline delete <id>
   vbpl pipeline run    <id>                   (needs backend)
-  vbpl pipeline stop   <id>                   [--immediate]
+  vbpl pipeline stop   <id>                   (needs backend)
   vbpl pipeline status <id>
   vbpl pipeline log    <id>                   [--follow|-f]
   vbpl pipeline merge  <id>                   AI merge → base
@@ -167,7 +167,7 @@ async function pipelineDelete(args: ParsedArgs): Promise<void> {
 }
 
 // 走 backend HTTP — spawn child(claude/codex runner)必須讓 backend 養。
-// CLI 自己 spawn 會在 CLI 退出時失去 child 控制權(orchestrator running map 蒸發,watchdog / pause / stop 都失效)
+// CLI 自己 spawn 會在 CLI 退出時失去 child 控制權(orchestrator running map 蒸發,watchdog / stop 都失效)
 async function pipelineRun(args: ParsedArgs): Promise<void> {
   const proj = await resolveProject(args.flags);
   await requireInit(proj.path);
@@ -190,24 +190,19 @@ async function pipelineRun(args: ParsedArgs): Promise<void> {
 }
 
 async function pipelineStop(args: ParsedArgs): Promise<void> {
+  if (args.flags["immediate"] !== undefined) fail("INVALID_ARGS", "Unknown flag: --immediate");
   const proj = await resolveProject(args.flags);
   await requireInit(proj.path);
   const id = args.positional[0];
-  if (!id) fail("INVALID_ARGS", "Usage: vbpl pipeline stop <id> [--immediate]");
+  if (!id) fail("INVALID_ARGS", "Usage: vbpl pipeline stop <id>");
 
-  const immediate = args.flags["immediate"] === true;
-  const body = immediate ? { mode: "immediate" as const } : undefined;
-  await post(`/api/projects/${proj.hash}/pipelines/${id}/stop`, body);
+  await post(`/api/projects/${proj.hash}/pipelines/${id}/stop`);
 
   if (isJsonMode()) {
-    okJson({ stopping: true, pipelineId: id, mode: immediate ? "immediate" : "graceful" });
+    okJson({ stopped: true, pipelineId: id });
     return;
   }
-  if (immediate) {
-    print(`Pipeline stopping (immediate): ${id} (runner killed mid-ticket)`);
-  } else {
-    print(`Pipeline stopping: ${id} (runner will mark paused after current ticket)`);
-  }
+  print(`Pipeline stopped: ${id}`);
 }
 
 async function pipelineStatus(args: ParsedArgs): Promise<void> {

@@ -16,8 +16,7 @@
 | paused         | false     | ▶ 繼續 (~lastDur)             | btn-primary   | ✗        | onRun     |
 | failed         | true      | 無ticket可執行                | btn           | ✓        | —         |
 | failed         | false     | ▶ 重試 (~lastDur)             | btn-primary   | ✗        | onRun     |
-| running        | n/a       | ⏸ 暫停                        | btn           | ✗        | onPause   |
-| stopping       | n/a       | (loader) 停止中               | btn           | ✓        | —         |
+| running        | n/a       | ⏹ 停止                        | btn-danger    | ✗        | onPause   |
 | ready          | n/a       | ✓ 全部完成                    | btn           | ✓        | —         |
 | merged         | n/a       | ✓ 已合併                      | btn           | ✓        | —         |
 
@@ -56,7 +55,7 @@
 | failed_iter_limit    | --failed        | iter 上限          |
 | failed_transient     | --failed        | transient 失敗     |
 
-注意:`STATE_COLOR` / `STATE_LABEL` 同時對 pipeline.state(planning / running / stopping / paused / ready / failed / merged)和 ticket.status 兩種 enum 服務 — key 撞時要小心。
+注意:`STATE_COLOR` / `STATE_LABEL` 同時對 pipeline.state(planning / running / queued / paused / ready / failed / merged)和 ticket.status 兩種 enum 服務 — key 撞時要小心。
 
 ---
 
@@ -65,7 +64,7 @@
 | item        | 顯示條件                                            | disabled 條件                              |
 | ----------- | --------------------------------------------------- | ------------------------------------------ |
 | 開啟 worktree | `onRevealWorktree` 有                               | (無)                                       |
-| 重跑全部     | `onResetAll` 有 + `hasResettable`(有 done/failed_*)| `lockedByState`(running / stopping)        |
+| 重跑全部     | `onResetAll` 有 + `hasResettable`(有 done/failed_*)| `lockedByState`(running / queued)          |
 | 刪除 pipeline | `onDelete` 有                                       | `lockedByState`                            |
 
 `hasResettable` = `tickets.some(t.status ∈ {done, failed, failed_iter_limit, failed_transient})`

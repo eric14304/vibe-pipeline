@@ -6,7 +6,6 @@ export const STATE_COLOR: Record<string, string> = {
   // pipeline states
   paused: "var(--paused)",
   running: "var(--running)",
-  stopping: "var(--paused)",
   queued: "var(--queued)",
   ready: "var(--done)",
   planning: "var(--draft)",
@@ -24,7 +23,6 @@ export const STATE_COLOR: Record<string, string> = {
 export const STATE_LABEL: Record<string, string> = {
   paused: "暫停",
   running: "執行中",
-  stopping: "停止中",
   queued: "排隊中",
   ready: "可合併",
   planning: "規劃中",

@@ -248,11 +248,10 @@ export async function savePipeline(hash: string, id: string, req: Request): Prom
   if (!existing) {
     return err("not_found", `Pipeline not found: ${id}(建立用 POST /pipelines)`, 404);
   }
-  // Race guard:running / stopping / queued 時禁止 PUT,避免覆蓋 runner 主 agent 正在寫的 iter / commits
+  // Race guard:running / queued 時禁止 PUT,避免覆蓋 runner 主 agent 正在寫的 iter / commits
   // 或把 queued 狀態踩掉導致 dispatcher 接不到。queued 可走「取消排隊」端點處理。
   if (
     existing.state === "running" ||
-    existing.state === "stopping" ||
     existing.state === "queued"
   ) {
     return err(
@@ -356,7 +355,7 @@ export async function runPipeline(hash: string, pipelineId: string): Promise<Res
       );
     }
     // 邏輯阻擋(state guard / 已在跑等)用 409 conflict;真正爆炸用 500
-    const isConflict = /已在|stopping|完成|排隊|merge/.test(r.error);
+    const isConflict = /已在|完成|排隊|merge/.test(r.error);
     return err("invalid_path", r.error, isConflict ? 409 : 500);
   }
   // queued: true 時,前端可立即顯示「排隊中(順位 N)」不等下一輪 poll
@@ -394,33 +393,17 @@ export async function pipelineDiff(hash: string, pipelineId: string): Promise<Re
 }
 
 // /pause 跟 /stop 共用本 handler。
-// body { mode?: "graceful" | "immediate" }(預設 graceful)。
-//   graceful  → orchestrator.stop()(標 stopping,主 agent 跑完當前 ticket 自己收尾)
-//   immediate → orchestrator.stopImmediate()(SIGKILL 主 agent + 同步標 paused)
-// queued 狀態無論 mode 都走 cancelQueued(沒有 process 可砍,行為一致)。
-// 預期沒 body / 不是 JSON 也容忍 — 老 caller(只 POST 不帶 body)維持 graceful 行為。
+// 固定立即停止:running 走 SIGKILL + 標 paused;queued 走 cancelQueued。
+// 預期沒 body / 不是 JSON 也容忍。
 export async function pausePipeline(
   hash: string,
   pipelineId: string,
-  req?: Request
+  _req?: Request
 ): Promise<Response> {
   const project = await projectStore.findByHash(hash);
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);
 
-  let mode: "graceful" | "immediate" = "graceful";
-  if (req) {
-    const ct = req.headers.get("content-type") ?? "";
-    if (ct.toLowerCase().includes("application/json")) {
-      const body = await readJson(req);
-      const raw = body.mode;
-      if (raw === "immediate" || raw === "graceful") mode = raw;
-      else if (raw !== undefined) {
-        return err("invalid_path", `Invalid mode: ${String(raw)}`, 400);
-      }
-    }
-  }
-
-  // queued 狀態走 cancelQueued(直接從 queue 拔 + 標 paused);running 走原 stop 流程
+  // queued 狀態走 cancelQueued(直接從 queue 拔 + 標 paused);running 走立即停止。
   if (orchestrator.isQueued(hash, pipelineId)) {
     const r = await orchestrator.cancelQueued({
       projectPath: project.path,
@@ -431,29 +414,17 @@ export async function pausePipeline(
     return ok({ ok: true, cancelled: true });
   }
 
-  if (mode === "immediate") {
-    const r = await orchestrator.stopImmediate({
-      projectPath: project.path,
-      projectHash: hash,
-      pipelineId,
-    });
-    if (!r.ok) {
-      const code: ApiErrorCode = r.code === "state_guard" ? "state_guard"
-        : r.code === "not_found" ? "not_found"
-        : "invalid_path";
-      const status = code === "not_found" ? 404 : 409;
-      return err(code, r.error, status);
-    }
-    return ok({ ok: true, mode: "immediate" as const });
-  }
-
-  const r = await orchestrator.stop({
+  const r = await orchestrator.stopImmediate({
     projectPath: project.path,
     projectHash: hash,
     pipelineId,
   });
-  if (!r.ok) return err("invalid_path", r.error, 409);
-  return ok({ ok: true, mode: "graceful" as const });
+  if (!r.ok) {
+    const code: ApiErrorCode = r.code === "not_found" ? "not_found" : "invalid_path";
+    const status = code === "not_found" ? 404 : 409;
+    return err(code, r.error, status);
+  }
+  return ok({ ok: true });
 }
 
 // AI merge(ticket-based):append 一張 mode=merge synthetic ticket 進 pipeline,
@@ -545,7 +516,7 @@ export async function syncStatus(hash: string, pipelineId: string): Promise<Resp
 // - clean merge → 立即 done
 // - 衝突 → 寫 syncJob.state=conflict_await,前端跳 modal 讓 user 決定要不要 AI 解
 // - merge 失敗(非衝突)→ syncJob.failed
-// 前置:state ∈ {ready, paused, planning, failed} 才允許,running/stopping/queued/merged 擋
+// 前置:state ∈ {ready, paused, planning, failed} 才允許,running/queued/merged 擋
 export async function syncPipeline(hash: string, pipelineId: string): Promise<Response> {
   const project = await projectStore.findByHash(hash);
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);

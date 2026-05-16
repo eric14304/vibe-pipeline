@@ -136,9 +136,7 @@ export function BoardScreen({
       return;
     }
     const projectName = project.name;
-    const running = pipelines.find(
-      (p) => p.state === "running" || p.state === "stopping"
-    );
+    const running = pipelines.find((p) => p.state === "running");
     const blockingNotifs = items.filter((i) => i.sev === "block" && i.unread).length;
     let prefix = "";
     if (blockingNotifs > 0) prefix = `[!${blockingNotifs}] `;
@@ -288,10 +286,7 @@ export function BoardScreen({
   }
 
   // running 條數從 pipelines 推(pipelines 已 1.5s polling,不另起 setInterval)。
-  // 視覺上 stopping 還佔 slot,算進去。
-  const runningCount = pipelines.filter(
-    (p) => p.state === "running" || p.state === "stopping"
-  ).length;
+  const runningCount = pipelines.filter((p) => p.state === "running").length;
   // queue 順位:state=queued 的依 id desc(列表 sort 順序)排,但 backend FIFO 是 enqueue 時間。
   // 沒 enqueueAt 持久化,只能近似 — 顯示順位從 1 起算同一批 queued 的 index。
   // (跨 server restart 會 reset 到 paused,reset 後重排 OK。)
@@ -641,18 +636,13 @@ export function BoardScreen({
             }}
             onPause={async (pid, mode) => {
               if (!project) return;
-              const stopMode = mode ?? "graceful";
+              const stopMode = mode ?? "immediate";
               try {
                 await api.pausePipeline(project.hash, pid, stopMode);
                 setReloadKey((k) => k + 1);
-                setActionError(
-                  stopMode === "immediate"
-                    ? "✓ 已立即停止 pipeline(runner child 已殺)"
-                    : "✓ 已送出暫停請求(等 ticket 收完)"
-                );
+                setActionError("✓ 已停止 pipeline,當前 ticket 已暫停");
               } catch (e) {
-                const label = stopMode === "immediate" ? "立即停止" : "暫停";
-                setActionError(`${label}失敗: ${e instanceof Error ? e.message : String(e)}`);
+                setActionError(`停止失敗: ${e instanceof Error ? e.message : String(e)}`);
               }
             }}
             onDelete={async (pid) => {

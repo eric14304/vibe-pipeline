@@ -43,7 +43,6 @@ const RUN_BUTTON_CASES: Array<{
     lastRun: { durationMs: 180000 },
   },
   { label: "running", pipeline: makePipeline({ state: "running", ticketStatus: "running" }) },
-  { label: "stopping", pipeline: makePipeline({ state: "stopping", ticketStatus: "running" }) },
   { label: "paused", pipeline: makePipeline({ state: "paused", ticketStatus: "draft" }) },
   { label: "paused + 0 tickets", pipeline: makePipeline({ state: "paused", noTickets: true }) },
   { label: "ready (all done)", pipeline: makePipeline({ state: "ready", ticketStatus: "done" }) },

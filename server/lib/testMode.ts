@@ -64,8 +64,6 @@ export type RunnerScript = {
   // pipeline 收尾 state。預設 "ready" (全成功);測 pause/fail 流程用 "paused" / "failed";
   // "merged" 給 merge / auto-merge spec 驗 worktree prune 用
   finalState?: "ready" | "paused" | "failed" | "merged";
-  // 模擬整段被 pause 後的行為 — 中途某 ticket 結束後標 paused。null 表示不 pause。
-  pauseAfterTicketIndex?: number;
 };
 
 const runnerScripts = new Map<string, RunnerScript>();

@@ -108,7 +108,6 @@ function railSecondary(p: Pipeline): string {
     }
     return `執行中${agoSuffix}`;
   }
-  if (p.state === "stopping") return `停止中${agoSuffix}`;
   if (p.state === "merged") return `已併入 ${base}${agoSuffix}`;
   if (p.state === "ready") return `可合併入 ${base}${agoSuffix}`;
   if (p.state === "failed") return `失敗${agoSuffix}`;

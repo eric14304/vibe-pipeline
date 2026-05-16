@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type APIRequestContext, type Page } from "@playwright/test";
 import { createTempProject, cleanupTempProject, type TempProject } from "../helpers/temp-project";
 import { resetMocks, setRunnerScript, type RunnerScript } from "../helpers/mock-control";
 
@@ -30,6 +30,28 @@ function pipelineWithTickets(tickets: Array<{ id: string; title: string; mode?: 
       status: "ready",
     })),
   };
+}
+
+type RunnerFlowPipeline = {
+  state: string;
+  tickets: Array<{ id: string; status: string }>;
+};
+
+async function readPipeline(
+  request: APIRequestContext,
+  hash: string,
+  pipelineId = "pipe-run-1"
+): Promise<RunnerFlowPipeline> {
+  const res = await request.get(`/api/projects/${hash}/pipelines/${pipelineId}`);
+  expect(res.ok()).toBe(true);
+  const body = (await res.json()) as { ok: boolean; data?: RunnerFlowPipeline };
+  expect(body.ok).toBe(true);
+  expect(body.data).toBeTruthy();
+  return body.data!;
+}
+
+async function clickImmediateStop(page: Page): Promise<void> {
+  await page.getByRole("button", { name: /停止/ }).click();
 }
 
 test("step ticket Run → running → done → ready,commit hash 寫回", async ({ page }) => {
@@ -95,7 +117,7 @@ test("iter mode FAIL → PASS chain,verdicts 顯示", async ({ page }) => {
   await expect(verdictPips.nth(1)).toHaveClass(/is-pass/);
 });
 
-test("Pause running → state 變 paused,resume 接續", async ({ page }) => {
+test("Pause running → state 立即變 paused,resume 接續", async ({ page, request }) => {
   proj = await createTempProject({
     pipelines: [
       pipelineWithTickets([
@@ -104,26 +126,119 @@ test("Pause running → state 變 paused,resume 接續", async ({ page }) => {
       ]),
     ],
   });
-  // 第一張慢一點,給時間 click pause
   const script: RunnerScript = {
     tickets: [
-      { beforeRunningMs: 100, workMs: 800, finalStatus: "done", commitHash: "mock-1" },
+      { beforeRunningMs: 100, workMs: 1000, finalStatus: "done", commitHash: "mock-1" },
       { beforeRunningMs: 50, workMs: 100, finalStatus: "done", commitHash: "mock-2" },
     ],
     finalState: "ready",
-    // 第 0 張 ticket 結束後 pause
-    pauseAfterTicketIndex: 0,
   };
   await setRunnerScript(proj.hash, "pipe-run-1", script);
 
   await page.goto(`/board?project=${proj.hash}`);
   await page.locator("button[title*='開始運行']").click();
 
-  // 等 paused 狀態(pauseAfterTicketIndex=0 → 第一張完成後直接 paused)
-  await expect(page.locator("button", { hasText: /繼續/ })).toBeVisible({ timeout: 10000 });
+  await expect.poll(async () => {
+    const p = await readPipeline(request, proj.hash);
+    return p.tickets.find((t) => t.id === "t-pause-1")?.status;
+  }).toBe("running");
 
-  // 第二張仍是 ready / 未跑(ticket-row 顯示應該沒 done)
-  // 第一張應該 done(commits 寫了)
+  await clickImmediateStop(page);
+
+  await expect.poll(async () => (await readPipeline(request, proj.hash)).state).toBe("paused");
+  const paused = await readPipeline(request, proj.hash);
+  expect(paused.tickets.find((t) => t.id === "t-pause-1")?.status).toBe("paused");
+  expect(paused.tickets.find((t) => t.id === "t-pause-2")?.status).toBe("ready");
+
+  await page.getByRole("button", { name: /繼續/ }).click();
+  await expect(page.locator(".banner-ready")).toBeVisible({ timeout: 10000 });
+});
+
+test("ticket 跑中段按停止 → ticket 直接標 paused", async ({ page, request }) => {
+  proj = await createTempProject({
+    pipelines: [
+      pipelineWithTickets([
+        { id: "t-mid-1", title: "long-running" },
+        { id: "t-mid-2", title: "next" },
+      ]),
+    ],
+  });
+  const script: RunnerScript = {
+    tickets: [
+      { beforeRunningMs: 50, workMs: 2000, finalStatus: "done", commitHash: "mock-mid-1" },
+      { beforeRunningMs: 50, workMs: 100, finalStatus: "done", commitHash: "mock-mid-2" },
+    ],
+    finalState: "ready",
+  };
+  await setRunnerScript(proj.hash, "pipe-run-1", script);
+
+  await page.goto(`/board?project=${proj.hash}`);
+  await page.locator("button[title*='開始運行']").click();
+
+  await expect.poll(async () => {
+    const p = await readPipeline(request, proj.hash);
+    return p.tickets.find((t) => t.id === "t-mid-1")?.status;
+  }).toBe("running");
+
+  await clickImmediateStop(page);
+
+  await expect.poll(async () => {
+    const p = await readPipeline(request, proj.hash);
+    return {
+      state: p.state,
+      first: p.tickets.find((t) => t.id === "t-mid-1")?.status,
+      second: p.tickets.find((t) => t.id === "t-mid-2")?.status,
+    };
+  }).toEqual({ state: "paused", first: "paused", second: "ready" });
+
+  await expect.poll(async () => {
+    const p = await readPipeline(request, proj.hash);
+    return {
+      state: p.state,
+      first: p.tickets.find((t) => t.id === "t-mid-1")?.status,
+      second: p.tickets.find((t) => t.id === "t-mid-2")?.status,
+    };
+  }, { timeout: 1300, intervals: [300, 500, 500] }).toEqual({
+    state: "paused",
+    first: "paused",
+    second: "ready",
+  });
+});
+
+test("按停止 → pipeline.state 從 running 直接到 paused,不經其他中介值", async ({ page, request }) => {
+  proj = await createTempProject({
+    pipelines: [pipelineWithTickets([{ id: "t-state-1", title: "state-watch" }])],
+  });
+  const script: RunnerScript = {
+    tickets: [
+      { beforeRunningMs: 50, workMs: 2000, finalStatus: "done", commitHash: "mock-state-1" },
+    ],
+    finalState: "ready",
+  };
+  await setRunnerScript(proj.hash, "pipe-run-1", script);
+
+  await page.goto(`/board?project=${proj.hash}`);
+  await page.locator("button[title*='開始運行']").click();
+
+  await expect.poll(async () => (await readPipeline(request, proj.hash)).state).toBe("running");
+
+  const observed: string[] = [];
+  const observer = (async () => {
+    const deadline = Date.now() + 3000;
+    while (Date.now() < deadline) {
+      const state = (await readPipeline(request, proj.hash)).state;
+      observed.push(state);
+      if (state === "paused") return;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+  })();
+
+  await clickImmediateStop(page);
+  await observer;
+
+  expect(observed).toContain("running");
+  expect(observed).toContain("paused");
+  expect(observed.every((state) => state === "running" || state === "paused")).toBe(true);
 });
 
 test("沒 ticket 的 pipeline 顯示「無ticket可執行」按鈕", async ({ page }) => {

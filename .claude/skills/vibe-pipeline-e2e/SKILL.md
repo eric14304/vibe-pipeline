@@ -11,7 +11,7 @@ E2E 用 Playwright 跑真瀏覽器 + 真 backend,**不靠 unit test 取代**。p
 
 ## 現況
 
-12 mock spec / 55 test + `auth.spec.ts`(TOTP)+ real 套 `vp-autotest` iter ticket 驗證。缺覆蓋:FCM fanout(需 mock FCM Admin SDK)/ RWD breakpoint / autoMerge / splitInto / sync / prune worktree / Settings 4-tab。Phase 進度 → [`CHANGELOG.md`](../../../docs/CHANGELOG.md)。
+12 mock spec / 57 test + `auth.spec.ts`(TOTP)+ real 套 `vp-autotest` iter ticket 驗證。缺覆蓋:FCM fanout(需 mock FCM Admin SDK)/ RWD breakpoint / autoMerge / splitInto / sync / prune worktree / Settings 4-tab。Phase 進度 → [`CHANGELOG.md`](../../../docs/CHANGELOG.md)。
 
 ## 雙模式
 
@@ -105,7 +105,8 @@ E2E 用 Playwright 跑真瀏覽器 + 真 backend,**不靠 unit test 取代**。p
 |  | RunHistory 展開 stdout/stderr |  |
 |  | Esc 關閉 |  |
 | **Runner** | Run → state 變 ready → running → done(全 ticket done) | `runner-flow.spec.ts` |
-|  | Pause(running → stopping → paused),resume 接續從下一 ticket |  |
+|  | Stop(running → paused immediately; active ticket paused),resume 接續 |  |
+|  | Stop state sequence: running → paused,無中介 state |  |
 |  | iter mode FAIL → PASS chain(verdicts 寫 ["FAIL","PASS"]) |  |
 |  | failed_iter_limit(達 iter 上限 + iterStopAtLimit=true → pause) |  |
 |  | failed_transient(mock 劇本第一次擲、第二次成功) |  |
@@ -134,7 +135,7 @@ E2E 用 Playwright 跑真瀏覽器 + 真 backend,**不靠 unit test 取代**。p
 |  | URL `?theme=dark` override |  |
 |  | tab title 動態(running 時 `(N) <pipeline> 跑中 · vibe-pipeline`) |  |
 | **State guards (backend via UI)** | savePipeline shape 缺欄位 → 4xx + UI 不變 | `guards.spec.ts` |
-|  | running/stopping 不准 PUT |  |
+|  | running/queued 不准 PUT |  |
 |  | PUT non-existent → 404 |  |
 |  | QA close 自動 cancel 空 draft |  |
 | **Empty states** | EmptyProject 箭頭指 TopBar + CTA | `empty.spec.ts` |

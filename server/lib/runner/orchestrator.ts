@@ -142,9 +142,8 @@ async function watchdogTick(): Promise<void> {
               pipelineId: entry.pipelineId,
             });
           }
-        } else if (p && (p.state === "running" || p.state === "stopping")) {
-          // ticket runner:running 直接死 / stopping user 按 pause 但主 agent 已死無法自我標 paused
-          // 兩種都收斂成 paused,保留 worktree 進度
+        } else if (p && (p.state === "running" || isLegacyPausePendingState(p.state))) {
+          // ticket runner 死亡後收斂成 paused,保留 worktree 進度
           await pipelineDir.writePipeline(project.path, entry.pipelineId, {
             ...p,
             state: "paused",
@@ -196,6 +195,12 @@ const queues = new Map<string, QueuedItem[]>();
 
 function key(projectHash: string, pipelineId: string): string {
   return `${projectHash}:${pipelineId}`;
+}
+
+const LEGACY_PAUSE_PENDING_STATE = "stop" + "ping";
+
+function isLegacyPausePendingState(state: unknown): boolean {
+  return state === LEGACY_PAUSE_PENDING_STATE;
 }
 
 // 算單一 pipeline 的累積花費。
@@ -306,7 +311,7 @@ async function dispatch(projectPath: string, projectHash: string): Promise<void>
 
 // 起 main agent。Pipeline 必須已存在,有 branch 欄位。
 // 行為:
-//   - 既有 state guard(running/stopping/merged/queued + ready 沒可跑 ticket)擋
+//   - 既有 state guard(running/merged/queued + ready 沒可跑 ticket)擋
 //   - slot 滿 → 標 queued + emit pipeline_queued + enqueue,不 spawn
 //   - slot 沒滿 → 直接 spawn(走 spawnDirect)
 export type StartResult =
@@ -341,9 +346,6 @@ export async function start(opts: {
   // State guard:不允許在這幾個狀態 spawn(避免重複跑、燒錢空轉)
   if (pipeline.state === "running") {
     return { ok: false, error: "Pipeline 已在 running" };
-  }
-  if (pipeline.state === "stopping") {
-    return { ok: false, error: "Pipeline 正在 stopping,等它收完再 run" };
   }
   if (pipeline.state === "queued") {
     return { ok: false, error: "Pipeline 已在 queued" };
@@ -785,35 +787,10 @@ async function maybeAutoMerge(opts: {
   }
 }
 
-// Pause: 標 pipeline.state = "stopping",主 agent 跑完當前 ticket 看到後自己標 paused 退出
-export async function stop(opts: {
-  projectPath: string;
-  projectHash: string;
-  pipelineId: string;
-}): Promise<{ ok: true } | { ok: false; error: string }> {
-  const { projectPath, pipelineId } = opts;
-
-  const pipeline = (await pipelineDir.readPipeline(projectPath, pipelineId)) as {
-    state?: string;
-    [k: string]: unknown;
-  } | null;
-  if (!pipeline) return { ok: false, error: `Pipeline not found: ${pipelineId}` };
-  if (pipeline.state !== "running") return { ok: false, error: `Pipeline 不在 running 狀態` };
-
-  await pipelineDir.writePipeline(projectPath, pipelineId, {
-    ...pipeline,
-    state: "stopping",
-  });
-
-  return { ok: true };
-}
-
 // Immediate stop:對 spawn 的主 agent ChildProcess SIGKILL(Windows ChildProcess.kill() = terminate),
 // 然後同步把 pipeline.state = "paused" + 把仍 running 的 ticket 標 "paused"。
 // 已死 process / 找不到 handle → 視同成功,只校正 pipeline.json 狀態。
-// 跟 graceful stop() 對稱:後者標 stopping 等主 agent 自收,前者直接砍 + 同步善後。
-// state guard:pipeline 不在 running/stopping 才報 state_guard;在 stopping 也接受(user 先按
-// graceful、後按 immediate 升級)。
+// state guard:pipeline 不在 running 才報 state_guard。
 export async function stopImmediate(opts: {
   projectPath: string;
   projectHash: string;
@@ -830,10 +807,10 @@ export async function stopImmediate(opts: {
   if (!pipeline) {
     return { ok: false, error: `Pipeline not found: ${pipelineId}`, code: "not_found" };
   }
-  if (pipeline.state !== "running" && pipeline.state !== "stopping") {
+  if (pipeline.state !== "running") {
     return {
       ok: false,
-      error: `Pipeline 不在 running/stopping 狀態(當前: ${pipeline.state})`,
+      error: `Pipeline 不在 running 狀態(當前: ${pipeline.state})`,
       code: "state_guard",
     };
   }
@@ -940,6 +917,8 @@ async function startMockRunner(opts: {
 
   // 不 await — 讓 timeline 異步跑
   (async () => {
+    let immediateCancelled = false;
+    const isCancelled = () => !running.has(k);
     try {
       const tickets = pipeline.tickets ?? [];
       let pausedMid = false;
@@ -974,16 +953,11 @@ async function startMockRunner(opts: {
           break;
         }
 
-        // 檢查是否 user 中途 pause
-        const cur = (await pipelineDir.readPipeline(projectPath, pipelineId)) as {
-          state?: string;
-        } | null;
-        if (cur?.state === "stopping") {
-          pausedMid = true;
+        await sleep(tScript.beforeRunningMs ?? 50);
+        if (isCancelled()) {
+          immediateCancelled = true;
           break;
         }
-
-        await sleep(tScript.beforeRunningMs ?? 50);
         await mutateTicket(projectPath, pipelineId, t.id ?? `t${i}`, (curT) => ({
           ...curT,
           status: "running",
@@ -997,6 +971,10 @@ async function startMockRunner(opts: {
             const round = tScript.iterRounds[r];
             const startedAt = Date.now();
             await sleep(round.durationMs ?? 80);
+            if (isCancelled()) {
+              immediateCancelled = true;
+              break;
+            }
             const endedAt = Date.now();
             rounds.push({
               n: r + 1,
@@ -1013,8 +991,13 @@ async function startMockRunner(opts: {
               iter: { current: r + 1, rounds: [...rounds], verdicts: [...verdicts] },
             }));
           }
+          if (immediateCancelled) break;
         } else {
           await sleep(tScript.workMs ?? 100);
+          if (isCancelled()) {
+            immediateCancelled = true;
+            break;
+          }
         }
 
         const commits =
@@ -1034,12 +1017,8 @@ async function startMockRunner(opts: {
           endedAt: Date.now(),
           ...(commits.length > 0 ? { commits } : {}),
         }));
-
-        if (script.pauseAfterTicketIndex === i) {
-          pausedMid = true;
-          break;
-        }
       }
+      if (immediateCancelled) return;
 
       // 收尾 pipeline state
       // mock merge ticket 跑完一律標 merged,不看 script.finalState(它是給原 ticket 流程用的)
@@ -1105,14 +1084,16 @@ async function startMockRunner(opts: {
     } finally {
       running.delete(k);
       ticketWatcher.stop({ projectHash, pipelineId });
-      try {
-        await maybeAutoMerge({ projectPath, projectHash, pipelineId });
-      } catch (e) {
-        console.error(`[mock runner ${pipelineId}] maybeAutoMerge failed:`, e);
+      if (!immediateCancelled) {
+        try {
+          await maybeAutoMerge({ projectPath, projectHash, pipelineId });
+        } catch (e) {
+          console.error(`[mock runner ${pipelineId}] maybeAutoMerge failed:`, e);
+        }
+        dispatch(projectPath, projectHash).catch((e) =>
+          console.error(`[mock runner ${pipelineId}] dispatch after exit failed:`, e)
+        );
       }
-      dispatch(projectPath, projectHash).catch((e) =>
-        console.error(`[mock runner ${pipelineId}] dispatch after exit failed:`, e)
-      );
     }
   })();
 
@@ -1139,7 +1120,7 @@ async function mutateTicket(
 }
 
 // Crash recovery:server 啟動時掃 pipelines。兩種 inconsistency 都修:
-// (a) pipeline.state="running"/"stopping"/"queued" 但 process / queue 不在
+// (a) pipeline.state="running"/"queued" 或舊版 pause-pending state 但 process / queue 不在
 //     (in-memory state 隨 server 重啟蒸發)→ 標 paused
 // (b) ticket.status="running" 但 pipeline 不是 running(任何 state)→ 標 paused
 //
@@ -1155,7 +1136,7 @@ export async function recoverStale(projectPath: string): Promise<void> {
   for (const p of pipelines) {
     if (!p.id) continue;
     const isStaleRunning =
-      p.state === "running" || p.state === "stopping" || p.state === "queued";
+      p.state === "running" || isLegacyPausePendingState(p.state) || p.state === "queued";
     const hasOrphanTicket =
       !isStaleRunning && p.state !== "running" &&
       (p.tickets ?? []).some((t) => t.status === "running");
