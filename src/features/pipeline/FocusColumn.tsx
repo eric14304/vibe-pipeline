@@ -1173,7 +1173,7 @@ export function ReadyBanner({
   );
 }
 
-function TicketCard({
+export function TicketCard({
   ticket,
   tick,
   index,
@@ -1274,7 +1274,16 @@ function TicketCard({
 
       {ticket.goal && <div className="ticket-goal">{ticket.goal}</div>}
 
-      {isIter && ticket.iter && (() => {
+      {/* iter row / stage chip 只在有跑過(rounds 非空)或執行 / 完成 / 失敗狀態才顯示。
+          ready / draft 即使 backend 預建 iter={rounds:[],...} 也不渲染,避免誤判執行中。*/}
+      {isIter && ticket.iter &&
+        ((ticket.iter.rounds?.length ?? 0) > 0 ||
+          ticket.status === "running" ||
+          ticket.status === "paused" ||
+          ticket.status === "done" ||
+          ticket.status === "failed" ||
+          ticket.status === "failed_iter_limit" ||
+          ticket.status === "failed_transient") && (() => {
         const rounds = ticket.iter.rounds ?? [];
         const inProgress =
           (ticket.status === "running" || ticket.status === "paused") &&
