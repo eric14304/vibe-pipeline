@@ -125,7 +125,7 @@ async function watchdogTick(): Promise<void> {
           } catch (e) {
             console.error(`[watchdog ${entry.pipelineId}] sync abort failed:`, e);
           }
-          if (p && p.syncJob && p.syncJob.state === "ai_running") {
+          if (p?.syncJob?.state === "ai_running") {
             await pipelineDir.writePipeline(project.path, entry.pipelineId, {
               ...p,
               syncJob: {
