@@ -33,15 +33,29 @@ export const STATE_LABEL: Record<string, string> = {
 };
 
 // ticket.status 用。跟 STATE_LABEL 故意分兩個 map 避開 ready 字面相同語意不同的 bug。
+// draft 跟 ready 視為同一類「未執行」(2026-05-16 合併;runner 本來就不區分,UI 也統一)。
 export const TICKET_STATUS_LABEL: Record<string, string> = {
-  draft: "草稿",
-  ready: "待跑",
+  draft: "未執行",
+  ready: "未執行",
   running: "執行中",
   paused: "暫停",
   done: "完成",
   failed: "失敗",
   failed_iter_limit: "達 iter 上限",
   failed_transient: "暫時錯誤",
+};
+
+// ticket.status 顏色。注意 ready 用淡色(未執行)— STATE_COLOR.ready 是 pipeline 層 var(--done) 綠,
+// 兩層顏色語意不同,跟 LABEL 同樣理由分開。
+export const TICKET_STATUS_COLOR: Record<string, string> = {
+  draft: "var(--draft)",
+  ready: "var(--draft)",
+  running: "var(--running)",
+  paused: "var(--paused)",
+  done: "var(--done)",
+  failed: "var(--failed)",
+  failed_iter_limit: "var(--failed)",
+  failed_transient: "var(--failed)",
 };
 
 export function fmtElapsed(s: number): string {

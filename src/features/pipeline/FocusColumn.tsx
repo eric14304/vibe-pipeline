@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CheckCircleIcon, CheckIconSm, CloseIcon, FolderIcon, MergeIcon, PlusIcon, ProhibitIcon, RefreshIcon, TrashIcon } from "../../ui/icons";
 import { PipelineHistoryDrawer } from "./PipelineHistoryDrawer";
-import { STATE_COLOR, STATE_LABEL, TICKET_STATUS_LABEL, fmtElapsed, fmtDuration, normalizeVerdict } from "../../data/pipelines";
+import { STATE_COLOR, STATE_LABEL, TICKET_STATUS_LABEL, TICKET_STATUS_COLOR, fmtElapsed, fmtDuration, normalizeVerdict } from "../../data/pipelines";
 import { MODE_LABELS } from "../../api/qa";
 import { useConfirm } from "../../ui/ConfirmDialog";
 import { DiffModal } from "./DiffModal";
@@ -1194,7 +1194,8 @@ function TicketCard({
   const stageList: IterStage[] = hasCritic ? ["doer", "critic", "✓"] : ["doer", "✓"];
   const isRunning = ticket.status === "running";
   const isPaused = ticket.status === "paused";
-  const isDraft = ticket.status === "draft";
+  // draft / ready 統一視為「未執行」,共用 is-draft 樣式(opacity 偏淡)
+  const isDraft = ticket.status === "draft" || ticket.status === "ready";
 
   // Round-sum 計時:已完成 round 累加 + in-progress round live(到 Date.now())。
   // 避免 wall-clock 把暫停 / 跨日的閒置時間也算進去(觀感「6 小時還沒跑完」其實多半在等 user)。
@@ -1392,7 +1393,7 @@ function TicketCard({
 }
 
 function StatusPill({ status }: { status: TicketStatus }) {
-  const c = STATE_COLOR[status];
+  const c = TICKET_STATUS_COLOR[status] ?? STATE_COLOR[status];
   const label = TICKET_STATUS_LABEL[status] ?? status;
   const isLive = status === "running";
   return (

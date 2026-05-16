@@ -131,7 +131,7 @@ async function ticketAdd(args: ParsedArgs): Promise<void> {
     acceptance,
     prompt,
     mode,
-    status: "draft",
+    status: "ready",
     ...(iterLimit != null && !isNaN(iterLimit) ? { iterLimit } : {}),
   };
 
