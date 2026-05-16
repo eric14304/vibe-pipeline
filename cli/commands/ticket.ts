@@ -174,6 +174,10 @@ async function ticketUpdate(args: ParsedArgs): Promise<void> {
   if (typeof args.flags["mode"] === "string") {
     const m = args.flags["mode"];
     updated.mode = (m === "iter" ? "iter" : "step") as TicketMode;
+    // 切到 iter 但原 ticket 無 iter 結構 → 補預設;反向切 step 保留 iter(user 反悔餘地)
+    if (updated.mode === "iter" && !updated.iter) {
+      updated.iter = { current: 0, stage: "doer", verdicts: [], rounds: [] };
+    }
   }
   if (typeof args.flags["status"] === "string") {
     updated.status = args.flags["status"] as TicketStatus;
