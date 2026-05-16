@@ -2,7 +2,21 @@
 
 設計新功能 / 推進 backend 前,參考類似產品的成熟設計。三家都做過同類型(multi-agent / coding-agent orchestrator)但走不同路線,**互相補位**。
 
-完整萃取在 `archive/` 三檔(每家 ~250-340 行),本檔是「重點借鏡 + 不抄方向」濃縮索引。
+完整萃取在 `archive/` 四檔,本檔是「重點借鏡 + 不抄方向」濃縮索引。
+
+---
+
+## [archive/torque-2026-05-16.md](archive/torque-2026-05-16.md)
+
+**runtorque/torque**(2026-05 新出,v1.1.0,23 stars,active)— macOS-first 桌面 multi-agent orchestrator,group / engineer / worker 三層,**MCP 物理隔離寫權限**。深度低(只看 README),要落地任一借鏡點前先挖對應 docs/。
+
+**借鏡點**:
+- **MCP scoping** — per-agent `.mcp.json` + `X-Torque-Cell-Id` header,daemon server 端 filter tool list(physical contract,no override flag)。解 VP 當前「禁止改 pipeline.json」純 prompt 自律的 leak 風險
+- **Action = Jinja2 template + transitions DAG**(`implement → review → merge`)— prompt 重用,等 VP 有重複 ticket 套路再評估
+- **Engineer wave 模式** — batch N parallel workers → 等齊 → review → 派下波。VP 線性派,跨 pipeline 才平行
+- **Hooks 即時 event stream**(`SessionStart / PreToolUse / PostToolUse / Stop` → daemon `/events`)— 粒度到 tool call。VP 只到 ticket status
+
+**不抄**:macOS-first / iTerm2 Toolbelt / pywebview native app / group 抽象 / inline terminal cell
 
 ---
 

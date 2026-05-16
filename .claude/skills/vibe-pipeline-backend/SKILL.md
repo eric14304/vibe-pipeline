@@ -126,6 +126,9 @@ description: vibe-pipeline 後端 / 執行層的職責邊界、約定與 invaria
 - json 寫入 atomic(tmp + rename),避免 crash 中斷後檔案半段
 - fs 操作 normalize 路徑,防 path traversal
 - `ALLOWED_ORIGINS` CORS 白名單不放 `*`(雷見 root CLAUDE.md 手機遠端段)
+- **pipelines/*.json mutation 一律走 backend(vbpl / API)**,**禁止任何外部 caller(包括對話 AI / Python 腳本 / Edit / Write / mv)直接 fs write**。理由:race guard / savePipeline validation / running 中 ticket 鎖 / main agent dispatch 全在 backend 內;直接 fs 繞過所有保護,造成 state corruption(已踩:reset/swap/race guard bypass 多次)。例外:**只有 backend 本身重啟 recovery 程式碼**可在 backend 內走 `pipelineDir.writePipeline` 直接寫
+  - 對 AI:跑中 pipeline → 一律 `vbpl pipeline stop` + `vbpl ticket update/add/remove` + `vbpl pipeline run`,不准 Python / Edit / mv 直接 patch `.vibe-pipeline/pipelines/*.json`
+  - paused pipeline 改動雖無 race risk,**仍走 vbpl** 維持單一 mutation 通道(future MCP scope / audit log 才能 cover)
 
 ## Phase 6 候選(動到的話走 ScopeReport)
 

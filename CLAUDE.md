@@ -197,6 +197,8 @@ vibe-pipeline/
 | [`sync-redesign-2026-05-13.md`](docs/refs/sync-redesign-2026-05-13.md) | Sync 重構(Plan C)— 從 mode=sync ticket 拆成 pipeline.syncJob;state machine + 4 endpoints + AI 衝突解 prompt 設計 + 「靠 git 判定不靠 AI stdout」雷紀錄 |
 | [`skill-injection-2026-05-14.md`](docs/refs/skill-injection-2026-05-14.md) | Phase 7「引用重點 SKILL」設計討論(規劃中)— pointer vs inline 取捨、三來源、不拆 per-AI、plugin 不自動列舉、未定項清單 + plugin cache 雷 |
 | [`worktree-env-2026-05-15.md`](docs/refs/worktree-env-2026-05-15.md) | worktree gitignored 檔複製(採 `.worktreeinclude` 慣例)+ 漏設提醒 + merge 前 secret 洩漏偵測設計(規劃中)|
+| [`pause-simplify-2026-05-17.md`](docs/refs/pause-simplify-2026-05-17.md) | 拔 graceful pause,UI/API/CLI 只留「停止」(immediate SIGKILL)— 7 張 ticket 拆分 spec(待跑) |
+| [`pause-simplify-run-postmortem-2026-05-17.md`](docs/refs/pause-simplify-run-postmortem-2026-05-17.md) | pause-simplify 跑前 + 第一次 run 踩雷紀錄(8 個 bug,5 新發現,提 follow-up pipeline 拆分建議) |
 
 **Archive(已落地或一次性閱讀)**:`docs/refs/archive/` 下 — phase 1/2 計畫已落地;`docs/refs/competitor-refs.md` 是 vibe-kanban / symphony / composio-ao 競品對照合集(設計初期一次性參考)。
 

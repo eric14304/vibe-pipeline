@@ -12,14 +12,7 @@ playwright/.cache/
 .playwright-browsers/
 .tmp/
 
-# vibe-pipeline runtime (session drafts etc, regenerated)
-.vibe-pipeline/.runtime/
-# pipeline 執行紀錄 — merge 後 redundant 於 git commit chain(每張 ticket 的 ticket(<n>): <title> commit + merge commit
-# 已記錄結果),pipeline.json 留的 iter rounds / status 是過程,solo 用沒共享需求
-.vibe-pipeline/pipelines/
-# self-dogfood config — 對 vibe-pipeline 自身 repo,config.json 是個人化 setup(max_parallel / cost_limit 等),
-# user target repo 設計上應 git tracked(CLAUDE.md § Repo 外),但這 repo 本身的 self-dogfood 不該散
-.vibe-pipeline/config.json
+.vibe-pipeline
 
 # perf bench output(benchmark 跑出來的 results,當時量測用,不該 track)
 .perf-bench/
