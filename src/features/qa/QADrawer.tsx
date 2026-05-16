@@ -3,7 +3,7 @@ import "../../styles/drawer.css";
 import "./qa.css";
 import type { Draft, TicketSpec } from "../../api/qa";
 
-const FIRST_AI_MESSAGE = "描述一下任務,我會協助收斂需求並建立 ticket";
+const FIRST_AI_MESSAGE = "描述一下任務\n我會協助收斂需求並建立 ticket";
 const FIRST_AI_OPTIONS = ["列出這個專案問題"];
 
 export function QADrawer({
