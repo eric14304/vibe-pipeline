@@ -873,13 +873,14 @@ html.light .create-card { background: var(--bg-elevated); }
 .picker-item.is-active .picker-item-hint { margin-left: 4px; }
 
 .create-actions {
-  display: grid; grid-template-columns: 1fr 1.3fr;
+  display: grid; grid-template-columns: auto 1fr;
   gap: 6px;
   margin-top: 2px;
 }
 .create-cancel {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   font-size: 11px;
+  white-space: nowrap;
   background: transparent;
   border-color: var(--line-2);
   color: var(--fg-mute);
