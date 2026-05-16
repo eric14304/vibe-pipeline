@@ -7,7 +7,7 @@ import { MODE_LABELS } from "../../api/qa";
 import { useConfirm } from "../../ui/ConfirmDialog";
 import { DiffModal } from "./DiffModal";
 import { useApi } from "../../hooks/useApi";
-import type { IterStage, Pipeline, Ticket, TicketStatus } from "../../types/pipeline";
+import type { IterStage, Pipeline, PipelineState, Ticket, TicketStatus } from "../../types/pipeline";
 import * as api from "../../api/projects";
 import type { RunSummary } from "../../api/projects";
 import "./focus.css";
@@ -17,7 +17,7 @@ import "./focus.css";
 export function RunButton({
   pipeline,
   onRun,
-  onPause,
+  onStop,
   lastRun,
   spawning = false,
   queuePosition,
@@ -25,8 +25,7 @@ export function RunButton({
 }: {
   pipeline: Pipeline;
   onRun?: (id: string) => void;
-  // queued state 的「取消排隊」不帶 mode(沒 runner 在跑,backend 自己處理)
-  onPause?: (id: string, mode?: "immediate") => void;
+  onStop?: (id: string) => void;
   lastRun?: RunSummary | null;
   // user 點 開始/繼續/重試 後 → 等 polling 看到 state 跳出 planning/paused/failed 為止
   // 避開「點下去看似沒反應」的視覺空窗(POST 回來到第一個 ticket 真跑可能 0-7s)
@@ -35,7 +34,7 @@ export function RunButton({
   // syncJob.state ∈ {merging, conflict_await, ai_running} → RunButton 一律 disabled,避免撞 worktree
   syncActive?: boolean;
 }) {
-  const s = pipeline.state;
+  const s = pipeline.state as PipelineState;
   const noTickets = pipeline.tickets.length === 0;
   const lastDur = lastRun?.durationMs ? fmtDuration(lastRun.durationMs) : null;
 
@@ -72,8 +71,9 @@ export function RunButton({
         <button
           type="button"
           className="btn btn-danger run-btn-stop-now"
-          onClick={() => onPause?.(pipeline.id, "immediate")}
-          title="立即停止 runner,當前 ticket 會標為 paused"
+          onClick={() => onStop?.(pipeline.id)}
+          title="停止"
+          aria-label="停止"
         >
           ⏹ 停止
         </button>
@@ -84,16 +84,14 @@ export function RunButton({
         <button
           type="button"
           className="btn"
-          onClick={() => onPause?.(pipeline.id)}
-          title="取消排隊(改回 paused)"
+          onClick={() => onStop?.(pipeline.id)}
+          title="取消排隊"
           style={{ color: "var(--queued)", borderColor: "var(--queued)" }}
         >
           ⏳ {posLabel}
         </button>
       );
     }
-    case "stopping":
-      return null;
     case "planning":
     case "paused":
     case "failed":
@@ -150,7 +148,7 @@ export function FocusColumn({
   onAddTicket,
   hasActiveDraft = false,
   onRun,
-  onPause,
+  onStop,
   onDelete,
   onRename,
   onResetAll,
@@ -173,7 +171,7 @@ export function FocusColumn({
   onAddTicket?: (pipelineId: string) => void;
   hasActiveDraft?: boolean;
   onRun?: (pipelineId: string) => void;
-  onPause?: (pipelineId: string, mode?: "immediate") => void;
+  onStop?: (pipelineId: string) => void;
   onDelete?: (pipelineId: string) => void;
   onRename?: (pipelineId: string, newName: string) => void;
   onResetAll?: (pipelineId: string) => void;
@@ -414,7 +412,7 @@ export function FocusColumn({
                 setSpawning(true);
                 onRun?.(pid);
               }}
-              onPause={onPause}
+              onStop={onStop}
               lastRun={lastRun}
               spawning={spawning}
               queuePosition={queuePosition}
@@ -509,7 +507,7 @@ function SyncStatusBar({
         className="sync-chip"
         title={
           pipelineBusy
-            ? `落後 ${pipeline.baseBranch || "base"} ${behindFallback} commit(pipeline 在跑,等 pause/ready 才能 sync)`
+            ? `落後 ${pipeline.baseBranch || "base"} ${behindFallback} commit(pipeline 在跑,等停止後或 ready 才能 sync)`
             : `落後 ${pipeline.baseBranch || "base"} ${behindFallback} commit · 點擊先試 git merge,衝突才呼叫 AI`
         }
         disabled={pipelineBusy}

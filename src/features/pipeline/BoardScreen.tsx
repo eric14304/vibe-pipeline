@@ -634,13 +634,12 @@ export function BoardScreen({
                 setActionError(`開始運行失敗: ${e instanceof Error ? e.message : String(e)}`);
               }
             }}
-            onPause={async (pid, mode) => {
+            onStop={async (pid) => {
               if (!project) return;
-              const stopMode = mode ?? "immediate";
               try {
-                await api.pausePipeline(project.hash, pid, stopMode);
+                await api.pausePipeline(project.hash, pid);
                 setReloadKey((k) => k + 1);
-                setActionError("✓ 已停止 pipeline,當前 ticket 已暫停");
+                setActionError("✓ 已停止 pipeline");
               } catch (e) {
                 setActionError(`停止失敗: ${e instanceof Error ? e.message : String(e)}`);
               }

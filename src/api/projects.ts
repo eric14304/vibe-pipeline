@@ -137,14 +137,9 @@ export function runPipeline(hash: string, id: string): Promise<{ ok: true }> {
 }
 
 // backend /pause 與 /stop 同義:立即停止 runner child,並把 running ticket 標 paused。
-export function pausePipeline(
-  hash: string,
-  id: string,
-  mode: "immediate" = "immediate"
-): Promise<{ ok: true }> {
+export function pausePipeline(hash: string, id: string): Promise<{ ok: true }> {
   return call<{ ok: true }>(`/api/projects/${hash}/pipelines/${id}/pause`, {
     method: "POST",
-    body: { mode },
   });
 }
 

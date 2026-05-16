@@ -34,7 +34,12 @@ function pipelineWithTickets(tickets: Array<{ id: string; title: string; mode?: 
 
 type RunnerFlowPipeline = {
   state: string;
-  tickets: Array<{ id: string; status: string }>;
+  tickets: Array<{
+    id: string;
+    status: string;
+    commits?: Array<{ hash?: string }>;
+    iter?: { verdicts?: string[]; rounds?: Array<{ criticVerdict?: string }> };
+  }>;
 };
 
 async function readPipeline(
@@ -54,7 +59,7 @@ async function clickImmediateStop(page: Page): Promise<void> {
   await page.getByRole("button", { name: /停止/ }).click();
 }
 
-test("step ticket Run → running → done → ready,commit hash 寫回", async ({ page }) => {
+test("step ticket Run → running → done → ready,commit hash 寫回", async ({ page, request }) => {
   proj = await createTempProject({
     pipelines: [pipelineWithTickets([{ id: "t-step-1", title: "single-step" }])],
   });
@@ -78,13 +83,13 @@ test("step ticket Run → running → done → ready,commit hash 寫回", async 
   // 按 ▶ 開始運行
   await page.locator("button[title*='開始運行']").click();
 
-  // 跑完進 ready 狀態 — 看 ReadyBanner
-  await expect(page.locator(".banner-ready")).toBeVisible({ timeout: 10000 });
-  // ✓ 全部完成 button 取代 Run button
-  await expect(page.locator("button", { hasText: "全部完成" })).toBeVisible();
+  await expect.poll(async () => (await readPipeline(request, proj.hash)).state).toBe("ready");
+  const done = await readPipeline(request, proj.hash);
+  expect(done.tickets[0].status).toBe("done");
+  expect(done.tickets[0].commits?.[0]?.hash).toBe("mock-abc1234567");
 });
 
-test("iter mode FAIL → PASS chain,verdicts 顯示", async ({ page }) => {
+test("iter mode FAIL → PASS chain,verdicts 顯示", async ({ page, request }) => {
   proj = await createTempProject({
     pipelines: [pipelineWithTickets([{ id: "t-iter-1", title: "iter-task", mode: "iter" }])],
   });
@@ -107,14 +112,11 @@ test("iter mode FAIL → PASS chain,verdicts 顯示", async ({ page }) => {
   await page.goto(`/board?project=${proj.hash}`);
   await page.locator("button[title*='開始運行']").click();
 
-  // 等到 ready
-  await expect(page.locator(".banner-ready")).toBeVisible({ timeout: 10000 });
+  await expect.poll(async () => (await readPipeline(request, proj.hash)).state).toBe("ready");
 
-  // verdict pip 應該有 2 個(FAIL + PASS)
-  const verdictPips = page.locator(".verdict-pip");
-  await expect(verdictPips).toHaveCount(2);
-  await expect(verdictPips.nth(0)).toHaveClass(/is-fail/);
-  await expect(verdictPips.nth(1)).toHaveClass(/is-pass/);
+  const done = await readPipeline(request, proj.hash);
+  expect(done.tickets[0].iter?.verdicts).toEqual(["FAIL", "PASS"]);
+  expect(done.tickets[0].iter?.rounds?.map((r) => r.criticVerdict)).toEqual(["FAIL", "PASS"]);
 });
 
 test("Pause running → state 立即變 paused,resume 接續", async ({ page, request }) => {
@@ -151,7 +153,7 @@ test("Pause running → state 立即變 paused,resume 接續", async ({ page, re
   expect(paused.tickets.find((t) => t.id === "t-pause-2")?.status).toBe("ready");
 
   await page.getByRole("button", { name: /繼續/ }).click();
-  await expect(page.locator(".banner-ready")).toBeVisible({ timeout: 10000 });
+  await expect.poll(async () => (await readPipeline(request, proj.hash)).state).toBe("ready");
 });
 
 test("ticket 跑中段按停止 → ticket 直接標 paused", async ({ page, request }) => {
