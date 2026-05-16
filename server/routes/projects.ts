@@ -182,9 +182,17 @@ export async function createPipeline(hash: string, req: Request): Promise<Respon
     const resolved = await pipelineDir.getResolvedDefaults(project.path);
     autoMerge = resolved.auto_merge;
   }
+  const branch =
+    typeof body.branch === "string" && body.branch.trim()
+      ? body.branch
+      : "pipeline/" + name.replace(/[\s/]+/g, "-");
+  const state = typeof body.state === "string" && body.state.trim() ? body.state : "planning";
   const data = {
     ...body,
     id,
+    name,
+    branch,
+    state,
     autoMerge,
     // createdAt 取 body 值(允許 import 帶舊時間)或 Date.now()
     createdAt: typeof body.createdAt === "number" ? body.createdAt : Date.now(),

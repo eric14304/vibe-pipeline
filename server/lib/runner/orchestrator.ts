@@ -125,7 +125,7 @@ async function watchdogTick(): Promise<void> {
           } catch (e) {
             console.error(`[watchdog ${entry.pipelineId}] sync abort failed:`, e);
           }
-          if (p && p.syncJob && p.syncJob.state === "ai_running") {
+          if (p?.syncJob?.state === "ai_running") {
             await pipelineDir.writePipeline(project.path, entry.pipelineId, {
               ...p,
               syncJob: {
@@ -543,8 +543,52 @@ async function spawnDirect(opts: {
       await patchRunnerLogExitCode(logFile, pipelineId, code ?? codeFromExited);
       console.log(`[runner ${pipelineId}] exited code=${code}, log → ${logFile}`);
 
+      // 偵測 transient error:exit code !== 0(child crash / OOM / API quota / kill)
+      // 或 stdout 含 turn.failed / thread.failed(Claude CLI 回報 API 拒絕)
+      // 主 agent 在這些情況沒機會自標 paused,backend 要兜底:
+      //   pipeline.state="paused" + 將 running ticket 改 failed_transient + emit notif
+      // 為 normal exit(code===0 且無 turn.failed)留路徑不動,讓主 agent 自己寫的 state 為準
+      const exitCode = code ?? codeFromExited;
+      const hasTurnFailed = /\b(turn\.failed|thread\.failed)\b/.test(stdoutText);
+      const isTransient = (exitCode !== null && exitCode !== 0) || hasTurnFailed;
+      if (isTransient) {
+        try {
+          const cur = (await pipelineDir.readPipeline(projectPath, pipelineId)) as {
+            state?: string;
+            name?: string;
+            tickets?: Array<{ status?: string; [k: string]: unknown }>;
+            [k: string]: unknown;
+          } | null;
+          if (cur && (cur.state === "running" || cur.state === "stopping")) {
+            const now = Date.now();
+            const tickets = (cur.tickets ?? []).map((t) =>
+              t.status === "running"
+                ? { ...t, status: "failed_transient", endedAt: now }
+                : t
+            );
+            await pipelineDir.writePipeline(projectPath, pipelineId, {
+              ...cur,
+              state: "paused",
+              tickets,
+            });
+            const sub = hasTurnFailed
+              ? "child 回報 turn.failed(API quota / provider error)"
+              : `child 異常退出 (code=${exitCode})`;
+            notifs.emit(projectPath, {
+              type: "pipeline_paused",
+              title: `${cur.name || pipelineId} runner 異常結束,已暫停`,
+              sub,
+              pipelineId,
+            });
+          }
+        } catch (e) {
+          console.error(`[runner ${pipelineId}] transient recovery failed:`, e);
+        }
+      }
+
       // Emit notif based on final pipeline state
-      try {
+      // transient 路徑已 emit pipeline_paused + 寫 state,跳過避免重複 notif
+      if (!isTransient) try {
         const final = (await pipelineDir.readPipeline(projectPath, pipelineId)) as {
           state?: string;
           name?: string;
@@ -1162,14 +1206,32 @@ export async function recoverStale(projectPath: string): Promise<void> {
     if (!isStaleRunning && !hasOrphanTicket) continue;
 
     const nextState = isStaleRunning ? "paused" : p.state;
-    const tickets = (p.tickets ?? []).map((t) =>
-      t.status === "running" ? { ...t, status: "paused" } : t
-    );
+    // stale running pipeline 視同 transient 失敗 — 主 agent 沒機會自標 paused 就被殺
+    // (server restart / OS crash 等),running ticket 改 failed_transient + endedAt
+    // 對齊 exit handler transient 路徑語義;user 按繼續會 reset 成 paused 再 reuse worktree。
+    // 純 orphan ticket(pipeline 不是 running)維持改 paused — 那是「state 寫對 ticket 沒同步」
+    // 的非 transient 殘留。
+    const now = Date.now();
+    const tickets = (p.tickets ?? []).map((t) => {
+      if (t.status !== "running") return t;
+      return isStaleRunning
+        ? { ...t, status: "failed_transient", endedAt: now }
+        : { ...t, status: "paused" };
+    });
     await pipelineDir.writePipeline(projectPath, p.id, {
       ...p,
       state: nextState,
       tickets,
     });
+    if (isStaleRunning) {
+      const pName = (p as { name?: string }).name || p.id;
+      notifs.emit(projectPath, {
+        type: "pipeline_paused",
+        title: `${pName} 因 server 重啟暫停`,
+        sub: `runner child 已蒸發,worktree 進度保留;按繼續可從中斷處接`,
+        pipelineId: p.id,
+      });
+    }
     console.log(
       `[runner] recovered stale pipeline ${p.id} (was ${p.state}) → ${nextState}, orphan tickets fixed`
     );

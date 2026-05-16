@@ -354,6 +354,7 @@ export type RunSummary = {
     output: number;
     cacheRead: number;
     cacheCreate: number;
+    reasoning?: number;
   } | null;
   sessionId: string | null;
   hasStderr: boolean;

@@ -1,7 +1,7 @@
 // Dev-only states gallery:一頁掃完所有 (PipelineState × condition) → button/banner 渲染。
 // 加新 state 或改 button 邏輯後直接到 /dev/states 視覺驗收,不用一個一個跑 e2e。
-import { RunButton, ReadyBanner } from "../pipeline/FocusColumn";
-import type { Pipeline, PipelineState, TicketStatus } from "../../types/pipeline";
+import { RunButton, ReadyBanner, TicketCard } from "../pipeline/FocusColumn";
+import type { Pipeline, PipelineState, Ticket, TicketStatus } from "../../types/pipeline";
 
 function makePipeline(opts: {
   state: PipelineState;
@@ -61,6 +61,73 @@ const READY_BANNER_CASES: Array<{ label: string; pipeline: Pipeline }> = [
   ] } },
 ];
 
+// TicketCard 視覺案例:重點驗證 mode=iter / status=ready 但 backend 已預建空 iter 物件時,
+// FocusColumn 不能把它當「執行中」渲染(B5 bug)。
+const TICKET_CARD_CASES: Array<{ label: string; ticket: Ticket }> = [
+  {
+    label: "iter + ready + 預建空 iter (rounds=[])",
+    ticket: {
+      id: "tc1",
+      n: 1,
+      title: "ready iter ticket (預建空 iter)",
+      goal: "驗證 ready iter 不顯示 stage chip / iter row",
+      mode: "iter",
+      status: "ready",
+      iter: { current: 0, stage: "doer", verdicts: [], rounds: [] },
+    },
+  },
+  {
+    label: "iter + draft (沒 iter 物件)",
+    ticket: {
+      id: "tc2",
+      n: 2,
+      title: "draft iter ticket",
+      mode: "iter",
+      status: "draft",
+    },
+  },
+  {
+    label: "iter + running + 1 完成 round",
+    ticket: {
+      id: "tc3",
+      n: 3,
+      title: "running iter ticket",
+      mode: "iter",
+      status: "running",
+      startedAt: Date.now() - 120000,
+      iter: {
+        current: 2,
+        stage: "critic",
+        verdicts: ["FAIL"],
+        rounds: [
+          { n: 1, startedAt: Date.now() - 120000, endedAt: Date.now() - 60000, criticVerdict: "FAIL" },
+          { n: 2, startedAt: Date.now() - 60000, criticVerdict: "FAIL" },
+        ],
+      },
+    },
+  },
+  {
+    label: "iter + done",
+    ticket: {
+      id: "tc4",
+      n: 4,
+      title: "done iter ticket",
+      mode: "iter",
+      status: "done",
+      startedAt: Date.now() - 300000,
+      endedAt: Date.now() - 60000,
+      iter: {
+        current: 1,
+        stage: "✓",
+        verdicts: ["PASS"],
+        rounds: [
+          { n: 1, startedAt: Date.now() - 300000, endedAt: Date.now() - 60000, criticVerdict: "PASS" },
+        ],
+      },
+    },
+  },
+];
+
 export function StatesGallery() {
   return (
     <div style={{ padding: 24, fontFamily: "system-ui", maxWidth: 1200, margin: "0 auto" }}>
@@ -94,6 +161,18 @@ export function StatesGallery() {
               {c.label}
             </div>
             <ReadyBanner pipeline={c.pipeline} />
+          </div>
+        ))}
+      </div>
+
+      <h2 style={{ marginTop: 32, marginBottom: 12 }}>TicketCard(iter row / stage chip 條件)</h2>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 12 }}>
+        {TICKET_CARD_CASES.map((c, i) => (
+          <div key={c.label}>
+            <div className="mono" style={{ fontSize: 11, color: "var(--fg-faint)", marginBottom: 8 }}>
+              {c.label}
+            </div>
+            <TicketCard ticket={c.ticket} tick={0} index={i} />
           </div>
         ))}
       </div>

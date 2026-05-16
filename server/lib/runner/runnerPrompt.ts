@@ -255,7 +255,19 @@ JSON 結構:
 
 `;
 
-const RUNNER_BEHAVIOR_PROMPT_TAIL = `## sub-agent 使用總覽
+const RUNNER_BEHAVIOR_PROMPT_TAIL = `## pipeline.json 寫入嚴格規則(robustness — 絕對遵守)
+
+下列三條是 strict invariant,任何寫入 pipeline.json 之前先對齊,踩線視為主流程 bug:
+
+1. **iter ticket 初始化 iter 物件** — 對 mode='iter' 的 ticket,進入「跑 ticket 流程」步驟 1 之前,**先檢查 ticket.iter 是否存在**。若不存在(或為 null / undefined),**先寫入** ticket.iter = { "current": 0, "verdicts": [], "rounds": [], "stage": "doer" } 並 Write 回 pipeline.json,**再**進步驟 1。已存在(即使是 paused resume 接續)就**不要重置**,直接沿用。
+
+2. **絕對禁止修改 ticket.mode** — ticket.mode 由 user 在建立 ticket 時設定('step' / 'iter' / 'merge'),是 ticket 的 immutable 屬性。主 agent 在任何情況下**都不可以改 ticket.mode**(不准從 'iter' 改 'step'、也不准補寫缺失的 mode、不准修正看起來不對的 mode)。若讀到 mode 缺失或值異常,標 ticket.status='failed' + pipeline.state='paused' 結束 session 讓 user 處理,**不要自作主張改 mode**。
+
+3. **每次寫 pipeline.json 只准動「當前 dispatch 的 ticket」** — 寫回 pipeline.json 時,tickets[] 內**只有當前處理中的那張 ticket** 的欄位可以被修改(iter / status / commits / startedAt / endedAt / 任何欄位)。其他 tickets 的所有欄位(iter / status / commits / mode / prompt / 等等)**一個都不准動**,連看起來「順手修正」也不行。需要參考其他 ticket 的資料 → **只讀不寫**(Read pipeline.json 拿值即可,Write 回去時把那些欄位原樣保留)。例外:pipeline 層級欄位(pipeline.state / mergedAt / mergeCommit)由主迴圈控制,不算 ticket 動。
+
+違反任一條 → 視為主 agent bug,backend 可能會 warn / abort。
+
+## sub-agent 使用總覽
 
 不論 provider,派 sub-agent 都是 atomic 動作:給 prompt → 等回應 → 拿到 sub-agent 最終訊息。具體 tool 呼叫格式見上方「派 sub-agent 用的 provider / model / effort」段的對應 provider 子段。
 

@@ -106,7 +106,11 @@ function RunCard({
   const tokens = run.tokens
     ? `in ${fmtNum(run.tokens.input)} · out ${fmtNum(run.tokens.output)} · cache ${fmtNum(
         run.tokens.cacheRead
-      )}`
+      )}${
+        run.tokens.reasoning != null && run.tokens.reasoning > 0
+          ? ` · reason ${fmtNum(run.tokens.reasoning)}`
+          : ""
+      }`
     : "—";
   return (
     <div className="tdrw-run-card">
