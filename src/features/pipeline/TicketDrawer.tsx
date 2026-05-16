@@ -8,16 +8,7 @@ import { STATE_COLOR, fmtDuration, normalizeVerdict } from "../../data/pipelines
 import { useConfirm } from "../../ui/ConfirmDialog";
 import { RefreshIcon, ScissorsIcon, TrashIcon } from "../../ui/icons";
 
-const STATUS_LABEL: Record<string, string> = {
-  draft: "草稿",
-  ready: "待跑",
-  running: "執行中",
-  paused: "暫停",
-  done: "完成",
-  failed: "失敗",
-  failed_iter_limit: "達 iter 上限",
-  failed_transient: "暫時錯誤",
-};
+import { TICKET_STATUS_LABEL } from "../../data/pipelines";
 
 export function TicketDrawer({
   ticket,
@@ -62,7 +53,7 @@ export function TicketDrawer({
   }, [onClose]);
 
   const accent = STATE_COLOR[ticket.status] || "var(--fg-mute)";
-  const statusLabel = STATUS_LABEL[ticket.status] || ticket.status;
+  const statusLabel = TICKET_STATUS_LABEL[ticket.status] || ticket.status;
   const modeLabel = MODE_LABELS[ticket.mode as "step" | "iter"] ?? ticket.mode;
   const spec = ticket as unknown as {
     goal?: string;

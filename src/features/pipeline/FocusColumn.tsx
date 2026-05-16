@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CheckCircleIcon, CheckIconSm, CloseIcon, FolderIcon, MergeIcon, PlusIcon, ProhibitIcon, RefreshIcon, TrashIcon } from "../../ui/icons";
 import { PipelineHistoryDrawer } from "./PipelineHistoryDrawer";
-import { STATE_COLOR, STATE_LABEL, fmtElapsed, fmtDuration, normalizeVerdict } from "../../data/pipelines";
+import { STATE_COLOR, STATE_LABEL, TICKET_STATUS_LABEL, fmtElapsed, fmtDuration, normalizeVerdict } from "../../data/pipelines";
 import { MODE_LABELS } from "../../api/qa";
 import { useConfirm } from "../../ui/ConfirmDialog";
 import { DiffModal } from "./DiffModal";
@@ -1393,7 +1393,7 @@ function TicketCard({
 
 function StatusPill({ status }: { status: TicketStatus }) {
   const c = STATE_COLOR[status];
-  const label = STATE_LABEL[status];
+  const label = TICKET_STATUS_LABEL[status] ?? status;
   const isLive = status === "running";
   return (
     <span className="status-pill mono" style={{ color: c }}>

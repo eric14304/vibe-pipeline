@@ -19,8 +19,9 @@ export const STATE_COLOR: Record<string, string> = {
   failed_transient: "var(--failed)",
 };
 
+// 純 pipeline.state 用。注意 ticket 不要用這個 — ready 在 pipeline 是「可合併」,
+// 在 ticket 是「待跑」,語意衝突。ticket 走下面 TICKET_STATUS_LABEL。
 export const STATE_LABEL: Record<string, string> = {
-  // pipeline states
   paused: "暫停",
   running: "執行中",
   stopping: "停止中",
@@ -29,9 +30,16 @@ export const STATE_LABEL: Record<string, string> = {
   planning: "規劃中",
   failed: "失敗",
   merged: "已合併",
-  // ticket statuses
-  done: "完成",
+};
+
+// ticket.status 用。跟 STATE_LABEL 故意分兩個 map 避開 ready 字面相同語意不同的 bug。
+export const TICKET_STATUS_LABEL: Record<string, string> = {
   draft: "草稿",
+  ready: "待跑",
+  running: "執行中",
+  paused: "暫停",
+  done: "完成",
+  failed: "失敗",
   failed_iter_limit: "達 iter 上限",
   failed_transient: "暫時錯誤",
 };
