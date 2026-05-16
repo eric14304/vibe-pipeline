@@ -106,7 +106,8 @@ E2E 用 Playwright 跑真瀏覽器 + 真 backend,**不靠 unit test 取代**。p
 |  | Esc 關閉 |  |
 | **Runner** | Run → state 變 ready → running → done(全 ticket done) | `runner-flow.spec.ts` |
 |  | Stop(running → paused immediately; active ticket paused),resume 接續 |  |
-|  | Stop state sequence: running → paused,無中介 state |  |
+|  | Stop state sequence: running → paused,無中介 state(無 `stopping` / 無 graceful 路徑) |  |
+|  | RunButton 單按鈕 label 切換:idle/paused/failed → 開始/繼續/重試;running → 停止;**不出現雙按鈕或「停止中」chip** |  |
 |  | iter mode FAIL → PASS chain(verdicts 寫 ["FAIL","PASS"]) |  |
 |  | failed_iter_limit(達 iter 上限 + iterStopAtLimit=true → pause) |  |
 |  | failed_transient(mock 劇本第一次擲、第二次成功) |  |

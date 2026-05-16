@@ -156,7 +156,7 @@ vbpl pipeline sync <id> --cancel                       # 取消同步
 | `NO_BACKEND` | backend server 沒起 | 「先跑 `bun run server`」 |
 | `NO_PROJECT` | resolveProject 找不到 | 「--project <hash> 指定 / 或先 `vbpl project add <path>`」 |
 | `NOT_INITIALIZED` | project 沒 `.vibe-pipeline/` | 「跑 vbpl project add,首次進去 web UI 點自動初始化」 |
-| `STATE_GUARD` | operation 不允許在當前 state | 看 state(running 要先 pause / merged 不准 run) |
+| `STATE_GUARD` | operation 不允許在當前 state | 看 state(running 要先「停止」/ merged 不准 run) |
 | `working_tree_dirty` | merge 時 main repo 髒 | 「先 commit / stash 再 merge」 |
 
 ## 完整參考
