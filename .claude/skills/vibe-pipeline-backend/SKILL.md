@@ -70,7 +70,8 @@ description: vibe-pipeline 後端 / 執行層的職責邊界、約定與 invaria
 - Sub-agent 拆兩個 TaskClass:`executor`(改 code,高 capability)+ `critic`(讀 diff 判 PASS/FAIL,可便宜 model)
 - ticket commit 用 `git commit -F <tmpfile>` 多段 message,不用 `-m "...\n..."` 字面 \n
 - provider-aware dispatch:claude → Task tool;codex → 主 agent 用 `spawn_agent` → `wait_agent` → `close_agent` 三步 atomic in-process 序列(取代舊 Bash `codex exec` subprocess);`codexAdapter.spawnRunner` 自動加 `-c features.multi_agent=true`;工具限制走 sandbox 模式分流(executor / merge = `workspace-write`,critic = `read-only`)
-- `recoverStale` server boot 掃 stale `running`/`stopping` → paused;watchdog 抓死 PID
+- **Stop = SIGKILL immediate**:user 按「停止」→ orchestrator SIGKILL child + 標 `state=paused`。**沒有 graceful 路徑、沒有 `stopping` 中介 state**(2026-05-17 簡化,雷區 #18)
+- `recoverStale` server boot 掃 stale `running` → paused;同時修 legacy `stopping` 殘留(舊 schema 升級無痛);watchdog 抓死 PID
 
 ### Merge / Sync 二段式(`pipelineMerge.ts` + `syncJob.ts`)
 

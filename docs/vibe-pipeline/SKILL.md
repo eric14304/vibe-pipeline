@@ -57,7 +57,7 @@ vbpl config set <key> <value>                          # e.g. runner.model claud
 
 ```bash
 vbpl pipeline run <pipelineId>                         # 啟動 runner
-vbpl pipeline stop <pipelineId>                        # 暫停(runner 跑完當前 ticket 就停)
+vbpl pipeline stop <pipelineId>                        # 停止(SIGKILL runner → state=paused;按「繼續」從 critic 階段接續)
 vbpl pipeline merge <pipelineId>                       # 合併回 base(先試 git,衝突才 AI)
 vbpl pipeline sync <pipelineId>                        # 把 base 拉進 pipeline worktree
 vbpl pipeline sync <id> --ai                           # 衝突時讓 AI 解
