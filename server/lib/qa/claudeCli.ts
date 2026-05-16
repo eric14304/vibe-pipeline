@@ -57,9 +57,11 @@ export async function runTurn({
   }
 
   const qaCfg = await getTaskConfigWithAdapter("qa");
-  // perf:QA 是 server-controlled feature,system prompt 自己定完整契約,不該被 user 個人設定 / project hooks /
-  // MCP servers / slash commands 干擾。砍 setting-sources / mcp / slash-commands 後 cold start ~快 125ms、
-  // 1h cache_creation tokens 從 19512 降到 0(cost -89%)。量測見 refs/claude-cli-spawn-perf-2026-05-11.md。
+  // 隔離 flags(adapter 內砍 MCP / slash-commands,避免 user 個人 MCP / 自訂 slash command 干擾 QA 流程)。
+  //
+  // **但保留 setting-sources 預設**(2026-05-16 改動):QA 對純 VP 用戶(沒 CC 在旁)是主要建 ticket 入口,
+  // 沒專案脈絡時 spec 品質差。少用、要準 → 願意付 ~19k token/spawn 換 CLAUDE.md + skill 索引讓 AI 有專案知識。
+  // 早期 perf 量測(refs/claude-cli-spawn-perf-2026-05-11.md)的 -89% cost 對應的代價是 spec 品質,該回頭走回來。
   //
   // 注意:**不能加 --no-session-persistence** — QA 多輪靠 --resume 接續,
   // 第二輪起需要前一輪 session 落地到 disk,no-persist 會讓 follow-up turn 直接 500。

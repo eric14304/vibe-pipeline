@@ -63,8 +63,10 @@ function spawnQA(opts: QASpawnOpts): SpawnedProcess {
     "--effort",
     effort,
   ];
-  // perf flags(QA 不能加 --no-session-persistence,follow-up turn 需 --resume 讀 disk)
-  args.push("--setting-sources", "");
+  // 隔離 flags(QA 不能加 --no-session-persistence,follow-up turn 需 --resume 讀 disk)
+  // 註:刻意不加 --setting-sources ""。QA 少用、要的是準確 —— 載 user CLAUDE.md +
+  // skills 索引讓 QA AI 拿到 project 脈絡(否則只有 QA_BEHAVIOR_PROMPT,專案知識零,
+  // spec 品質落差大)。token cost +~19k/spawn 可接受(rare path)。
   args.push("--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}');
   args.push("--disable-slash-commands");
   args.push("--disallowedTools", "Edit Write Task");
