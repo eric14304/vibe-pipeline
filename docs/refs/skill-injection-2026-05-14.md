@@ -46,3 +46,69 @@ pointer 模型的關鍵性質:**自帶過濾**。索引全給,AI 看 description
 - **仍在安裝中的 plugin** 別直接 `rm` cache — 會造成 `installed_plugins.json` 指向不存在路徑的不一致狀態,且不會自動補回。要清先 `/plugin uninstall` 再 reinstall。
 
 → 對 VP 設計的硬結論:**不靠檔案系統掃 plugin;真要支援只走手動貼路徑**。
+
+---
+
+## 2026-05-16 更新 — 範圍收斂
+
+實做前回頭審視,有三大調整:
+
+### (a) QA 對你個人 vs 對產品的意義
+
+你的工作流:**CC 配 VP**,QA 少用。但 QA 是「**遠端入口**」(手機 / Tailscale)和「**非 CC 用戶的桌機主入口**」—— 對你少用、對產品核心,不能砍。
+
+關鍵推論:QA **少用 + 要準**,優先級從「省 token」翻成「給 context」。
+
+**落地動作**:`spawnQA` 拿掉 `--setting-sources ""`(commit `f780b3f`),改成載 user CLAUDE.md + skill 索引。代價 ~19k token/spawn,因少用可接受。`spawnRunner` 本來就載(註解已寫),`spawnSplit` 保留 `""`(split 是純結構分析,不需專案脈絡)。
+
+這個改動把 Phase 7 最大動機「QA 對非 CC 用戶要強」**部分提前用 brute force 解掉了** —— QA 第一輪起就拿全套 user / project 設定。下面 pointer 模型的設計仍有價值,但動機從「QA 補強」轉移到「runner / 細粒度控制」。
+
+### (b) Skill 安裝 / 散發:不重做,依賴既有工具
+
+原本設想 VP 自帶 catalog + fetch/install。**這個空間 2026 年已被既有工具佔滿**:
+
+**CLI 安裝器**(成熟):
+- `gh skill install`(GitHub CLI 官方擴展,跨多 agent — Claude Code / Cursor / Codex / Copilot / Gemini)
+- `caude-skill-manager`(`sk install/search/list`,Go binary,Claude Code 專用)
+- `ccpi`(配 tonsofskills.com,425 plugins / 2810 skills)
+- `antigravity-awesome-skills` installer
+
+**Marketplace / catalog**(10+ 個):
+- alirezarezvani/claude-skills(263+)
+- aiskillstore/marketplace(security-audited)
+- tonsofskills.com(2810)
+- awesome-claude-skills(travisvn / ComposioHQ curated lists)
+- netresearch/claude-code-marketplace(走 `agentskills.io` open standard,跨 30+ agents)
+
+**結論**:VP **不做** install / catalog / update / uninstall。VP 只做別人沒做的事 —— 「**把 user 已裝的 skill 注入 VP 的 spawn 場景**」。
+
+### (c) 修正後的 VP 範圍
+
+VP 三件事:
+1. **Detect**:掃 `~/.claude/skills/`(任何 installer 都裝這)+ target repo `.claude/skills/` → 列出已裝 skill + 抽 frontmatter
+2. **Inject**:QA(已 brute force 載入)/ runner(本來就載)/ split(不需)以外,如果未來要更細粒度控制(per-pipeline override 等),走 pointer 模型 — 仍按本檔上半段設計
+3. **Recommend(optional)**:UI 顯示「VP-driven coding 高度相關」精選 5-10 個 skill + 對應 `gh skill install <X>` 命令字串,**user 自己複製貼到他的 terminal 執行**,VP 不執行
+
+VP 推薦 list 候選(視 VP 使用模式):
+- `tdd` / `test-driven-development`
+- `systematic-debugging`
+- `brainstorming`
+- `requesting-code-review` / `receiving-code-review`
+- `writing-plans` / `executing-plans`
+
+**選 `gh skill` 當主推 installer**:github 官方背書,跨 agent,VP 用戶大多裝過 `gh`。沒裝給 fallback `curl` 命令。
+
+### (d) 原「未定」項的影響
+
+之前列的未定 1-7 項,現在的狀態:
+
+1. ~~VP 精選 SKILL 怎麼散發~~ → **取消**,改 Recommend 清單(只給 install 命令,不散發實體)
+2. sub-agent 拿不拿索引 → **仍未定**,但 runner 已自動載 settings,該問題某程度上自動解決
+3. ~~設定存哪~~ → **取消**(沒有 VP 自己的 skill 設定,純讀 `~/.claude/skills/`)
+4. ~~手動指定路徑 UI~~ → **取消**(不開放手動加 skill,user 用 installer 裝)
+5. 注入索引的 prompt 格式 → 仍未定(若做 pointer mode 才需要)
+6. 成本面 → QA 已決定走「全載入」,runner 本來就載 → 主動投錢買 context
+7. runner executor sub-agent 工具白名單 → 仍未定(若 sub-agent 也要載自定 skill 才需要)
+
+範圍大幅收斂。實作門檻降低,核心動機(QA 強化)已部分用 brute force 達成。
+
