@@ -873,7 +873,7 @@ html.light .create-card { background: var(--bg-elevated); }
 .picker-item.is-active .picker-item-hint { margin-left: 4px; }
 
 .create-actions {
-  display: grid; grid-template-columns: auto 1fr;
+  display: grid; grid-template-columns: 1fr 1fr;
   gap: 6px;
   margin-top: 2px;
 }
