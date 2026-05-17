@@ -56,63 +56,77 @@ const PUSH_EVENT_LABELS: Array<{ key: PushEventKey; label: string }> = [
   { key: "auto_merge_conflict", label: "AI 接手解衝突" },
 ];
 
-// Select 樣式 + 寬度都搬到 SettingsPopover.css(.task-row-selects > select 與 --task-w-* CSS vars)
+const TASK_ICON: Record<TaskClass, string> = {
+  qa: "📋",
+  split: "✂️",
+  runner: "🤖",
+  executor: "⚡",
+  critic: "🔍",
+  merge: "🔀",
+};
 
-function TaskModelRow({
+function AiTaskRow({
+  icon,
   label,
-  hint,
+  sub,
   provider,
   model,
   effort,
+  showProvider,
+  showEffort,
   disabled,
-  showProvider = false,
   onChange,
 }: {
+  icon: string;
   label: string;
-  hint?: string;
+  sub?: string;
   provider: Provider;
   model: ModelName;
   effort: Effort;
+  showProvider: boolean;
+  showEffort: boolean;
   disabled?: boolean;
-  showProvider?: boolean;
   onChange: (patch: { provider?: Provider; model?: ModelName; effort?: Effort }) => void;
 }) {
-  // layout(2026-05-13 update,RWD 完整搬 CSS):
-  //   row1: label(左)+ selects(右,desktop grid / mobile 整列)
-  //   row2: hint(獨立一行,full width)
-  // 樣式全走 SettingsPopover.css 的 .task-row-* class,desktop / mobile breakpoint 都在 CSS 內。
   return (
-    <div className="task-row">
-      <div className="task-row-head">
-        <span className="task-row-label">{label}</span>
-        <div className="task-row-selects">
-          {showProvider ? (
-            <select
-              value={provider}
-              disabled={disabled}
-              onChange={(e) => onChange({ provider: e.target.value as Provider })}
-            >
-              {PROVIDERS.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <span className="task-row-placeholder" />
-          )}
+    <div className="settings-row">
+      <div className="settings-row-label">
+        <div className="settings-row-label-head">
+          <span className="settings-row-icon" aria-hidden>{icon}</span>
+          {label}
+        </div>
+        {sub && <div className="settings-row-label-sub">{sub}</div>}
+      </div>
+      <div className="settings-row-control settings-row-control--multi">
+        {showProvider && (
           <select
-            value={model}
+            className="settings-input"
+            value={provider}
             disabled={disabled}
-            onChange={(e) => onChange({ model: e.target.value as ModelName })}
+            onChange={(e) => onChange({ provider: e.target.value as Provider })}
           >
-            {modelsForProvider(provider).map((m) => (
-              <option key={m} value={m}>
-                {m.replace(/^claude-/, "")}
+            {PROVIDERS.map((p) => (
+              <option key={p} value={p}>
+                {p}
               </option>
             ))}
           </select>
+        )}
+        <select
+          className="settings-input"
+          value={model}
+          disabled={disabled}
+          onChange={(e) => onChange({ model: e.target.value as ModelName })}
+        >
+          {modelsForProvider(provider).map((m) => (
+            <option key={m} value={m}>
+              {m.replace(/^claude-/, "")}
+            </option>
+          ))}
+        </select>
+        {showEffort && (
           <select
+            className="settings-input"
             value={effort}
             disabled={disabled}
             onChange={(e) => onChange({ effort: e.target.value as Effort })}
@@ -123,9 +137,8 @@ function TaskModelRow({
               </option>
             ))}
           </select>
-        </div>
+        )}
       </div>
-      {hint && <div className="task-row-hint">{hint}</div>}
     </div>
   );
 }
@@ -894,44 +907,46 @@ export function SettingsPopover({
 
       {/* ─── AI 任務 tab ─── */}
       {activeTab === "ai" && <>
-      <div className="settings-section-title">
-        全域 provider / model 設定
-      </div>
       {userCfg ? (
         <>
-        {/* Group 1:獨立 agent(各自挑 provider) */}
-        <div className="settings-popover-task-grid task-group task-group--primary">
+        <div className="settings-section">
+          <div className="settings-section-title">全域 provider / model 設定</div>
           {(["qa", "split", "runner"] as const).map((tc) => (
-            <TaskModelRow
+            <AiTaskRow
               key={tc}
+              icon={TASK_ICON[tc]}
               label={TASK_CLASS_LABELS[tc]}
-              hint={TASK_CLASS_HINTS[tc]}
+              sub={TASK_CLASS_HINTS[tc]}
               provider={userCfg.defaults[tc].provider}
               model={userCfg.defaults[tc].model}
               effort={userCfg.defaults[tc].effort}
               showProvider
+              showEffort={false}
               onChange={(patch) => updateTask(tc, patch)}
             />
           ))}
         </div>
-        {/* Group 2:跟主 agent(只挑 model / effort,provider 跟 runner) */}
-        <div className="task-group task-group--secondary">
-          <div className="task-group-hint">
-            ↑ 為了加快速度和節省 Token,預設跟隨 Main Agent 設定
-          </div>
-          <div className="settings-popover-task-grid">
-            {(["executor", "critic", "merge"] as const).map((tc) => (
-              <TaskModelRow
-                key={tc}
-                label={TASK_CLASS_LABELS[tc]}
-                hint={TASK_CLASS_HINTS[tc]}
-                provider={userCfg.defaults[tc].provider}
-                model={userCfg.defaults[tc].model}
-                effort={userCfg.defaults[tc].effort}
-                onChange={(patch) => updateTask(tc, patch)}
-              />
-            ))}
-          </div>
+
+        <div className="settings-section">
+          <div className="settings-section-title">進階設定(可依需求調整)</div>
+          {(["executor", "critic", "merge"] as const).map((tc) => (
+            <AiTaskRow
+              key={tc}
+              icon={TASK_ICON[tc]}
+              label={TASK_CLASS_LABELS[tc]}
+              sub={TASK_CLASS_HINTS[tc]}
+              provider={userCfg.defaults[tc].provider}
+              model={userCfg.defaults[tc].model}
+              effort={userCfg.defaults[tc].effort}
+              showProvider={false}
+              showEffort
+              onChange={(patch) => updateTask(tc, patch)}
+            />
+          ))}
+        </div>
+
+        <div className="settings-tip-card">
+          小提醒:這裡的設定套用到所有 project
         </div>
         </>
       ) : (
