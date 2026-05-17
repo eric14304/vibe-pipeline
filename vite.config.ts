@@ -14,7 +14,8 @@ export default defineConfig({
       filename: "firebase-messaging-sw.js",
       injectRegister: false,
       injectManifest: {
-        globPatterns: ["**/*.{js,css,html,svg,png,ico}"],
+        globPatterns: ["**/*.{js,css,html,svg,png,ico,webmanifest,json}"],
+        maximumFileSizeToCacheInBytes: 5_000_000,
       },
     }),
   ],
