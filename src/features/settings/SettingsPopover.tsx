@@ -218,35 +218,36 @@ function PushNotificationsSection({
             else void disable();
           }}
         />
-        <span>{enabled ? "推播通知 已啟用" : "啟用推播通知"}</span>
         <span className="toggle-pill-track" aria-hidden>
           <span className="toggle-pill-thumb" />
         </span>
+        {enabled ? "推播通知 已啟用" : "啟用推播通知"}
       </label>
       {hint && <div className="push-hint" style={{ marginTop: 6 }}>{hint}</div>}
-      <div className="settings-popover-task-grid" aria-label="推播事件">
-        {PUSH_EVENT_LABELS.map((item) => {
-          const checked = userCfg?.pushEvents[item.key] ?? true;
-          return (
-            <label
-              key={item.key}
-              className={"toggle-pill mono" + (checked ? " is-on" : "")}
-            >
-              <input
-                type="checkbox"
-                checked={checked}
-                disabled={!userCfg || !!pushSaving[item.key]}
-                onChange={(e) => onTogglePushEvent(item.key, e.target.checked)}
-              />
-              <span className="toggle-pill-track" aria-hidden>
-                <span className="toggle-pill-thumb" />
-              </span>
-              {item.label}
-            </label>
-          );
-        })}
-      </div>
-      <div className="push-hint">啟用後 pipeline 完成 / 失敗會推到此裝置(背景或前景皆可)。</div>
+      {enabled && (
+        <div className="settings-popover-task-grid" aria-label="推播事件" style={{ marginTop: "var(--space-3)" }}>
+          {PUSH_EVENT_LABELS.map((item) => {
+            const checked = userCfg?.pushEvents[item.key] ?? true;
+            return (
+              <label
+                key={item.key}
+                className={"toggle-pill mono" + (checked ? " is-on" : "")}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  disabled={!userCfg || !!pushSaving[item.key]}
+                  onChange={(e) => onTogglePushEvent(item.key, e.target.checked)}
+                />
+                <span className="toggle-pill-track" aria-hidden>
+                  <span className="toggle-pill-thumb" />
+                </span>
+                {item.label}
+              </label>
+            );
+          })}
+        </div>
+      )}
 
       {lastError && (
         <div className="mono push-error">
