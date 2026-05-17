@@ -28,16 +28,11 @@ User 把 repo URL 給你的話,標準流程:
 
 ```bash
 bun install
-
-# 開發(fullstack,一指令起 vite + backend):
-bun run dev           # vite 5173 + backend 3001(no watch)
-# 開 http://127.0.0.1:5173/board
-
-# Production-like(build + preview):
-bun run build         # tsc + vite build → dist/
-bun run preview       # vite preview → :4173
-bun run server        # 另一 terminal 起 backend(沒 concurrently 包)
+bun run start         # build + 同時起 backend 3001 + preview 4173
+# 開 http://127.0.0.1:4173/board
 ```
+
+`start` 一條指令搞定 production build + 後端 + 前端 preview(PWA SW 註冊正常)。改 VP source code 才用 `bun run dev`(走 5173 vite HMR,SW 不註冊,maintainer 用)。
 
 **Sub-agent 用 `sub:*` script + 100 port**(`sub:dev` / `sub:server` / `sub:preview`)避開 user backend。詳見 [package.json](package.json)。
 
@@ -229,9 +224,10 @@ Phase 1-5 全套已落地(CRUD + QA + Runner + Worktree + Merge/Sync + Auto + Ta
 
 | 指令 | 用途 |
 |---|---|
-| `bun run dev` | fullstack:vite 5173 + backend 3001(concurrently,no watch) |
+| `bun run start` | **enduser 用** — build + 同時 backend 3001 + preview 4173 |
+| `bun run dev` | maintainer 改 source 用:vite 5173 HMR + backend 3001(SW 不註冊) |
 | `bun run server` | 只 backend(3001) |
-| `bun run preview` | 提供 `dist/`(4173) |
+| `bun run preview` | 只 frontend preview(4173,需先 `bun run build`) |
 | `bun run sub:dev` | sub-agent 用:vite 5273 + backend 3101(避開 user 的 3001/5173) |
 | `bun run sub:server` | sub-agent 只 backend(3101) |
 | `bun run sub:preview` | sub-agent preview(4273 + proxy → 3101) |

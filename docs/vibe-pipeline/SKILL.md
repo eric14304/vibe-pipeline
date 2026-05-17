@@ -22,21 +22,17 @@ vbpl 主要 read 操作不需 backend(直接讀 fs),但 **run / pause / merge / 
 
 ```bash
 bun install                # 第一次或 dep 更新後跑
-bun run dev                # fullstack:vite 5173 + backend 3001(concurrently,no watch)
-# 開瀏覽器到 http://127.0.0.1:5173/board
+bun run start              # build + 同時起 backend 3001 + preview 4173
+# 開瀏覽器到 http://127.0.0.1:4173/board
 ```
 
-或者只起 backend 不要 frontend dev server:
-
-```bash
-bun run server             # backend 3001
-bun run preview            # 另開 terminal:build + 提供 dist 到 4173
-# 開 http://127.0.0.1:4173/board
-```
+`start` = `bun run build` 完接 `concurrently` 同 terminal 跑 server + preview,一條指令拿 production bundle + PWA SW + 後端。
 
 確認 backend 活:`curl http://127.0.0.1:3001/api/health` 回 `{"ok":true,...}`。
 
-死了 / 沒起就 `vbpl pipeline run` 會回 `NO_BACKEND` error,告訴 user 啟 `bun run server`(或 `bun run dev` 一起包前端)。
+死了 / 沒起就 `vbpl pipeline run` 會回 `NO_BACKEND` error,告訴 user 跑 `bun run start`。
+
+> `bun run dev` 是 **maintainer 改 VP 自己 source code** 才用(走 5173 vite HMR,SW 不註冊,不適合 enduser 正常用)。enduser 永遠走 `bun run start`。
 
 ## 心智模型
 
