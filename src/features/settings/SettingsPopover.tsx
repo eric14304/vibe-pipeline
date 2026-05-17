@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import * as api from "../../api/projects";
 import * as userConfigApi from "../../api/userConfig";
 import { SecurityTab } from "../auth/SecurityTab";
@@ -54,49 +54,115 @@ const PUSH_EVENT_META: Array<{
   label: string;
   sub: string;
   icon: string;
-  iconColor: string;
+  tone: string;
 }> = [
   {
     key: "ticket_done",
     label: "Ticket 完成通知",
     sub: "當 Ticket 完成時收到通知",
     icon: "✓",
-    iconColor: "var(--done)",
+    tone: "done",
   },
   {
     key: "ticket_failed",
     label: "Ticket 失敗通知",
     sub: "當 Ticket 失敗時收到通知",
     icon: "✕",
-    iconColor: "var(--failed)",
+    tone: "failed",
   },
   {
     key: "pipeline_paused",
     label: "Pipeline 暫停通知",
     sub: "當 Pipeline 暫停需回應時收到通知",
     icon: "⏸",
-    iconColor: "var(--accent)",
+    tone: "paused",
   },
   {
     key: "auto_merge_conflict",
     label: "AI 衝突處理通知",
     sub: "當 AI 接手解衝突時收到通知",
     icon: "AI",
-    iconColor: "var(--accent)",
+    tone: "iter",
   },
 ];
 
-const TASK_ICON: Record<TaskClass, string> = {
-  qa: "📋",
-  split: "✂️",
-  runner: "🤖",
-  executor: "⚡",
-  critic: "🔍",
-  merge: "🔀",
+type TaskIconKind = "qa" | "split" | "runner" | "executor" | "critic" | "merge";
+
+const TASK_ICON: Record<TaskClass, TaskIconKind> = {
+  qa: "qa",
+  split: "split",
+  runner: "runner",
+  executor: "executor",
+  critic: "critic",
+  merge: "merge",
 };
+
+const TASK_TONE: Record<TaskClass, string> = {
+  qa: "blue",
+  split: "violet",
+  runner: "green",
+  executor: "amber",
+  critic: "red",
+  merge: "teal",
+};
+
+function TaskIconGlyph({ kind }: { kind: TaskIconKind }) {
+  if (kind === "executor") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden>
+        <path d="M13 2 5 14h6l-1 8 8-12h-6l1-8Z" />
+      </svg>
+    );
+  }
+  if (kind === "critic") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden>
+        <path d="M12 3 5 6v5c0 4.1 2.8 7.9 7 9.8 4.2-1.9 7-5.7 7-9.8V6l-7-3Z" />
+        <path d="m9 12 2 2 4-5" />
+      </svg>
+    );
+  }
+  if (kind === "merge") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden>
+        <path d="M7 4v6a4 4 0 0 0 4 4h6" />
+        <path d="M17 8v12" />
+        <path d="M4 7l3-3 3 3" />
+        <path d="M14 17l3 3 3-3" />
+      </svg>
+    );
+  }
+  if (kind === "split") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden>
+        <path d="M7 4v16" />
+        <path d="M7 8h6a4 4 0 0 1 4 4v8" />
+        <path d="M4 7l3-3 3 3" />
+      </svg>
+    );
+  }
+  if (kind === "runner") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden>
+        <path d="M8 19v-2a4 4 0 0 1 4-4h1" />
+        <circle cx="10" cy="8" r="4" />
+        <path d="m15 17 2 2 4-5" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path d="M7 3h8l4 4v14H7V3Z" />
+      <path d="M15 3v5h4" />
+      <path d="M10 12h5" />
+      <path d="M10 16h4" />
+    </svg>
+  );
+}
 
 function AiTaskRow({
   icon,
+  tone,
   label,
   sub,
   provider,
@@ -107,7 +173,8 @@ function AiTaskRow({
   disabled,
   onChange,
 }: {
-  icon: string;
+  icon: TaskIconKind;
+  tone: string;
   label: string;
   sub?: string;
   provider: Provider;
@@ -121,13 +188,29 @@ function AiTaskRow({
   return (
     <div className="settings-row ai-task-row">
       <div className="settings-row-label">
-        <div className="settings-row-label-head">
-          <span className="settings-row-icon" aria-hidden>{icon}</span>
-          {label}
+        <div className="settings-row-identity">
+          <span className={"settings-row-icon settings-icon-badge settings-icon-badge--" + tone} aria-hidden>
+            <TaskIconGlyph kind={icon} />
+          </span>
+          <div className="settings-row-text">
+            <div className="settings-row-label-head">{label}</div>
+            {sub && <div className="settings-row-label-sub">{sub}</div>}
+          </div>
         </div>
-        {sub && <div className="settings-row-label-sub">{sub}</div>}
       </div>
       <div className="settings-row-control settings-row-control--multi">
+        <select
+          className="settings-input"
+          value={model}
+          disabled={disabled}
+          onChange={(e) => onChange({ model: e.target.value as ModelName })}
+        >
+          {modelsForProvider(provider).map((m) => (
+            <option key={m} value={m}>
+              {m.replace(/^claude-/, "")}
+            </option>
+          ))}
+        </select>
         {showProvider && (
           <select
             className="settings-input"
@@ -142,18 +225,6 @@ function AiTaskRow({
             ))}
           </select>
         )}
-        <select
-          className="settings-input"
-          value={model}
-          disabled={disabled}
-          onChange={(e) => onChange({ model: e.target.value as ModelName })}
-        >
-          {modelsForProvider(provider).map((m) => (
-            <option key={m} value={m}>
-              {m.replace(/^claude-/, "")}
-            </option>
-          ))}
-        </select>
         {showEffort && (
           <select
             className="settings-input"
@@ -171,6 +242,29 @@ function AiTaskRow({
       </div>
     </div>
   );
+}
+
+function TipCard({
+  title = "小提醒",
+  children,
+  compact,
+}: {
+  title?: string;
+  children: ReactNode;
+  compact?: boolean;
+}) {
+  return (
+    <div className={"settings-tip-card" + (compact ? " settings-tip-card--compact" : "")}>
+      <div className="settings-tip-copy">
+        <div className="settings-tip-title">{title}</div>
+        <div className="settings-tip-body">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function InfoDot() {
+  return <span className="settings-info-dot settings-info-dot--small" aria-hidden>i</span>;
 }
 
 function PushNotificationsSection({
@@ -274,8 +368,11 @@ function PushNotificationsSection({
       ) : null}
 
       <label
-        className={"toggle-pill mono push-main-toggle" + (enabled ? " is-on" : "")}
-        style={{ opacity: mainDisabled ? 0.55 : 1, cursor: mainDisabled ? "not-allowed" : "pointer" }}
+        className={
+          "toggle-pill mono push-main-toggle" +
+          (enabled ? " is-on" : "") +
+          (mainDisabled ? " is-disabled" : "")
+        }
       >
         <input
           type="checkbox"
@@ -306,25 +403,25 @@ function PushNotificationsSection({
               className={"settings-row push-event-row" + (eventsDisabled ? " push-row-disabled" : "")}
             >
               <div className="settings-row-label">
-                <div className="settings-row-label-head">
+                <div className="settings-row-identity">
                   <span
-                    className="settings-row-icon push-event-icon"
+                    className={"settings-row-icon push-event-icon push-event-icon--" + item.tone}
                     aria-hidden
-                    style={{ color: item.iconColor }}
                   >
                     {item.icon}
                   </span>
-                  {item.label}
+                  <div className="settings-row-text">
+                    <div className="settings-row-label-head">{item.label}</div>
+                    <div className="settings-row-label-sub">{item.sub}</div>
+                    {idx === 0 && eventsDisabled && (
+                      <div className="settings-row-label-sub push-event-hint">請先啟用推播通知</div>
+                    )}
+                  </div>
                 </div>
-                <div className="settings-row-label-sub">{item.sub}</div>
-                {idx === 0 && eventsDisabled && (
-                  <div className="settings-row-label-sub push-event-hint">請先啟用推播通知</div>
-                )}
               </div>
               <div className="settings-row-control">
                 <label
-                  className={"toggle-pill mono" + (checked ? " is-on" : "")}
-                  style={{ cursor: rowDisabled ? "not-allowed" : "pointer" }}
+                  className={"toggle-pill mono" + (checked ? " is-on" : "") + (rowDisabled ? " is-disabled" : "")}
                 >
                   <input
                     type="checkbox"
@@ -337,6 +434,9 @@ function PushNotificationsSection({
                   </span>
                 </label>
               </div>
+              {eventsDisabled && (
+                <div className="settings-row-hint push-event-lock">需先啟用推播通知</div>
+              )}
             </div>
           );
         })}
@@ -383,37 +483,32 @@ function InstallAppSection({ onActionError }: { onActionError?: (message: string
     : platform === "other"
       ? "此瀏覽器不支援"
       : "尚未安裝";
-  const statusIcon = installed ? "✓" : platform === "other" ? "!" : "○";
+  const statusIcon = installed ? "✓" : platform === "other" ? "!" : "▯";
   const statusTone: "ok" | "warn" | "neutral" = installed ? "ok" : platform === "other" ? "warn" : "neutral";
 
   return (
-    <div className="settings-section">
-      <div className="settings-section-title">安裝為 App</div>
-      <div className="settings-section-sub">將 App 加入主畫面,可隨時使用快捷啟動,並支援接收推播通知</div>
+    <div className="settings-section settings-section--plain">
+      <div className="settings-feature-row">
+        <div className="settings-feature-label">
+          <div className="settings-feature-title">安裝為 App</div>
+          <div className="settings-feature-sub">將此網站安裝為 App,可更快開啟並接收推播通知。</div>
+        </div>
 
-      <div className="install-chip-grid">
+        <div className="install-panel">
         {/* chip 1:狀態 */}
         <div className={"install-chip install-chip--status install-chip--tone-" + statusTone}>
           <div className={"install-chip-status-icon install-chip-status-icon--" + statusTone} aria-hidden>
             {statusIcon}
           </div>
-          <div className="install-chip-status-label">{statusLabel}</div>
+          <div className="install-chip-text">
+            <div className="install-chip-status-label">{statusLabel}</div>
+            <div className="install-chip-hint">安裝後可在桌面或主畫面開啟</div>
+          </div>
         </div>
 
         {/* chip 2:Chrome / Edge / Android */}
         <div className={"install-chip" + (platform === "chromium" ? " install-chip--active" : "")}>
-          <div className="install-chip-head">
-            <span className="install-chip-icon" aria-hidden>
-              <svg width="22" height="22" viewBox="0 0 48 48" fill="none">
-                <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="2.5" />
-                <circle cx="24" cy="24" r="7" stroke="currentColor" strokeWidth="2.5" />
-                <path d="M24 4 L24 17" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-                <path d="M6.7 34 L18 27.5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-                <path d="M41.3 34 L30 27.5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-              </svg>
-            </span>
-            <div className="install-chip-title">Chrome / Edge / Android</div>
-          </div>
+          <div className="install-chip-title">Chrome / Edge / Android</div>
           <div className="install-chip-body">
             {installed ? (
               <div className="install-chip-hint">已安裝</div>
@@ -428,8 +523,15 @@ function InstallAppSection({ onActionError }: { onActionError?: (message: string
               </button>
             ) : (
               <div className="install-chip-hint">
-                點瀏覽器網址列右側<br />
-                「⊕ 安裝」icon
+                點擊網址列右側的
+                <span className="install-inline-icon" aria-hidden>
+                  <svg viewBox="0 0 24 24">
+                    <path d="M12 4v10" />
+                    <path d="m8 10 4 4 4-4" />
+                    <path d="M5 19h14" />
+                  </svg>
+                </span>
+                安裝
               </div>
             )}
           </div>
@@ -437,23 +539,14 @@ function InstallAppSection({ onActionError }: { onActionError?: (message: string
 
         {/* chip 3:iOS Safari */}
         <div className={"install-chip" + (platform === "ios" ? " install-chip--active" : "")}>
-          <div className="install-chip-head">
-            <span className="install-chip-icon" aria-hidden>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                <path d="M12 3 L12 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                <path d="M8 7 L12 3 L16 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M5 12 L5 19 A2 2 0 0 0 7 21 L17 21 A2 2 0 0 0 19 19 L19 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-            </span>
-            <div className="install-chip-title">iOS Safari</div>
-          </div>
+          <div className="install-chip-title">iOS Safari <span className="settings-title-muted">(不支援安裝)</span></div>
           <div className="install-chip-body">
             <div className="install-chip-hint">
-              點下方「分享」<br />
-              選「加入主畫面」
+              點擊「分享」→「加入主畫面」即可從主畫面開啟
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
@@ -876,7 +969,7 @@ export function SettingsPopover({
               key={t.key}
               type="button"
               onClick={() => setActiveTab(t.key)}
-              className={"settings-popover-tab" + (isActive ? " is-active" : "")}
+              className={"settings-popover-tab settings-popover-tab--" + t.key + (isActive ? " is-active" : "")}
             >
               {t.label}
             </button>
@@ -895,11 +988,12 @@ export function SettingsPopover({
 
       {/* ─── Project tab ─── */}
       {activeTab === "project" && <>
+      <div className="settings-card settings-project-card">
       <div className="settings-row">
         <div className="settings-row-label">
           <div className="settings-row-label-head">
-            <span className="settings-row-icon" aria-hidden>⚡</span>
             平行上限
+            <span className="settings-info-dot" aria-hidden>i</span>
           </div>
           <div className="settings-row-label-sub">{MIN}–{MAX} 條</div>
         </div>
@@ -934,7 +1028,6 @@ export function SettingsPopover({
       <div className="settings-row">
         <div className="settings-row-label">
           <div className="settings-row-label-head">
-            <span className="settings-row-icon" aria-hidden>🌿</span>
             Base branch
           </div>
           <div className="settings-row-label-sub">預設用於新建 pipeline</div>
@@ -967,12 +1060,12 @@ export function SettingsPopover({
       <div className="settings-row">
         <div className="settings-row-label">
           <div className="settings-row-label-head">
-            <span className="settings-row-icon" aria-hidden>💰</span>
             Cost 上限
+            <span className="settings-info-dot" aria-hidden>i</span>
           </div>
-          <div className="settings-row-label-sub">USD,0 = 無限</div>
+          <div className="settings-row-label-sub">USD，0 = 無限</div>
         </div>
-        <div className="settings-row-control settings-row-control--multi">
+        <div className="settings-row-control settings-row-control--multi settings-cost-control">
           <input
             type="number"
             min={0}
@@ -1000,15 +1093,16 @@ export function SettingsPopover({
         <div className="settings-row-hint">每條 pipeline 個別累計上限,超過則不會跑其他 pipeline / run</div>
       </div>
 
-      <div className="settings-row">
+      <div className="settings-row settings-row--auto-merge">
         <div className="settings-row-label">
           <div className="settings-row-label-head">
-            <span className="settings-row-icon" aria-hidden>🔀</span>
             自動合併
+            <span className="settings-info-dot" aria-hidden>i</span>
           </div>
           <div className="settings-row-label-sub">每條 pipeline 可單獨調整</div>
         </div>
-        <div className="settings-row-control">
+        <div className="settings-row-control settings-row-control--wide">
+          <div className="settings-merge-panel">
           <label
             className={"toggle-pill mono" + (draftAutoMerge ? " is-on" : "")}
             title="全 ticket done → backend 自動 append merge ticket 走 runner 流程"
@@ -1036,13 +1130,16 @@ export function SettingsPopover({
             </span>
             新 pipeline 預設啟用
           </label>
+          <div className="settings-inline-alert">
+            <span className="settings-inline-alert-icon" aria-hidden>i</span>
+            啟用後,符合條件時將自動合併到 base branch。
+          </div>
+          </div>
         </div>
-        <div className="settings-row-hint">啟用後,符合條件時將自動合併到 base branch</div>
+      </div>
       </div>
 
-      <div className="settings-tip-card" style={{ marginTop: "var(--settings-space-3)" }}>
-        小提醒:以上設定會套用到新建立的 pipeline,已存在的 pipeline 不受影響
-      </div>
+      <TipCard>以上設定會套用於新建立的 pipeline，已存在的 pipeline 不受影響。</TipCard>
       </>}
 
       {/* ─── AI 任務 tab ─── */}
@@ -1050,29 +1147,61 @@ export function SettingsPopover({
       {userCfg ? (
         <>
         <div className="settings-section">
-          <div className="settings-section-title">全域 provider / model 設定</div>
+          <div className="settings-section-heading">
+            <div>
+              <div className="settings-section-title">全域 provider / model 設定</div>
+              <div className="settings-section-sub">設定預設模型與強度,將套用於全域任務與 AI 流程。</div>
+            </div>
+            <a
+              className="settings-section-link"
+              href="https://docs.anthropic.com/"
+              target="_blank"
+              rel="noreferrer"
+            >
+              模型與強度說明
+            </a>
+          </div>
+          <div className="settings-ai-card settings-ai-card--global">
+            <div className="settings-ai-header">
+              <span />
+              <span>模型 (Model) <InfoDot /></span>
+              <span>Provider <InfoDot /></span>
+              <span>強度 (Intensity) <InfoDot /></span>
+            </div>
           {(["qa", "split", "runner"] as const).map((tc) => (
             <AiTaskRow
               key={tc}
               icon={TASK_ICON[tc]}
+              tone={TASK_TONE[tc]}
               label={TASK_CLASS_LABELS[tc]}
               sub={TASK_CLASS_HINTS[tc]}
               provider={userCfg.defaults[tc].provider}
               model={userCfg.defaults[tc].model}
               effort={userCfg.defaults[tc].effort}
               showProvider
-              showEffort={false}
+              showEffort
               onChange={(patch) => updateTask(tc, patch)}
             />
           ))}
+          </div>
         </div>
 
-        <div className="settings-section">
-          <div className="settings-section-title">進階設定(可依需求調整)</div>
+        <div className="settings-section settings-ai-advanced">
+          <div className="settings-advanced-head">
+            <span className="settings-icon-badge settings-icon-badge--amber" aria-hidden>
+              <TaskIconGlyph kind="executor" />
+            </span>
+            <div>
+              <div className="settings-section-title">進階設定 <span className="settings-title-muted">(可依需求調整)</span></div>
+              <div className="settings-section-sub">為提升速度與節省 Token,請依任務重要性調整模型與強度。</div>
+            </div>
+          </div>
+          <div className="settings-ai-card settings-ai-card--advanced">
           {(["executor", "critic", "merge"] as const).map((tc) => (
             <AiTaskRow
               key={tc}
               icon={TASK_ICON[tc]}
+              tone={TASK_TONE[tc]}
               label={TASK_CLASS_LABELS[tc]}
               sub={TASK_CLASS_HINTS[tc]}
               provider={userCfg.defaults[tc].provider}
@@ -1083,11 +1212,10 @@ export function SettingsPopover({
               onChange={(patch) => updateTask(tc, patch)}
             />
           ))}
+          </div>
         </div>
 
-        <div className="settings-tip-card">
-          小提醒:這裡的設定套用到所有 project
-        </div>
+        <TipCard>變更設定將套用於新任務，進行中的任務不受影響。</TipCard>
         </>
       ) : (
         <div className="settings-subhint">載入中…</div>
@@ -1104,9 +1232,12 @@ export function SettingsPopover({
       {activeTab === "notifications" && (
         <>
           <InstallAppSection onActionError={onActionError} />
-          <div className="settings-section">
-            <div className="settings-section-title-row">
-              <div className="settings-section-title">推播通知</div>
+          <div className="settings-section settings-notify-section">
+            <div className="settings-section-heading">
+              <div>
+                <div className="settings-section-title">推播通知</div>
+                <div className="settings-section-sub">開啟後,系統事件發生時會推送通知到此裝置。</div>
+              </div>
               <a
                 className="settings-section-link"
                 href="https://web.dev/articles/push-notifications-overview"
@@ -1116,12 +1247,15 @@ export function SettingsPopover({
                 了解更多
               </a>
             </div>
+            <div className="settings-card settings-push-card">
             <PushNotificationsSection
               userCfg={userCfg}
               pushSaving={pushSaving}
               onTogglePushEvent={updatePushEvent}
               onActionError={onActionError}
             />
+            <TipCard compact>通知會推送到此裝置（背景或前景皆可）。</TipCard>
+            </div>
           </div>
         </>
       )}
