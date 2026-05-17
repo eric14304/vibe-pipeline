@@ -30,7 +30,16 @@ export function BoardScreen({
   startCreating?: boolean;
 }) {
   const { hash } = useActiveProjectHash();
-  const [project, setProject] = useState<Project | null>(null);
+  // PWA reload 體感 — mount 時從 localStorage hydrate 上次 project snapshot,避免 !project 全屏「載入中…」一閃
+  const [project, setProject] = useState<Project | null>(() => {
+    if (!hash) return null;
+    try {
+      const raw = localStorage.getItem(`vp-cache:project:${hash}`);
+      return raw ? (JSON.parse(raw) as Project) : null;
+    } catch {
+      return null;
+    }
+  });
   // 切兩種 error:
   // - loadError = 開專案時 status fetch 失敗 → 全屏 EmptyProject
   // - actionError = 跑 / 暫停 / 刪 / 建 等動作失敗 → top banner 顯示+自動消
@@ -196,6 +205,11 @@ export function BoardScreen({
       .then((p) => {
         if (cancelled) return;
         setProject(p);
+        try {
+          localStorage.setItem(`vp-cache:project:${hash}`, JSON.stringify(p));
+        } catch {
+          /* quota / serialize 失敗 — memory 仍有 */
+        }
       })
       .catch((e: Error) => {
         if (cancelled) return;
