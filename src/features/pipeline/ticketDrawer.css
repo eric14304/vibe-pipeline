@@ -420,6 +420,11 @@
   color: var(--fg);
   font-weight: 500;
 }
+.tdrw-run-meta-label {
+  font-family: var(--font-sans, inherit);
+  color: var(--fg-faint);
+  font-size: 10.5px;
+}
 .tdrw-run-detail {
   border-top: 1px solid var(--line);
   padding: 10px 12px;

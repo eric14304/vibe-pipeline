@@ -136,18 +136,21 @@ function RunCard({
       </button>
       <div className="tdrw-run-meta">
         <span className="tdrw-run-meta-item">
-          <span>⏱</span>
+          <span className="tdrw-run-meta-label">時間</span>
           <strong>{dur}</strong>
         </span>
         <span className="tdrw-run-meta-item">
-          <span>$</span>
+          <span className="tdrw-run-meta-label">成本</span>
           <strong>{cost}</strong>
         </span>
         <span className="tdrw-run-meta-item">
-          <span>↺</span>
+          <span className="tdrw-run-meta-label">回合</span>
           <strong>{turns}</strong>
         </span>
-        <span className="tdrw-run-meta-item">{tokens}</span>
+        <span className="tdrw-run-meta-item">
+          <span className="tdrw-run-meta-label">Tokens</span>
+          <strong>{tokens}</strong>
+        </span>
       </div>
 
       {open && (
