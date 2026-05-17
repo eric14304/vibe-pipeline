@@ -232,6 +232,7 @@ async function handle(req: Request): Promise<Response> {
     }
 
     if (rest === "/notifs" && method === "GET") return projects.listNotifs(hash);
+    if (rest === "/notif" && method === "POST") return projects.postNotif(hash, req);
     if (rest === "/notifs/mark-all-read" && method === "POST")
       return projects.markAllNotifsRead(hash);
     if (rest === "/notifs/dismiss-all" && method === "POST")

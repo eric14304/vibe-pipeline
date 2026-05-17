@@ -1,5 +1,5 @@
 import type { BannerKind } from "../ui/icons";
-import type { NotifSeverity } from "../../shared/types";
+import type { NotifEventType, NotifSeverity } from "../../shared/types";
 
 // 從 shared/ 轉發 sev 型別,讓本檔的 NotifItem 與其他 UI 元件能單點 import。
 export type { NotifSeverity };
@@ -14,6 +14,7 @@ export type NotifAction = {
 // 由 BoardScreen 從 NotifRecord 投影出來。
 export type NotifItem = {
   id: string;
+  type?: NotifEventType;
   sev: NotifSeverity;
   icon: string;
   iconKind: BannerKind;
@@ -28,4 +29,4 @@ export type NotifItem = {
 };
 
 export type InboxState = "expanded" | "collapsed" | "hidden";
-export type InboxFilter = "all" | "unread" | "blocking";
+export type InboxFilter = "all" | "unread" | "blocking" | "frontend";
