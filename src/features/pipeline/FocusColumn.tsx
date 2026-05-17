@@ -675,6 +675,10 @@ function SyncConflictModal({
       onClick={(e) => {
         if (e.target === e.currentTarget) onCancel();
       }}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onCancel();
+      }}
+      tabIndex={-1}
     >
       <div className="modal-card">
         <div className="modal-title">Sync 遇到衝突</div>

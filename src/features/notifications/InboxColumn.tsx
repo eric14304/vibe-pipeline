@@ -104,6 +104,7 @@ function InboxStrip({
   const previewItem = previewIdx !== null ? visible[previewIdx] : null;
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: hover previews are visual-only; actions stay on child buttons
     <div
       className="inbox-strip"
       ref={stripRef}
@@ -169,7 +170,7 @@ function InboxStrip({
           />
         ))}
         {overflow > 0 && (
-          <span className="inbox-strip-overflow mono" aria-label={`還有 ${overflow} 條`}>
+          <span className="inbox-strip-overflow mono" title={`還有 ${overflow} 條`}>
             +{overflow}
           </span>
         )}

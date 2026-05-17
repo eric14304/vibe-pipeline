@@ -507,9 +507,8 @@ function PushNotificationsSection({
         啟用推播通知
       </label>
 
-      <div
+      <fieldset
         className={"push-events-list" + (eventsDisabled ? " is-disabled" : "")}
-        role="group"
         aria-label="推播事件"
       >
         {PUSH_EVENT_META.map((item, idx) => {
@@ -563,7 +562,7 @@ function PushNotificationsSection({
             </div>
           );
         })}
-      </div>
+      </fieldset>
 
       {lastError && (
         <div className="mono push-error">
@@ -612,7 +611,7 @@ function InstallAppSection({ onActionError }: { onActionError?: (message: string
     <div className="settings-section settings-section--plain">
       <div className="settings-feature-row">
         <div className="settings-feature-label">
-          <div className="settings-feature-title">安裝為 App</div>
+          <div className="settings-feature-title settings-section-title">安裝為 App</div>
           <div className="settings-feature-sub">將此網站安裝為 App,可更快開啟並接收推播通知。</div>
         </div>
 
@@ -1297,7 +1296,7 @@ export function SettingsPopover({
           <div className="settings-section-heading">
             <div>
               <div className="settings-section-title">全域 provider / model 設定</div>
-              <div className="settings-section-sub">設定預設模型與強度,將套用於全域任務與 AI 流程。</div>
+              <div className="settings-section-sub">設定預設模型與強度,會套用到所有 project 的新任務與 AI 流程。</div>
             </div>
             <a
               className="settings-section-link"
