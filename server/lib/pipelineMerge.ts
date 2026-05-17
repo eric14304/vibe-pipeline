@@ -6,6 +6,7 @@ import * as orchestrator from "./runner/orchestrator";
 import * as git from "./git";
 import { mergeTicketPrompt } from "./runner/mergeTicketPrompt";
 import { getTaskConfig } from "./userConfig";
+import { ensureDepsAfterMerge, type DepInstallResult } from "./depInstall";
 
 export type TriggerMergeResult =
   | { ok: true; ticketId: string; reused: boolean }
@@ -127,7 +128,7 @@ export async function triggerMerge(opts: {
 // 心智:autoMerge 是「便利開關」,風險(燒 token 解衝突)決策回到 user
 
 export type AutoMergeResult =
-  | { ok: true; mergeCommit: { hash: string; subject: string; ts: number }; behindCount: number }
+  | { ok: true; mergeCommit: { hash: string; subject: string; ts: number }; behindCount: number; depInstall?: DepInstallResult }
   | { ok: true; alreadyMerged: true }
   | { ok: false; reason: "no_git" | "not_found" | "running" | "working_tree_dirty"; error: string }
   | { ok: false; reason: "conflict"; error: string; conflictFiles: string[] }
@@ -252,7 +253,8 @@ export async function autoMergeNoAI(opts: {
       // pipeline 不見就算了,git 已 merge 成功
     }
     const aheadNum = Number(ahead.out) || 0;
-    return { ok: true, mergeCommit, behindCount: aheadNum };
+    const depInstall = await ensureDepsAfterMerge(projectPath, mergeCommit.hash);
+    return { ok: true, mergeCommit, behindCount: aheadNum, depInstall };
   }
 
   // merge 失敗:看是不是衝突

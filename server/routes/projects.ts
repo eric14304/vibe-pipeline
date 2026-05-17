@@ -516,7 +516,12 @@ export async function mergePipeline(hash: string, pipelineId: string): Promise<R
   if (mech.ok) {
     // alreadyMerged 是 no-op,mergeCommit 不存在;clean merge 才會有 mergeCommit
     if ("mergeCommit" in mech && mech.mergeCommit) {
-      return ok({ ok: true, mode: "mechanical" as const, mergeCommit: mech.mergeCommit });
+      return ok({
+        ok: true,
+        mode: "mechanical" as const,
+        mergeCommit: mech.mergeCommit,
+        ...(mech.depInstall ? { depInstall: mech.depInstall } : {}),
+      });
     }
     return ok({ ok: true, mode: "mechanical" as const, alreadyMerged: true });
   }

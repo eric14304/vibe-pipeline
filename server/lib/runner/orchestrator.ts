@@ -11,6 +11,7 @@ import * as runLog from "./runLog";
 import * as testMode from "../testMode";
 import { buildRunnerBehaviorPrompt } from "./runnerPrompt";
 import { loadUserConfig, getTaskConfigWithAdapter } from "../userConfig";
+import { ensureDepsAfterMerge } from "../depInstall";
 
 const LOG_CODE_WIDTH = 10;
 
@@ -615,6 +616,7 @@ async function spawnDirect(opts: {
           state?: string;
           name?: string;
           baseBranch?: string;
+          mergeCommit?: { hash?: string };
         } | null;
         const name = final?.name || pipelineId;
 
@@ -635,6 +637,25 @@ async function spawnDirect(opts: {
             }
           } catch (e) {
             console.warn(`[runner ${pipelineId}] worktree prune threw:`, e);
+          }
+
+          // 雷區 #20:merge 動到 package.json 或 bun.lock → 同步跑 bun install 補 main repo node_modules
+          const mergeHash = final?.mergeCommit?.hash;
+          if (mergeHash) {
+            try {
+              const dep = await ensureDepsAfterMerge(projectPath, mergeHash);
+              if (dep.ran && !dep.ok) {
+                console.warn(`[runner ${pipelineId}] bun install failed: ${dep.error}`);
+                notifs.emit(projectPath, {
+                  type: "pipeline_merge_cleanup_failed",
+                  title: `${name} merge 後 bun install 失敗`,
+                  sub: dep.error,
+                  pipelineId,
+                });
+              }
+            } catch (e) {
+              console.warn(`[runner ${pipelineId}] ensureDepsAfterMerge threw:`, e);
+            }
           }
         }
 
