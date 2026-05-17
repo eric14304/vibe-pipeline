@@ -53,35 +53,35 @@ const PUSH_EVENT_META: Array<{
   key: PushEventKey;
   label: string;
   sub: string;
-  icon: string;
+  icon: "done" | "failed" | "paused" | "ai";
   tone: string;
 }> = [
   {
     key: "ticket_done",
     label: "Ticket 完成通知",
     sub: "當 Ticket 完成時收到通知",
-    icon: "✓",
+    icon: "done",
     tone: "done",
   },
   {
     key: "ticket_failed",
     label: "Ticket 失敗通知",
     sub: "當 Ticket 失敗時收到通知",
-    icon: "✕",
+    icon: "failed",
     tone: "failed",
   },
   {
     key: "pipeline_paused",
     label: "Pipeline 暫停通知",
     sub: "當 Pipeline 暫停需回應時收到通知",
-    icon: "⏸",
+    icon: "paused",
     tone: "paused",
   },
   {
     key: "auto_merge_conflict",
     label: "AI 衝突處理通知",
     sub: "當 AI 接手解衝突時收到通知",
-    icon: "AI",
+    icon: "ai",
     tone: "iter",
   },
 ];
@@ -185,6 +185,35 @@ function AiTaskRow({
   disabled?: boolean;
   onChange: (patch: { provider?: Provider; model?: ModelName; effort?: Effort }) => void;
 }) {
+  const modelSelect = (
+    <select
+      className="settings-input"
+      value={model}
+      disabled={disabled}
+      onChange={(e) => onChange({ model: e.target.value as ModelName })}
+    >
+      {modelsForProvider(provider).map((m) => (
+        <option key={m} value={m}>
+          {m.replace(/^claude-/, "")}
+        </option>
+      ))}
+    </select>
+  );
+  const providerSelect = showProvider ? (
+    <select
+      className="settings-input"
+      value={provider}
+      disabled={disabled}
+      onChange={(e) => onChange({ provider: e.target.value as Provider })}
+    >
+      {PROVIDERS.map((p) => (
+        <option key={p} value={p}>
+          {p}
+        </option>
+      ))}
+    </select>
+  ) : null;
+
   return (
     <div className="settings-row ai-task-row">
       <div className="settings-row-label">
@@ -199,32 +228,8 @@ function AiTaskRow({
         </div>
       </div>
       <div className="settings-row-control settings-row-control--multi">
-        <select
-          className="settings-input"
-          value={model}
-          disabled={disabled}
-          onChange={(e) => onChange({ model: e.target.value as ModelName })}
-        >
-          {modelsForProvider(provider).map((m) => (
-            <option key={m} value={m}>
-              {m.replace(/^claude-/, "")}
-            </option>
-          ))}
-        </select>
-        {showProvider && (
-          <select
-            className="settings-input"
-            value={provider}
-            disabled={disabled}
-            onChange={(e) => onChange({ provider: e.target.value as Provider })}
-          >
-            {PROVIDERS.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-        )}
+        {showProvider ? providerSelect : modelSelect}
+        {showProvider ? modelSelect : null}
         {showEffort && (
           <select
             className="settings-input"
@@ -244,17 +249,49 @@ function AiTaskRow({
   );
 }
 
+function StepperChevron({ direction }: { direction: "up" | "down" }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path d={direction === "up" ? "m7 15 5-5 5 5" : "m7 9 5 5 5-5"} />
+    </svg>
+  );
+}
+
+function TipIcon({ kind }: { kind: "bulb" | "info" }) {
+  if (kind === "info") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 11v6" />
+        <path d="M12 7h.01" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path d="M9 18h6" />
+      <path d="M10 22h4" />
+      <path d="M8.5 14.5a6 6 0 1 1 7 0c-.9.7-1.5 1.5-1.5 2.5h-4c0-1-.6-1.8-1.5-2.5Z" />
+    </svg>
+  );
+}
+
 function TipCard({
   title = "小提醒",
   children,
   compact,
+  icon = "bulb",
 }: {
   title?: string;
   children: ReactNode;
   compact?: boolean;
+  icon?: "bulb" | "info";
 }) {
   return (
     <div className={"settings-tip-card" + (compact ? " settings-tip-card--compact" : "")}>
+      <span className="settings-tip-icon" aria-hidden>
+        <TipIcon kind={icon} />
+      </span>
       <div className="settings-tip-copy">
         <div className="settings-tip-title">{title}</div>
         <div className="settings-tip-body">{children}</div>
@@ -265,6 +302,81 @@ function TipCard({
 
 function InfoDot() {
   return <span className="settings-info-dot settings-info-dot--small" aria-hidden>i</span>;
+}
+
+function PushEventGlyph({ icon }: { icon: "done" | "failed" | "paused" | "ai" }) {
+  if (icon === "failed") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden>
+        <circle cx="12" cy="12" r="8" />
+        <path d="m9 9 6 6" />
+        <path d="m15 9-6 6" />
+      </svg>
+    );
+  }
+  if (icon === "paused") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden>
+        <circle cx="12" cy="12" r="8" />
+        <path d="M10 9v6" />
+        <path d="M14 9v6" />
+      </svg>
+    );
+  }
+  if (icon === "ai") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden>
+        <text x="12" y="15" textAnchor="middle">AI</text>
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <rect x="5" y="5" width="14" height="14" rx="3" />
+      <path d="m8.5 12 2.4 2.4 4.6-5" />
+    </svg>
+  );
+}
+
+function LockGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <rect x="6" y="10" width="12" height="10" rx="2" />
+      <path d="M8.5 10V7.5a3.5 3.5 0 0 1 7 0V10" />
+    </svg>
+  );
+}
+
+function InstallStatusIcon({ tone }: { tone: "ok" | "warn" | "neutral" }) {
+  if (tone === "warn") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden>
+        <path d="M12 8v5" />
+        <path d="M12 17h.01" />
+        <path d="M10.3 4.2 2.7 17.4A2 2 0 0 0 4.4 20h15.2a2 2 0 0 0 1.7-2.6L13.7 4.2a2 2 0 0 0-3.4 0Z" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path d="M8 3h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" />
+      <path d="M11 6h2" />
+      <path d="M10 18h4" />
+      {tone === "ok" ? <path d="m9 12 2 2 4-5" /> : <path d="M17 15.5 19 17l2-3" />}
+    </svg>
+  );
+}
+
+function PushStatusIcon({ kind }: { kind: "warn" | "info" }) {
+  if (kind === "info") {
+    return <span className="push-status-info-mark" aria-hidden>i</span>;
+  }
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path d="M18 8a6 6 0 1 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z" />
+      <path d="M10 21h4" />
+    </svg>
+  );
 }
 
 function PushNotificationsSection({
@@ -344,10 +456,16 @@ function PushNotificationsSection({
     <div>
       {supported === false ? (
         <div className="push-status-banner push-status-banner--info">
+          <span className="push-status-banner-icon" aria-hidden>
+            <PushStatusIcon kind="info" />
+          </span>
           <div className="push-status-banner-text">此瀏覽器不支援 Web Push</div>
         </div>
       ) : permission !== "granted" ? (
         <div className="push-status-banner push-status-banner--warn">
+          <span className="push-status-banner-icon" aria-hidden>
+            <PushStatusIcon kind="warn" />
+          </span>
           <div className="push-status-banner-text">
             尚未允許通知權限
             <div className="push-status-banner-sub">
@@ -408,7 +526,7 @@ function PushNotificationsSection({
                     className={"settings-row-icon push-event-icon push-event-icon--" + item.tone}
                     aria-hidden
                   >
-                    {item.icon}
+                    <PushEventGlyph icon={item.icon} />
                   </span>
                   <div className="settings-row-text">
                     <div className="settings-row-label-head">{item.label}</div>
@@ -435,7 +553,12 @@ function PushNotificationsSection({
                 </label>
               </div>
               {eventsDisabled && (
-                <div className="settings-row-hint push-event-lock">需先啟用推播通知</div>
+                <div className="settings-row-hint push-event-lock">
+                  <span className="push-event-lock-icon" aria-hidden>
+                    <LockGlyph />
+                  </span>
+                  需先啟用推播通知
+                </div>
               )}
             </div>
           );
@@ -483,7 +606,6 @@ function InstallAppSection({ onActionError }: { onActionError?: (message: string
     : platform === "other"
       ? "此瀏覽器不支援"
       : "尚未安裝";
-  const statusIcon = installed ? "✓" : platform === "other" ? "!" : "▯";
   const statusTone: "ok" | "warn" | "neutral" = installed ? "ok" : platform === "other" ? "warn" : "neutral";
 
   return (
@@ -498,7 +620,7 @@ function InstallAppSection({ onActionError }: { onActionError?: (message: string
         {/* chip 1:狀態 */}
         <div className={"install-chip install-chip--status install-chip--tone-" + statusTone}>
           <div className={"install-chip-status-icon install-chip-status-icon--" + statusTone} aria-hidden>
-            {statusIcon}
+            <InstallStatusIcon tone={statusTone} />
           </div>
           <div className="install-chip-text">
             <div className="install-chip-status-label">{statusLabel}</div>
@@ -909,6 +1031,20 @@ export function SettingsPopover({
       });
   }
 
+  function updateMaxParallel(nextValue: number) {
+    const clamped = Math.max(MIN, Math.min(MAX, Math.floor(nextValue || MIN)));
+    setDraftMaxParallel(nextValue);
+    scheduleProjectSave(
+      "max_parallel",
+      { defaults: { max_parallel: clamped } },
+      (next) => applyProjectDisplay("max_parallel", next),
+      () => {
+        const confirmedValue = confirmedProjectValuesRef.current?.max_parallel;
+        if (confirmedValue !== undefined) setDraftMaxParallel(confirmedValue);
+      }
+    );
+  }
+
   // outside click + Esc 關
   useEffect(() => {
     if (!open) return;
@@ -998,29 +1134,40 @@ export function SettingsPopover({
           <div className="settings-row-label-sub">{MIN}–{MAX} 條</div>
         </div>
         <div className="settings-row-control">
-          <input
-            type="number"
-            min={MIN}
-            max={MAX}
-            step={1}
-            value={draftMaxParallel}
-            onChange={(e) => {
-              const nextValue = Number(e.target.value);
-              const clamped = Math.max(MIN, Math.min(MAX, Math.floor(nextValue || MIN)));
-              setDraftMaxParallel(nextValue);
-              scheduleProjectSave(
-                "max_parallel",
-                { defaults: { max_parallel: clamped } },
-                (next) => applyProjectDisplay("max_parallel", next),
-                () => {
-                  const confirmedValue = confirmedProjectValuesRef.current?.max_parallel;
-                  if (confirmedValue !== undefined) setDraftMaxParallel(confirmedValue);
-                }
-              );
-            }}
-            disabled={!cfg}
-            className="mono settings-input settings-input--w-narrow"
-          />
+          <div className="settings-number-stepper">
+            <input
+              type="number"
+              min={MIN}
+              max={MAX}
+              step={1}
+              value={draftMaxParallel}
+              onChange={(e) => updateMaxParallel(Number(e.target.value))}
+              disabled={!cfg}
+              className="mono settings-input settings-input--w-narrow settings-input--stepper"
+            />
+            <div className="settings-stepper-buttons" aria-hidden={!cfg}>
+              <button
+                type="button"
+                className="settings-stepper-btn"
+                onClick={() => updateMaxParallel(Math.min(MAX, Math.floor(draftMaxParallel || MIN) + 1))}
+                disabled={!cfg || draftMaxParallel >= MAX}
+                tabIndex={cfg ? 0 : -1}
+                aria-label="增加平行上限"
+              >
+                <StepperChevron direction="up" />
+              </button>
+              <button
+                type="button"
+                className="settings-stepper-btn"
+                onClick={() => updateMaxParallel(Math.max(MIN, Math.floor(draftMaxParallel || MIN) - 1))}
+                disabled={!cfg || draftMaxParallel <= MIN}
+                tabIndex={cfg ? 0 : -1}
+                aria-label="減少平行上限"
+              >
+                <StepperChevron direction="down" />
+              </button>
+            </div>
+          </div>
         </div>
         <div className="settings-row-hint">達上限後新 Run 排隊,前面跑完自動接棒</div>
       </div>
@@ -1215,7 +1362,7 @@ export function SettingsPopover({
           </div>
         </div>
 
-        <TipCard>變更設定將套用於新任務，進行中的任務不受影響。</TipCard>
+        <TipCard icon="info">變更設定將套用於新任務，進行中的任務不受影響。</TipCard>
         </>
       ) : (
         <div className="settings-subhint">載入中…</div>
@@ -1254,7 +1401,7 @@ export function SettingsPopover({
               onTogglePushEvent={updatePushEvent}
               onActionError={onActionError}
             />
-            <TipCard compact>通知會推送到此裝置（背景或前景皆可）。</TipCard>
+            <TipCard compact icon="info">通知會推送到此裝置（背景或前景皆可）。</TipCard>
             </div>
           </div>
         </>
