@@ -1,0 +1,43 @@
+.sw-update-banner {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 2100;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px 10px 14px;
+  background: var(--panel-2);
+  color: var(--fg);
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  max-width: calc(100vw - 32px);
+}
+
+.sw-update-banner__text {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg);
+}
+
+.sw-update-banner__btn {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.sw-update-banner__close {
+  width: 24px;
+  height: 24px;
+  font-size: 16px;
+  line-height: 1;
+}
+
+@media (max-width: 600px) {
+  .sw-update-banner {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    justify-content: space-between;
+  }
+}

@@ -83,7 +83,12 @@ async function ensureMessaging() {
 
 self.addEventListener("install", (event) => {
   event.waitUntil(ensureMessaging().catch((e) => console.error("[sw] init failed", e)));
-  self.skipWaiting();
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener("activate", (event) => {

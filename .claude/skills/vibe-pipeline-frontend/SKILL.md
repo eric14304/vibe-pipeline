@@ -258,6 +258,29 @@ VitePWA({
 
 `injectRegister: false` 是關鍵:plugin 不自己生 register script,SW 註冊仍由 `src/lib/fcm.ts:99`(`navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' })`)在 user 啟用 push 時做。
 
+### registerType: prompt(user 主動觸發更新)
+
+`registerType: 'prompt'`(非 `autoUpdate`):SW 新版背景 install + 進入 `waiting`,**不會 force reload**,等 user 點 banner 才 `messageSkipWaiting` → controlling event → `window.location.reload()`。對應雷區 #22。
+
+實作三檔:
+
+- **`src/lib/swUpdate.ts`** — workbox-window 包裝。`registerSW()` 在 app boot 時呼叫一次(`src/main.tsx` / `App.tsx`),建 `Workbox('/firebase-messaging-sw.js')` 監聽 `waiting` / `controlling` / `activated`;`updateSW()` 對外 API 觸發 skip waiting + reload;`useSwUpdate()` hook 給 component 用,回 `{ needRefresh, offlineReady, updateSW }`。state 是 module-scoped(多 component 共享同一份 needRefresh 不重複 register)
+- **`src/features/system/SwUpdateBanner.tsx`** — UI。`useSwUpdate()` 拿 `needRefresh`,顯「有新版可更新」+「更新」(`btn-primary`)+「×」(本地 dismiss)。塞在 AppShell topBar 下方 / 適當全域位置一份就好
+- **掛載點** — banner 是全 app 跨畫面狀態,不要在單 feature 內 mount(避免換頁就消失)
+
+### 開發者改 SW 後測試流程
+
+雷區 #19 已寫 SW 只 production 註冊。配合 prompt mode 完整驗證流程:
+
+1. `bun run build && bun run preview` → 開 `http://localhost:4173/`
+2. 第一次進 PWA(可加進主畫面 / 用瀏覽器分頁均可)— SW install + activate,Application → Service Workers 看 `activated and is running`
+3. 改 `public/firebase-messaging-sw.js` 任一行(加 comment 即可觸發 hash 變更)
+4. 再 `bun run build`(preview 仍跑著)→ 切回瀏覽器分頁 → reload 該頁
+5. 預期:SW 新版進 `waiting` 狀態(Application → Service Workers 看到「waiting to activate」),`<SwUpdateBanner>` 顯「有新版可更新」
+6. 點「更新」→ controller 切換 → 頁面 reload → 新版 SW 接管
+
+若 banner 沒跳:檢查 (a)`registerSW()` 確實在 app boot 有被呼叫(console 無 register 錯誤),(b) SW 內容真的有變(workbox 比對 hash,純註解可能被 build 優化掉,改實質字串如版本號最保險),(c) DevTools Application → Service Workers 勾「Update on reload」會跳過 waiting,debug 時關掉。
+
 ### SW 內部三段共存
 
 `public/firebase-messaging-sw.js` 從上到下:
