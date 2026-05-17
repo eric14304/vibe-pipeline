@@ -280,6 +280,22 @@ function PushNotificationsSection({
   );
 }
 
+// PWA 行為 hint(install 之外的)— 放 PWA tab 上半部「PWA 相關資訊」
+function PwaInfoHint() {
+  return (
+    <div style={{ marginTop: "var(--space-3)" }}>
+      <div className="settings-section-title">PWA 行為提醒</div>
+      <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: "var(--fg-mute)", lineHeight: 1.6 }}>
+        <li>離線時上方會顯紅色「離線」chip,重連顯綠色「已連線」2.5 秒。</li>
+        <li>有新版會在底部跳橘色 banner「有新版可更新」,點才更新(不會強制 reload)。</li>
+        <li>離線時仍能進畫面看上次快取資料;但啟動 / 暫停 pipeline 等操作需 backend 連線。</li>
+        <li>iOS Safari 安裝走「分享 → 加入主畫面」;Android Chrome / 桌面 Chrome 走網址列右側「⊕ 安裝」icon。</li>
+        <li>切到別 App 太久 OS 會回收 PWA,切回時會 reload(SW cache 會讓 reload 接近無感)。</li>
+      </ul>
+    </div>
+  );
+}
+
 function InstallAppSection({ onActionError }: { onActionError?: (message: string) => void }) {
   const { canInstall, installed, promptInstall } = useInstallPrompt();
   const [busy, setBusy] = useState(false);
@@ -724,7 +740,7 @@ export function SettingsPopover({
           [
             { key: "project", label: "Project" },
             { key: "ai", label: "AI 任務" },
-            { key: "notifications", label: "通知" },
+            { key: "notifications", label: "PWA" },
             ...(authStatus?.bound === true
               ? ([{ key: "security", label: "安全" }] as const)
               : []),
@@ -933,13 +949,16 @@ export function SettingsPopover({
 
       {activeTab === "notifications" && (
         <>
+          <InstallAppSection onActionError={onActionError} />
+          <PwaInfoHint />
+          <div style={{ height: 1, background: "var(--line)", margin: "var(--space-4) 0" }} />
+          <div className="settings-section-title">推播通知</div>
           <PushNotificationsSection
             userCfg={userCfg}
             pushSaving={pushSaving}
             onTogglePushEvent={updatePushEvent}
             onActionError={onActionError}
           />
-          <InstallAppSection onActionError={onActionError} />
         </>
       )}
 
