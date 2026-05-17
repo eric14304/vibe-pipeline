@@ -207,7 +207,7 @@ function PushNotificationsSection({
     <div>
       <label
         className={"toggle-pill mono" + (enabled ? " is-on" : "")}
-        style={{ width: "100%", justifyContent: "space-between", opacity: disabled ? 0.55 : 1, cursor: disabled ? "not-allowed" : "pointer" }}
+        style={{ opacity: disabled ? 0.55 : 1, cursor: disabled ? "not-allowed" : "pointer" }}
       >
         <input
           type="checkbox"
@@ -219,6 +219,9 @@ function PushNotificationsSection({
           }}
         />
         <span>{enabled ? "推播通知 已啟用" : "啟用推播通知"}</span>
+        <span className="toggle-pill-track" aria-hidden>
+          <span className="toggle-pill-thumb" />
+        </span>
       </label>
       {hint && <div className="push-hint" style={{ marginTop: 6 }}>{hint}</div>}
       <div className="settings-popover-task-grid" aria-label="推播事件">
