@@ -14,6 +14,30 @@ User 在這台機器**可能裝了** **vibe-pipeline**(多 AI agent 的 ticket /
 - **回版本號** → 已裝,跳到「心智模型」
 - **`command not found`** → 引導 user 看 [`install.md`](install.md)(build + install to PATH per-OS + trouble),完事後 `vbpl --version` 驗
 
+## 啟動 backend / 開 Web UI
+
+vbpl 主要 read 操作不需 backend(直接讀 fs),但 **run / pause / merge / sync** 跟 web UI 都需 backend up。
+
+在 **vibe-pipeline repo 內** 開 terminal:
+
+```bash
+bun install                # 第一次或 dep 更新後跑
+bun run dev                # fullstack:vite 5173 + backend 3001(concurrently,no watch)
+# 開瀏覽器到 http://127.0.0.1:5173/board
+```
+
+或者只起 backend 不要 frontend dev server:
+
+```bash
+bun run server             # backend 3001
+bun run preview            # 另開 terminal:build + 提供 dist 到 4173
+# 開 http://127.0.0.1:4173/board
+```
+
+確認 backend 活:`curl http://127.0.0.1:3001/api/health` 回 `{"ok":true,...}`。
+
+死了 / 沒起就 `vbpl pipeline run` 會回 `NO_BACKEND` error,告訴 user 啟 `bun run server`(或 `bun run dev` 一起包前端)。
+
 ## 心智模型
 
 ```
