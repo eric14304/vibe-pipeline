@@ -211,6 +211,11 @@ async function handle(req: Request): Promise<Response> {
       return projects.pipelineDiff(hash, diffFullMatch[1]);
     }
 
+    const pipelineAuditMatch = rest.match(/^\/pipelines\/([a-z0-9_-]+)\/audit$/);
+    if (pipelineAuditMatch && method === "GET") {
+      return projects.listPipelineAudit(hash, pipelineAuditMatch[1], req);
+    }
+
     const pipelineRunsListMatch = rest.match(/^\/pipelines\/([a-z0-9_-]+)\/runs$/);
     if (pipelineRunsListMatch && method === "GET") {
       return projects.listPipelineRuns(hash, pipelineRunsListMatch[1]);

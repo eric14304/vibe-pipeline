@@ -240,3 +240,23 @@ export function getPipelineRun(
     `/api/projects/${hash}/pipelines/${pipelineId}/runs/${encodeURIComponent(filename)}`
   );
 }
+
+export type AuditEntry = {
+  ts: number;
+  pipelineId: string;
+  type: "state_change";
+  from: string;
+  to: string;
+  source: string;
+  sourceDetail?: string;
+};
+
+export function getPipelineAudit(
+  hash: string,
+  pipelineId: string,
+  limit = 50
+): Promise<AuditEntry[]> {
+  return call<AuditEntry[]>(
+    `/api/projects/${hash}/pipelines/${pipelineId}/audit?limit=${limit}`
+  );
+}

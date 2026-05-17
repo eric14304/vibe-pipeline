@@ -139,7 +139,10 @@ async function pipelineCreate(args: ParsedArgs): Promise<void> {
     autoMerge,
   };
 
-  await pipelineDir.writePipeline(proj.path, id, pipeline);
+  await pipelineDir.writePipeline(proj.path, id, pipeline, {
+    source: "cli-pipeline-create",
+    sourceDetail: `create pipeline ${name}`,
+  });
 
   if (isJsonMode()) {
     okJson(pipeline);
@@ -469,7 +472,11 @@ async function pipelineSync(args: ParsedArgs): Promise<void> {
     }
     const { syncJob: _drop, ...rest } = p;
     void _drop;
-    await pipelineDir.writePipeline(proj.path, id, rest);
+    await pipelineDir.writePipeline(proj.path, id, rest, {
+      source: "cli-sync-dismiss",
+      sourceDetail: "dismiss syncJob",
+      prevStateHint: typeof (p as { state?: string }).state === "string" ? (p as { state: string }).state : undefined,
+    });
     if (isJsonMode()) { okJson({ dismissed: true }); return; }
     print("syncJob dismissed.");
     return;

@@ -8,6 +8,7 @@ import * as syncJob from "../lib/runner/syncJob";
 import * as worktree from "../lib/git/worktree";
 import * as runLog from "../lib/runner/runLog";
 import * as notifs from "../lib/notifs/store";
+import * as auditLog from "../lib/auditLog";
 import { triggerMerge, autoMergeNoAI } from "../lib/pipelineMerge";
 import { pickFolder, revealFolder } from "../lib/dialog";
 import { projectHash } from "../lib/hash";
@@ -198,7 +199,10 @@ export async function createPipeline(hash: string, req: Request): Promise<Respon
     createdAt: typeof body.createdAt === "number" ? body.createdAt : Date.now(),
     tickets: Array.isArray(body.tickets) ? body.tickets : [],
   };
-  await pipelineDir.writePipeline(project.path, id, data);
+  await pipelineDir.writePipeline(project.path, id, data, {
+    source: "api-create-pipeline",
+    sourceDetail: `POST /pipelines name=${name}`,
+  });
   return ok(data);
 }
 
@@ -290,7 +294,11 @@ export async function savePipeline(hash: string, id: string, req: Request): Prom
     return err("invalid_path", "autoMerge 必須為 boolean", 400);
   }
   const data = { ...body, id };
-  await pipelineDir.writePipeline(project.path, id, data);
+  await pipelineDir.writePipeline(project.path, id, data, {
+    source: "api-handler-explicit",
+    sourceDetail: "PUT /pipelines/:id",
+    prevStateHint: typeof existing.state === "string" ? existing.state : undefined,
+  });
   return ok(data);
 }
 
@@ -337,6 +345,9 @@ export async function runPipeline(hash: string, pipelineId: string): Promise<Res
         }
       }
       return p;
+    }, {
+      source: "api-run-pipeline",
+      sourceDetail: "reset failed_transient → paused on user run",
     });
   } catch (e) {
     console.warn(`[runPipeline] reset failed_transient skipped: ${String(e)}`);
@@ -597,7 +608,11 @@ export async function syncDismiss(hash: string, pipelineId: string): Promise<Res
   }
   const { syncJob: _drop, ...rest } = p;
   void _drop;
-  await pipelineDir.writePipeline(project.path, pipelineId, rest);
+  await pipelineDir.writePipeline(project.path, pipelineId, rest, {
+    source: "api-sync-dismiss",
+    sourceDetail: "user dismissed syncJob",
+    prevStateHint: typeof (p as { state?: string }).state === "string" ? (p as { state: string }).state : undefined,
+  });
   return ok({ ok: true });
 }
 
@@ -655,6 +670,23 @@ export async function getPipelineRun(
   const run = await runLog.getRun(project.path, pipelineId, filename);
   if (!run) return err("not_found", `Run log not found: ${filename}`, 404);
   return ok(run);
+}
+
+// GET /api/projects/:hash/pipelines/:id/audit?limit=50
+// 回該 pipeline 最近 N 筆 state_change audit entry(降冪,最新在最前)。
+// 給 RunHistory drawer 顯示「狀態變動歷史」timeline。
+export async function listPipelineAudit(
+  hash: string,
+  pipelineId: string,
+  req: Request
+): Promise<Response> {
+  const project = await projectStore.findByHash(hash);
+  if (!project) return err("not_found", `Project not found: ${hash}`, 404);
+  const url = new URL(req.url);
+  const limitRaw = url.searchParams.get("limit");
+  const limit = limitRaw && /^\d+$/.test(limitRaw) ? Math.min(500, parseInt(limitRaw, 10)) : 50;
+  const entries = auditLog.listAudit(project.path, pipelineId, limit);
+  return ok(entries);
 }
 
 export async function revealWorktree(hash: string, pipelineId: string): Promise<Response> {

@@ -9,6 +9,7 @@ import { fanoutPush } from "../fcm";
 import * as tokenStore from "../push/tokenStore";
 import * as testMode from "../testMode";
 import { loadUserConfig } from "../userConfig";
+import { appendStateChange, listAudit } from "../auditLog";
 import type { NotifEventType, PushEventKey } from "../../../shared/types";
 
 type Active = { unwatch: () => void };
@@ -152,6 +153,32 @@ export async function start(opts: {
             pipelineId: opts.pipelineId,
             ticketId: tid,
           });
+        }
+      }
+      // Audit fallback:disk 上 state 變了但 pipelineDir.writePipeline 沒寫 audit
+      // (代表是 runner 主 agent 透過 Edit/Write 直接改 pipeline.json,沒走 backend)。
+      // 比對 audit.jsonl 最新一筆,若 (from,to) 跟 disk diff 一致 → backend 已記錄,跳過;
+      // 否則補一筆 source='runner-self-detected'。
+      if (last.state !== cur.state && (last.state !== undefined || cur.state !== undefined)) {
+        try {
+          const recent = listAudit(opts.projectPath, opts.pipelineId, 1)[0];
+          const alreadyLogged =
+            recent &&
+            recent.from === (last.state ?? "(none)") &&
+            recent.to === (cur.state ?? "(none)") &&
+            Date.now() - recent.ts < 5000;
+          if (!alreadyLogged) {
+            appendStateChange({
+              projectPath: opts.projectPath,
+              pipelineId: opts.pipelineId,
+              from: last.state ?? "(none)",
+              to: cur.state ?? "(none)",
+              source: "runner-self-detected",
+              sourceDetail: "ticketWatcher detected disk state change without backend write",
+            });
+          }
+        } catch (e) {
+          console.warn(`[ticketWatcher ${opts.pipelineId}] audit fallback failed:`, e);
         }
       }
       if (last.state !== "paused" && cur.state === "paused") {

@@ -134,6 +134,10 @@ async function watchdogTick(): Promise<void> {
                 endedAt: Date.now(),
                 reason: reason,
               },
+            }, {
+              source: "watchdog-crash-recover",
+              sourceDetail: `sync ${reason}`,
+              prevStateHint: typeof p.state === "string" ? p.state : undefined,
             });
             notifs.emit(project.path, {
               type: "sync_failed",
@@ -147,6 +151,10 @@ async function watchdogTick(): Promise<void> {
           await pipelineDir.writePipeline(project.path, entry.pipelineId, {
             ...p,
             state: "paused",
+          }, {
+            source: "watchdog-crash-recover",
+            sourceDetail: reason,
+            prevStateHint: typeof p.state === "string" ? p.state : undefined,
           });
           notifs.emit(project.path, {
             type: "runner_crash",
@@ -391,7 +399,10 @@ export async function start(opts: {
     await pipelineDir.mutatePipeline(projectPath, pipelineId, (p) => ({
       ...p,
       state: "queued",
-    }));
+    }), {
+      source: "orchestrator.start",
+      sourceDetail: "slot full → enqueue",
+    });
     const pos = queuePosition(projectHash, pipelineId);
     notifs.emit(projectPath, {
       type: "pipeline_queued",
@@ -440,7 +451,10 @@ async function spawnDirect(opts: {
   await pipelineDir.mutatePipeline(projectPath, pipelineId, (p) => ({
     ...p,
     state: "running",
-  }));
+  }), {
+    source: "orchestrator.spawnDirect",
+    sourceDetail: "spawn runner main agent",
+  });
 
   // GC:每次 /run 順便修剪累積。logs per-pipeline 留 10、notifs 全 project 留 500。
   // 失敗安靜忽略,GC 不該擋 runner 起跑。
@@ -572,6 +586,12 @@ async function spawnDirect(opts: {
               ...cur,
               state: "paused",
               tickets,
+            }, {
+              source: "orchestrator.transient-recover",
+              sourceDetail: hasTurnFailed
+                ? "child reported turn.failed"
+                : `child exit code=${exitCode}`,
+              prevStateHint: typeof cur.state === "string" ? cur.state : undefined,
             });
             const sub = hasTurnFailed
               ? "child 回報 turn.failed(API quota / provider error)"
@@ -717,6 +737,10 @@ async function maybeAutoMerge(opts: {
     await pipelineDir.writePipeline(projectPath, pipelineId, {
       ...pipeline,
       lastAutoMergeError: undefined,
+    }, {
+      source: "maybeAutoMerge",
+      sourceDetail: "clear lastAutoMergeError before retry",
+      prevStateHint: typeof pipeline.state === "string" ? pipeline.state : undefined,
     });
   }
 
@@ -792,12 +816,17 @@ async function maybeAutoMerge(opts: {
       });
       if (!ai.ok) {
         const cur = (await pipelineDir.readPipeline(projectPath, pipelineId)) as {
+          state?: string;
           [k: string]: unknown;
         } | null;
         if (cur) {
           await pipelineDir.writePipeline(projectPath, pipelineId, {
             ...cur,
             lastAutoMergeError: ai.error,
+          }, {
+            source: "maybeAutoMerge",
+            sourceDetail: `AI fallback failed: ${ai.error}`,
+            prevStateHint: typeof cur.state === "string" ? cur.state : undefined,
           });
         }
         notifs.emit(projectPath, {
@@ -812,12 +841,17 @@ async function maybeAutoMerge(opts: {
 
     // dirty / git_error / not_found / running — 不適合 AI 自動解,emit merge_blocked
     const cur = (await pipelineDir.readPipeline(projectPath, pipelineId)) as {
+      state?: string;
       [k: string]: unknown;
     } | null;
     if (cur) {
       await pipelineDir.writePipeline(projectPath, pipelineId, {
         ...cur,
         lastAutoMergeError: r.error,
+      }, {
+        source: "maybeAutoMerge",
+        sourceDetail: `auto-merge blocked: ${r.error}`,
+        prevStateHint: typeof cur.state === "string" ? cur.state : undefined,
       });
     }
     notifs.emit(projectPath, {
@@ -899,6 +933,10 @@ export async function stopImmediate(opts: {
       ...cur,
       state: "paused",
       tickets,
+    }, {
+      source: "stop-immediate",
+      sourceDetail: "user pressed stop",
+      prevStateHint: typeof cur.state === "string" ? cur.state : undefined,
     });
     notifs.emit(projectPath, {
       type: "pipeline_paused",
@@ -1083,7 +1121,12 @@ async function startMockRunner(opts: {
           const hash = mergeTicket?.commits?.[0]?.hash;
           if (hash) next.mergeCommit = { hash, mergedAt: Date.now() };
         }
-        await pipelineDir.writePipeline(projectPath, pipelineId, next);
+        const finalState_ = (final as { state?: unknown }).state;
+        await pipelineDir.writePipeline(projectPath, pipelineId, next, {
+          source: "mock-runner-finalize",
+          sourceDetail: `mock runner final state=${finalState}`,
+          prevStateHint: typeof finalState_ === "string" ? finalState_ : undefined,
+        });
       }
 
       const name = pipeline.name || pipelineId;
@@ -1160,7 +1203,14 @@ async function mutateTicket(
   const idx = tickets.findIndex((t) => t.id === ticketId);
   if (idx === -1) return;
   tickets[idx] = update(tickets[idx]);
-  await pipelineDir.writePipeline(projectPath, pipelineId, { ...p, tickets });
+  const prev = typeof (p as { state?: unknown }).state === "string"
+    ? ((p as { state: string }).state)
+    : undefined;
+  await pipelineDir.writePipeline(projectPath, pipelineId, { ...p, tickets }, {
+    source: "mock-runner-ticket",
+    sourceDetail: `update ticket ${ticketId}`,
+    prevStateHint: prev,
+  });
 }
 
 // Crash recovery:server 啟動時掃 pipelines。兩種 inconsistency 都修:
@@ -1203,6 +1253,12 @@ export async function recoverStale(projectPath: string): Promise<void> {
       ...p,
       state: nextState,
       tickets,
+    }, {
+      source: "startup-recover",
+      sourceDetail: isStaleRunning
+        ? `stale ${p.state} → paused on server boot`
+        : "orphan running ticket fix",
+      prevStateHint: typeof p.state === "string" ? p.state : undefined,
     });
     if (isStaleRunning) {
       const pName = (p as { name?: string }).name || p.id;
@@ -1236,6 +1292,10 @@ export async function cancelQueued(opts: {
     await pipelineDir.writePipeline(projectPath, pipelineId, {
       ...pipeline,
       state: "paused",
+    }, {
+      source: "cancel-queued",
+      sourceDetail: "user dequeue",
+      prevStateHint: pipeline.state,
     });
   }
   return { ok: true };

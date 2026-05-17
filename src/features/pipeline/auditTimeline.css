@@ -1,0 +1,72 @@
+/* AuditTimeline — pipeline 狀態變動歷史 collapsible timeline。
+   命名走 audit- prefix(避雷 #1 prototype namespace 殘留)。 */
+
+.audit-toggle {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.audit-chev {
+  display: inline-block;
+  width: 12px;
+  color: var(--fg-mute);
+}
+
+.audit-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 6px);
+  margin-top: var(--space-1, 4px);
+}
+
+.audit-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-1, 4px) var(--space-3, 10px);
+  padding: var(--space-2, 6px) var(--space-3, 8px);
+  border-radius: 6px;
+  background: var(--panel-2, transparent);
+  border: 1px solid var(--line-faint, var(--line));
+  font-size: 12px;
+}
+
+.audit-ts {
+  color: var(--fg-mute);
+  white-space: nowrap;
+}
+
+.audit-states {
+  color: var(--fg);
+}
+
+.audit-from {
+  color: var(--fg-mute);
+}
+
+.audit-arrow {
+  margin: 0 var(--space-2, 6px);
+  color: var(--fg-faint);
+}
+
+.audit-to {
+  color: var(--fg);
+}
+
+.audit-source-line {
+  grid-column: 1 / span 2;
+  color: var(--fg-mute);
+}
+
+.audit-source {
+  color: var(--accent, var(--fg-mute));
+}
+
+.audit-detail {
+  margin-left: var(--space-2, 6px);
+  color: var(--fg-faint);
+}
