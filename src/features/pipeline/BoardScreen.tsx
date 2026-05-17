@@ -261,8 +261,9 @@ export function BoardScreen({
       gate: !!project?.hasInit,
       deps: [project, reloadKey],
       // PWA reload 體感 — mount 立刻顯上次 pipelines 快照(不等 network);背景 fetch 更新。
-      // hash 變動就換 cache key,避免顯到別 project 的舊資料
-      cacheKey: project?.hash ? `pipelines:${project.hash}` : undefined,
+      // 用 hash 不用 project.hash:hash 從 useActiveProjectHash lazy init 第一 frame 就有,
+      // project.hash 要等 fetch 才填,會錯過 useState lazy init 的時機。
+      cacheKey: hash ? `pipelines:${hash}` : undefined,
     }
   );
   useEffect(() => {

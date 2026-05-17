@@ -87,6 +87,14 @@ export function useApi<T>(
   const [error, setError] = useState<Error | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
+  // cacheKey 後續才有(mount 時 undefined,project fetch 完才填)的 case:
+  // hydrate 補一次。functional setter 避免覆蓋背景 fetch 拿到的新資料(prev 有就不蓋)
+  useEffect(() => {
+    if (!cacheKey) return;
+    const cached = readCache<T>(cacheKey);
+    if (cached !== null) setData((prev) => prev ?? cached);
+  }, [cacheKey]);
+
   const fetcherRef = useRef(fetcher);
   fetcherRef.current = fetcher;
 
