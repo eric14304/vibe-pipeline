@@ -296,29 +296,24 @@ function InstallAppSection({ onActionError }: { onActionError?: (message: string
     }
   }
 
-  let label = "安裝 App";
-  if (installed) label = "已安裝";
-  else if (busy) label = "處理中…";
-
+  // button 只在「真能 prompt」(canInstall + 未 install)才顯,避免 disabled button 誤導 user 點不動以為壞。
+  // 已 install / 不能 prompt 都改純文字提示。
   return (
     <div style={{ marginTop: "var(--space-3)" }}>
       <div className="settings-section-title">安裝為 App</div>
-      <div className="push-action-row">
-        <button
-          type="button"
-          className="btn"
-          disabled={installed || !canInstall || busy}
-          onClick={() => void onClick()}
-        >
-          {label}
-        </button>
-      </div>
+      {canInstall && !installed && (
+        <div className="push-action-row">
+          <button type="button" className="btn" disabled={busy} onClick={() => void onClick()}>
+            {busy ? "處理中…" : "安裝 App"}
+          </button>
+        </div>
+      )}
       <div className="push-hint">
         {installed
-          ? "已加入桌面 / 主畫面,可直接從 App 圖示開啟。"
+          ? "✓ 已加入桌面 / 主畫面,可直接從 App 圖示開啟。"
           : canInstall
             ? "加入桌面 / 主畫面後可全螢幕開啟,推播也更穩。"
-            : "瀏覽器尚未提示可安裝;iOS Safari 請用「分享 → 加入主畫面」。"}
+            : "瀏覽器沒提示可安裝(可能已安裝過 / iOS Safari / 不支援);若要安裝請用瀏覽器網址列右側「⊕ 安裝」icon,或 iOS Safari「分享 → 加入主畫面」。"}
       </div>
     </div>
   );
