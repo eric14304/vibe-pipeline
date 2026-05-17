@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { CheckCircleIcon, CheckIconSm, CloseIcon, FolderIcon, MergeIcon, PlusIcon, ProhibitIcon, RefreshIcon, ScrollTextIcon, TrashIcon } from "../../ui/icons";
+import { CheckCircleIcon, CheckIconSm, CloseIcon, FolderIcon, HistoryIcon, MergeIcon, PlusIcon, ProhibitIcon, RefreshIcon, TrashIcon } from "../../ui/icons";
 import { PipelineHistoryDrawer } from "./PipelineHistoryDrawer";
 import { STATE_COLOR, STATE_LABEL, TICKET_STATUS_LABEL, TICKET_STATUS_COLOR, fmtElapsed, fmtDuration, normalizeVerdict } from "../../data/pipelines";
 import { MODE_LABELS } from "../../api/qa";
@@ -803,7 +803,7 @@ function OverflowMenu({
           )}
           {onShowHistory && (
             <MenuItem
-              icon={<ScrollTextIcon />}
+              icon={<HistoryIcon />}
               label="執行紀錄"
               hint="主 agent 啟動紀錄"
               onClick={() => {
