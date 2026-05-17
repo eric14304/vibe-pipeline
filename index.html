@@ -7,6 +7,22 @@
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="apple-touch-icon" href="/icon.svg" />
     <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#d4956d" />
+    <!-- 初始 body bg 對齊 theme,避免 React mount 前 white flash -->
+    <style>
+      html { background: #f7f4ee; }
+      html:not(.light) { background: #1c1916; }
+      body { margin: 0; }
+      #vp-mount-loader {
+        position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+        flex-direction: column; gap: 12px;
+        font-family: 'Noto Sans TC', sans-serif;
+      }
+      #vp-mount-loader img { opacity: 0.7; }
+      #vp-mount-loader .vp-mount-msg {
+        font-size: 12px; color: #888; letter-spacing: 0.05em;
+      }
+    </style>
     <script>
       // Set theme class synchronously before any CSS or React loads (no first-paint flash).
       // Priority: URL ?theme=  →  localStorage  →  default light
@@ -25,7 +41,13 @@
     <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet" />
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- React mount 前 placeholder:避免 PWA reload 白屏一閃。React mount 後整段被取代 -->
+      <div id="vp-mount-loader">
+        <img src="/icon.svg" width="48" height="48" alt="" />
+        <div class="vp-mount-msg">載入中…</div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
