@@ -29,22 +29,17 @@ User 把 repo URL 給你的話,標準流程:
 ```bash
 bun install
 
-# 直接用(production-like,不 watch):
-bun run build         # 一次:tsc + vite build → dist/
-bun run start         # 跑 preview (4173) + backend (3001) 兩件
-# 開 http://127.0.0.1:4173/board
-```
-
-開發改 code:
-
-```bash
-# 開兩個 terminal:
-bun run dev           # 前端 Vite HMR (5173)
-bun run server        # 後端 Bun (3001,不 watch)
+# 開發(fullstack,一指令起 vite + backend):
+bun run dev           # vite 5173 + backend 3001(no watch)
 # 開 http://127.0.0.1:5173/board
+
+# Production-like(build + preview):
+bun run build         # tsc + vite build → dist/
+bun run preview       # vite preview → :4173
+bun run server        # 另一 terminal 起 backend(沒 concurrently 包)
 ```
 
-`bun run dev:all` 一次起 dev + server:watch,但 **AI merge 進行時別用** — 熱重載會殺掉 runner 子程。日常 dev 不觸發 merge 才用,否則分開跑保險。
+**Sub-agent 用 `sub:*` script + 100 port**(`sub:dev` / `sub:server` / `sub:preview`)避開 user backend。詳見 [package.json](package.json)。
 
 打包 CLI 成單檔 binary:
 
@@ -234,13 +229,13 @@ Phase 1-5 全套已落地(CRUD + QA + Runner + Worktree + Merge/Sync + Auto + Ta
 
 | 指令 | 用途 |
 |---|---|
-| `bun run dev` | Vite 前端 HMR(5173,dev 用) |
-| `bun run server` | Bun 後端(3001,不 watch) |
-| `bun run server:watch` | 後端熱重載(self-merge 期間別用 — `bun --watch` reload 會殺掉 spawn 出去的 runner 子程) |
-| `bun run dev:all` | dev + server:watch 同時跑(AI merge 時別用) |
-| `bun run build` | `tsc -b && vite build` → `dist/` |
+| `bun run dev` | fullstack:vite 5173 + backend 3001(concurrently,no watch) |
+| `bun run server` | 只 backend(3001) |
 | `bun run preview` | 提供 `dist/`(4173) |
-| `bun run start` | preview + server,production-like 直接用 |
+| `bun run sub:dev` | sub-agent 用:vite 5273 + backend 3101(避開 user 的 3001/5173) |
+| `bun run sub:server` | sub-agent 只 backend(3101) |
+| `bun run sub:preview` | sub-agent preview(4273 + proxy → 3101) |
+| `bun run build` | `tsc -b && vite build` → `dist/` |
 | `bun run lint` | Biome lint |
 | `bun run test:e2e` | Playwright mock 模式(CI 預設) |
 | `bun run test:e2e:real` | Playwright real 模式(燒 token,opt-in) |
