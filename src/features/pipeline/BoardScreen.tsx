@@ -396,13 +396,15 @@ export function BoardScreen({
   }
 
   if (!hash) {
+    // 統一顯「載入中…」— PWA mobile reload race(localStorage 第一 frame 偶發拿不到)會讓 hash 短暫 null,
+    // 跳「沒有選擇專案」誤判。真的沒選 project 的 user 看 TopBar 切換器自己選。
     return (
       <AppShell
         density={density}
         rootClassName={shellRootClass}
         topBar={topBar}
         rail={<Rail pipelines={[]} activeId="" onSelect={() => {}} />}
-        main={<EmptyProject />}
+        main={<EmptyProject message="載入中…" hint="" pointToTopBar={false} />}
         aside={inboxAside}
         mobileTabBar={mobileTabBar}
       />
