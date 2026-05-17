@@ -167,12 +167,18 @@ export function BoardScreen({
   // hash 切換時 reset 該 project 專屬 UI state
   // activeId / pipelines 必須一起清:否則切 project 後 FocusColumn 拿舊 pipeline id
   // 配新 project hash 去 fetch sync-status / diff-stat → 404(pipeline 不在那 project)
+  // 注意:初次 mount(prevHash=null → 有值)不清 activeId,保留 URL ?pipeline= F5 持久化
   // biome-ignore lint/correctness/useExhaustiveDependencies: hash is the intentional trigger
+  const prevHashRef = useRef<string | null>(null);
   useEffect(() => {
     setPopupDismissed(false);
     setActionError(null);
-    setActiveId("");
-    setPipelines([]);
+    // 真實切換才清(prevHash 已有 + 跟新 hash 不同);初次 mount 留 URL 內 ?pipeline=
+    if (prevHashRef.current !== null && prevHashRef.current !== hash) {
+      setActiveId("");
+      setPipelines([]);
+    }
+    prevHashRef.current = hash ?? null;
   }, [hash]);
 
   // reloadKey 是手動 force-refetch counter,改變即使內容沒變也要重抓
