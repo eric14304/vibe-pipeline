@@ -1,10 +1,23 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { VitePWA } from "vite-plugin-pwa";
 
 const apiTarget = process.env.VITE_E2E_API_TARGET ?? "http://127.0.0.1:3001";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    VitePWA({
+      registerType: "autoUpdate",
+      strategies: "injectManifest",
+      srcDir: "public",
+      filename: "firebase-messaging-sw.js",
+      injectRegister: false,
+      injectManifest: {
+        globPatterns: ["**/*.{js,css,html,svg,png,ico}"],
+      },
+    }),
+  ],
   server: {
     port: 5173,
     host: "0.0.0.0",

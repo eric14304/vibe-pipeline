@@ -1,3 +1,8 @@
+import { precacheAndRoute } from "workbox-precaching";
+
+// vite-plugin-pwa injectManifest 注入點:build 時被取代成 precache manifest array
+precacheAndRoute(self.__WB_MANIFEST || []);
+
 importScripts("https://www.gstatic.com/firebasejs/12.13.0/firebase-app-compat.js");
 importScripts("https://www.gstatic.com/firebasejs/12.13.0/firebase-messaging-compat.js");
 
