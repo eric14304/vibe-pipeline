@@ -742,9 +742,15 @@ export function SettingsPopover({
 
       {/* ─── Project tab ─── */}
       {activeTab === "project" && <>
-      <div className="settings-field-row">
-        <label className="settings-field-label">平行上限</label>
-        <div className="settings-field-controls">
+      <div className="settings-row">
+        <div className="settings-row-label">
+          <div className="settings-row-label-head">
+            <span className="settings-row-icon" aria-hidden>⚡</span>
+            平行上限
+          </div>
+          <div className="settings-row-label-sub">{MIN}–{MAX} 條</div>
+        </div>
+        <div className="settings-row-control">
           <input
             type="number"
             min={MIN}
@@ -768,41 +774,52 @@ export function SettingsPopover({
             disabled={!cfg}
             className="mono settings-input settings-input--w-narrow"
           />
-          <span className="mono settings-inline-unit">
-            {MIN}–{MAX} 條
-          </span>
         </div>
+        <div className="settings-row-hint">達上限後新 Run 排隊,前面跑完自動接棒</div>
       </div>
-      <div className="settings-subhint">達到上限後新 Run 排隊,前面跑完自動接棒。</div>
 
-      <div className="settings-field-row">
-        <label className="settings-field-label">Base branch</label>
-        <input
-          type="text"
-          value={draftBaseBranch}
-          onChange={(e) => {
-            const nextValue = e.target.value;
-            setDraftBaseBranch(nextValue);
-            scheduleProjectSave(
-              "default_base_branch",
-              { defaults: { default_base_branch: nextValue.trim() } },
-              (next) => applyProjectDisplay("default_base_branch", next),
-              () => {
-                const confirmedValue = confirmedProjectValuesRef.current?.default_base_branch;
-                if (confirmedValue !== undefined) setDraftBaseBranch(confirmedValue);
-              }
-            );
-          }}
-          disabled={!cfg}
-          placeholder={cfg?.defaults.base_branch || "main"}
-          className="mono settings-input settings-input--w-full"
-        />
+      <div className="settings-row">
+        <div className="settings-row-label">
+          <div className="settings-row-label-head">
+            <span className="settings-row-icon" aria-hidden>🌿</span>
+            Base branch
+          </div>
+          <div className="settings-row-label-sub">預設用於新建 pipeline</div>
+        </div>
+        <div className="settings-row-control">
+          <input
+            type="text"
+            value={draftBaseBranch}
+            onChange={(e) => {
+              const nextValue = e.target.value;
+              setDraftBaseBranch(nextValue);
+              scheduleProjectSave(
+                "default_base_branch",
+                { defaults: { default_base_branch: nextValue.trim() } },
+                (next) => applyProjectDisplay("default_base_branch", next),
+                () => {
+                  const confirmedValue = confirmedProjectValuesRef.current?.default_base_branch;
+                  if (confirmedValue !== undefined) setDraftBaseBranch(confirmedValue);
+                }
+              );
+            }}
+            disabled={!cfg}
+            placeholder={cfg?.defaults.base_branch || "main"}
+            className="mono settings-input settings-input--w-mid"
+          />
+        </div>
+        <div className="settings-row-hint">新 pipeline 從這個 branch 切</div>
       </div>
-      <div className="settings-subhint">新 pipeline 預設從這個 branch 切。</div>
 
-      <div className="settings-field-row">
-        <label className="settings-field-label">Cost 上限</label>
-        <div className="settings-field-controls">
+      <div className="settings-row">
+        <div className="settings-row-label">
+          <div className="settings-row-label-head">
+            <span className="settings-row-icon" aria-hidden>💰</span>
+            Cost 上限
+          </div>
+          <div className="settings-row-label-sub">USD,0 = 無限</div>
+        </div>
+        <div className="settings-row-control settings-row-control--multi">
           <input
             type="number"
             min={0}
@@ -825,43 +842,54 @@ export function SettingsPopover({
             placeholder="0"
             className="mono settings-input settings-input--w-mid"
           />
-          <span className="mono settings-inline-unit">USD,0 = 無限</span>
+          <span className="mono settings-inline-unit">USD</span>
         </div>
+        <div className="settings-row-hint">每條 pipeline 個別累計上限,超過則不會跑其他 pipeline / run</div>
       </div>
-      <div className="settings-subhint">每條 pipeline 個別累積上限,超過擋該 pipeline /run 不影響其他。</div>
 
-      <div className="settings-field-row settings-field-row--tight">
-        <span className="settings-field-label">自動合併</span>
-        <label
-          className={"toggle-pill mono" + (draftAutoMerge ? " is-on" : "")}
-          title="全 ticket done → backend 自動 append merge ticket 走 runner 流程"
-          style={{ alignSelf: "start" }}
-        >
-          <input
-            type="checkbox"
-            checked={draftAutoMerge}
-            onChange={(e) => {
-              const nextValue = e.target.checked;
-              setDraftAutoMerge(nextValue);
-              scheduleProjectSave(
-                "auto_merge",
-                { defaults: { auto_merge: nextValue } },
-                (next) => applyProjectDisplay("auto_merge", next),
-                () => {
-                  const confirmedValue = confirmedProjectValuesRef.current?.auto_merge;
-                  if (confirmedValue !== undefined) setDraftAutoMerge(confirmedValue);
-                }
-              );
-            }}
-            disabled={!cfg}
-          />
-          <span className="toggle-pill-track" aria-hidden>
-            <span className="toggle-pill-thumb" />
-          </span>
-          新 pipeline 預設啟用
-        </label>
+      <div className="settings-row">
+        <div className="settings-row-label">
+          <div className="settings-row-label-head">
+            <span className="settings-row-icon" aria-hidden>🔀</span>
+            自動合併
+          </div>
+          <div className="settings-row-label-sub">每條 pipeline 可單獨調整</div>
+        </div>
+        <div className="settings-row-control">
+          <label
+            className={"toggle-pill mono" + (draftAutoMerge ? " is-on" : "")}
+            title="全 ticket done → backend 自動 append merge ticket 走 runner 流程"
+          >
+            <input
+              type="checkbox"
+              checked={draftAutoMerge}
+              onChange={(e) => {
+                const nextValue = e.target.checked;
+                setDraftAutoMerge(nextValue);
+                scheduleProjectSave(
+                  "auto_merge",
+                  { defaults: { auto_merge: nextValue } },
+                  (next) => applyProjectDisplay("auto_merge", next),
+                  () => {
+                    const confirmedValue = confirmedProjectValuesRef.current?.auto_merge;
+                    if (confirmedValue !== undefined) setDraftAutoMerge(confirmedValue);
+                  }
+                );
+              }}
+              disabled={!cfg}
+            />
+            <span className="toggle-pill-track" aria-hidden>
+              <span className="toggle-pill-thumb" />
+            </span>
+            新 pipeline 預設啟用
+          </label>
+        </div>
+        <div className="settings-row-hint">啟用後,符合條件時將自動合併到 base branch</div>
       </div>
-      <div className="settings-subhint">每條 pipeline 也可單獨切換。</div>
+
+      <div className="settings-tip-card" style={{ marginTop: "var(--settings-space-3)" }}>
+        小提醒:以上設定會套用到新建立的 pipeline,已存在的 pipeline 不受影響
+      </div>
       </>}
 
       {/* ─── AI 任務 tab ─── */}
