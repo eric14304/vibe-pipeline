@@ -1,7 +1,7 @@
-// SW build marker v4 — change to trigger update banner
+// SW build marker v5 — change to trigger update banner
 import { precacheAndRoute, createHandlerBoundToURL } from "workbox-precaching";
 import { registerRoute, NavigationRoute } from "workbox-routing";
-import { StaleWhileRevalidate, CacheFirst } from "workbox-strategies";
+import { StaleWhileRevalidate, CacheFirst, NetworkOnly } from "workbox-strategies";
 import { ExpirationPlugin } from "workbox-expiration";
 import { CacheableResponsePlugin } from "workbox-cacheable-response";
 
@@ -10,6 +10,13 @@ precacheAndRoute(self.__WB_MANIFEST || []);
 
 // SPA navigation fallback → precached /index.html(offline 也能進畫面)
 registerRoute(new NavigationRoute(createHandlerBoundToURL("/index.html")));
+
+// /api/health → NetworkOnly(useOnlineStatus 真實偵測用,不能走 cache 否則離線時 cache hit 偽 online)
+// **必須在 /api/* SWR 之前 register**(Workbox route match first-match-win)
+registerRoute(
+  ({ url, request }) => request.method === "GET" && url.pathname === "/api/health",
+  new NetworkOnly()
+);
 
 // /api/* GET → SWR(reload 立刻顯舊 + 背景 refresh);非 GET 不快取
 registerRoute(
