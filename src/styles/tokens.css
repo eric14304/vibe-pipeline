@@ -121,8 +121,14 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; bo
   background: var(--panel-2);
   transition: background 120ms, border-color 120ms, transform 80ms;
 }
-.btn:hover { background: var(--hover); border-color: var(--line-2); }
-.btn:active { transform: translateY(0.5px); }
+.btn:hover:not(:disabled) { background: var(--hover); border-color: var(--line-2); }
+.btn:active:not(:disabled) { transform: translateY(0.5px); }
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  color: var(--fg-faint);
+}
+.btn:disabled:hover { background: var(--panel); border-color: var(--line); }
 .btn-primary {
   background: var(--accent); color: rgba(255,255,255,0.95); border-color: var(--accent);
   font-weight: 500;
