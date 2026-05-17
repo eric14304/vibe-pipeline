@@ -119,7 +119,7 @@ function AiTaskRow({
   onChange: (patch: { provider?: Provider; model?: ModelName; effort?: Effort }) => void;
 }) {
   return (
-    <div className="settings-row">
+    <div className="settings-row ai-task-row">
       <div className="settings-row-label">
         <div className="settings-row-label-head">
           <span className="settings-row-icon" aria-hidden>{icon}</span>
@@ -292,7 +292,11 @@ function PushNotificationsSection({
         啟用推播通知
       </label>
 
-      <div className={"push-events-list" + (eventsDisabled ? " is-disabled" : "")} aria-label="推播事件">
+      <div
+        className={"push-events-list" + (eventsDisabled ? " is-disabled" : "")}
+        role="group"
+        aria-label="推播事件"
+      >
         {PUSH_EVENT_META.map((item, idx) => {
           const checked = (userCfg?.pushEvents[item.key] ?? true) && enabled;
           const rowDisabled = eventsDisabled || !userCfg || !!pushSaving[item.key];

@@ -7,7 +7,7 @@ import { API_BASE } from "../helpers/api-base";
 //  1. 開 gear → popover 出現,4 個 tab(security 條件性,未綁定預設不出)
 //  2. Project tab 改 max_parallel → autosave → reload 仍在 + GET /config 拿得到
 //  3. AI 任務 tab 改 qa.model → autosave → reload 仍在 + GET /user/config 拿得到
-//  4. 通知 tab 切換可見(無 backend persistence,只驗 UI 切到位)
+//  4. PWA tab 切換可見(無 backend persistence,只驗 UI 切到位)
 //
 // userConfig 持久化驗證走 GET /api/user/config(等同讀 $VP_HOME/.vibe-pipeline/config.json),
 // 不直接讀檔 — playwright.config.ts 的 TEST_HOME 每次 module load 都重算,test process 跟
@@ -76,7 +76,7 @@ async function openSettings(page: import("@playwright/test").Page) {
   await expect(page.locator(".settings-popover")).toBeVisible();
 }
 
-test("Project / AI / 通知 三個 tab 預設可切換;Security 在未綁定 TOTP 時不出現", async ({ page }) => {
+test("Project / AI / PWA 三個 tab 預設可切換;Security 在未綁定 TOTP 時不出現", async ({ page }) => {
   await page.goto(`/board?project=${proj.hash}`);
   await openSettings(page);
 
@@ -85,14 +85,15 @@ test("Project / AI / 通知 三個 tab 預設可切換;Security 在未綁定 TOT
   await expect(popover.getByRole("button", { name: "Project" })).toBeVisible();
   await expect(popover.getByText("平行上限")).toBeVisible();
 
-  // 切 AI 任務
+  // 切 AI 任務 — 新版 amber tip card 文案
   await popover.getByRole("button", { name: "AI 任務" }).click();
-  await expect(popover.getByText(/跨 project/)).toBeVisible();
+  await expect(popover.getByText(/套用到所有 project/)).toBeVisible();
 
-  // 切 通知
-  await popover.getByRole("button", { name: "通知" }).click();
-  // 通知 tab 內容有「啟用通知 / 已啟用 / 尚未啟用」其中之一 — 用 hint 字串認
-  await expect(popover.getByText(/pipeline 完成/)).toBeVisible();
+  // 切 PWA(原「通知」tab redesign 後改名)
+  await popover.getByRole("button", { name: "PWA" }).click();
+  // PWA tab 一定有「安裝為 App」section title + 「推播通知」section title
+  await expect(popover.locator(".settings-section-title", { hasText: "安裝為 App" })).toBeVisible();
+  await expect(popover.locator(".settings-section-title", { hasText: "推播通知" })).toBeVisible();
 
   // Security tab 預設無 TOTP secret(authStatus.bound=false)→ tab 不渲染
   await expect(popover.getByRole("button", { name: "安全" })).toHaveCount(0);
@@ -131,13 +132,14 @@ test("AI 任務 tab：改 qa.model autosave → reload 持久 + GET /user/config
 
   await popover.getByRole("button", { name: "AI 任務" }).click();
 
-  // 第一行是 QA Spec(對應 task class "qa"),預設 claude / sonnet-4-6 / low
-  // 三個 select 順序:provider / model / effort
-  const taskGrid = popover.locator(".settings-popover-task-grid");
-  await expect(taskGrid).toBeVisible();
-  const firstRow = taskGrid.locator(".task-row").first();
+  // 第一行是 QA Spec(對應 task class "qa",AI Spec 群組第一筆)
+  // 新版 row pattern:.settings-row.ai-task-row,內含 .ai-task-controls (provider + model 兩個 select)
+  // executor/critic/merge 為進階組,顯示 effort 而非 provider;此處改 qa.model 屬主組
+  const aiRows = popover.locator(".settings-row.ai-task-row");
+  const firstRow = aiRows.first();
   const selects = firstRow.locator("select");
-  await expect(selects).toHaveCount(3);
+  // qa: showProvider=true, showEffort=false → 預期 2 個 select(provider / model)
+  await expect(selects).toHaveCount(2);
 
   // model 第二個 select。預設 claude-sonnet-4-6,改成 claude-opus-4-7
   const modelSelect = selects.nth(1);
@@ -158,15 +160,19 @@ test("AI 任務 tab：改 qa.model autosave → reload 持久 + GET /user/config
   await openSettings(page);
   await page.locator(".settings-popover").getByRole("button", { name: "AI 任務" }).click();
   await expect(
-    page.locator(".settings-popover .settings-popover-task-grid .task-row").first().locator("select").nth(1)
+    page.locator(".settings-popover .settings-row.ai-task-row").first().locator("select").nth(1)
   ).toHaveValue("claude-opus-4-7");
 });
 
-test("通知 tab：切到時 push 區塊渲染(不戳真權限,只看畫面)", async ({ page }) => {
+test("PWA tab：切到時 install + push 區塊渲染(不戳真權限,只看畫面)", async ({ page }) => {
   await page.goto(`/board?project=${proj.hash}`);
   await openSettings(page);
   const popover = page.locator(".settings-popover");
-  await popover.getByRole("button", { name: "通知" }).click();
-  // 任一狀態都會顯示 hint 字串
-  await expect(popover.getByText(/pipeline 完成 \/ 失敗會推到此裝置/)).toBeVisible();
+  await popover.getByRole("button", { name: "PWA" }).click();
+  // PWA tab 上半:安裝為 App section
+  await expect(popover.locator(".settings-section-title", { hasText: "安裝為 App" })).toBeVisible();
+  // PWA tab 下半:推播通知 section
+  await expect(popover.locator(".settings-section-title", { hasText: "推播通知" })).toBeVisible();
+  // 主 toggle label「啟用推播通知」永遠在
+  await expect(popover.locator(".push-main-toggle")).toBeVisible();
 });
