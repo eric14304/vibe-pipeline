@@ -805,7 +805,7 @@ function OverflowMenu({
             <MenuItem
               icon={<RefreshIcon />}
               label="執行紀錄"
-              hint="runner spawn log"
+              hint="主 agent 啟動紀錄"
               onClick={() => {
                 setOpen(false);
                 onShowHistory();
