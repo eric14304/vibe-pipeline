@@ -159,7 +159,7 @@ vbpl pipeline merge <id>                                        # 合併回 base
 4. 首次非 loopback 連線 → TOTP 設定(掃 QR 加進 Authenticator,之後每個 session 輸入 6 碼登入)
 5. Settings →「Push Notifications」開啟推播,ticket 事件會到手機
 
-詳細 FCM service-account 設定見 [`CLAUDE.md`](CLAUDE.md) § 手機遠端使用方式。
+手機遠端踩雷(Windows ACL / HTTPS / 0.0.0.0 / ALLOWED_ORIGINS / 離線 push 補送)見 [`CLAUDE.md`](CLAUDE.md) §不踩的雷 #24-28。
 
 ---
 

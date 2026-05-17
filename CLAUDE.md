@@ -4,7 +4,7 @@
 
 ## 當前狀態
 
-**Phase 1-5 全套已落地 + 2026-05 後續打磨**。Phase 表、歷次大改動、已 final 決定不做的清單在 [`docs/CHANGELOG.md`](docs/CHANGELOG.md);本檔不再追歷史,只保留現狀規則。
+**Phase 1-5 全套已落地 + 2026-05 後續打磨**。Phase 表 / 歷次大改動 / 已 final 不做 → [`docs/CHANGELOG.md`](docs/CHANGELOG.md)。**待動工** → [`docs/TODO.md`](docs/TODO.md)(對應 phase 8 pipeline `019e36fbea63-phase8`)。
 
 **架構決策**(現狀):
 - Bun local server + browser(前端 Vite 5173 / 後端 Bun 3001 / `/api/*` 透過 Vite proxy)
@@ -14,217 +14,26 @@
 - Sub-agent 拆 executor / critic 兩個 TaskClass:executor 真改 code 用高 capability,critic 讀 diff 判 PASS/FAIL 用便宜 model;`syncJob` 衝突解走 executor cfg
 - Auth 設計:loopback IP 永遠 bypass,只非 loopback 連線強制 TOTP;本機 dev 完全不受影響
 
-**待動工清單**:見 [`docs/TODO.md`](docs/TODO.md)(對應 phase 8 pipeline `019e36fbea63-phase8`)。
+## 其他索引
 
-## Repo 結構(物理路徑 single source of truth)
+- **Repo 物理結構**(檔案 / 目錄 SSOT)→ [`docs/refs/repo-structure.md`](docs/refs/repo-structure.md)
+- **refs 目錄**(設計文件 / 競品 / 歷史 spec)→ [`docs/refs/README.md`](docs/refs/README.md)
+- **開發環境 / scripts** → [`README.md`](README.md) §快速開始 + §Scripts
+- **手機遠端 setup**(Tailscale + TOTP + FCM)→ [`README.md`](README.md) §遠端存取
 
-> **集中規則**:repo 的物理檔案 / 目錄結構**只在這裡寫一份**。SKILL 內不再畫樹,只寫該層的「約定 / 職責邊界 / 思想」。新增資料夾或重組時改本段,SKILL 自動跟著對。
+dir 概覽(細節去 `repo-structure.md`):
 
-### Repo 內
+| dir | 職責 | 改 code 看哪份 SKILL |
+|---|---|---|
+| `src/` | React 前端 | `vibe-pipeline-frontend` |
+| `server/` | Bun backend(API + runner + qa + fcm + auth) | `vibe-pipeline-backend` |
+| `cli/` | `vbpl` CLI(import server/lib 直存 fs,不發 HTTP) | `vibe-pipeline-cli` |
+| `shared/` | 跨 backend/frontend 持久化型別 | (跟著用方走) |
+| `docs/` | CHANGELOG / TODO / refs / 散發給 enduser 的 SKILL bundle | — |
+| `.claude/skills/` | maintainer 4 份 sub-SKILL | 自己 |
+| `public/`, `scripts/`, `design/` | 靜態資產 / icon 生成腳本 / 設計 handoff 歷史 | — |
 
-```
-vibe-pipeline/
-├── CLAUDE.md                  本檔(always-on)
-├── AGENTS.md                  跨 provider pointer(codex 等不認 CLAUDE.md/skills 的 AI 看這份,指向 CLAUDE.md + SKILL)
-├── package.json               Bun + Vite + React + TS deps
-├── bun.lock
-├── tsconfig.json
-├── vite.config.ts             dev server(host 0.0.0.0 + allowedHosts true + /api → :3001 proxy)
-├── index.html                 Vite 入口,有 inline theme sync script + viewport-fit=cover + manifest link
-├── .env / .env.example        FCM keys / ALLOWED_ORIGINS / VITE_API_BASE_URL(.env gitignored)
-├── public/
-│   ├── manifest.json          PWA manifest(name / icons / display:standalone / theme_color)
-│   ├── firebase-messaging-sw.js  Service Worker(push event 自處理 + showNotification)
-│   ├── icon.svg               SVG 主 icon(對齊 TopBar Logo)
-│   └── icon-{192,512}.png     ImageMagick 從 SVG 產(`bun run icons`)
-├── scripts/
-│   └── gen-icons.ts           SVG → PNG 工具腳本(需 ImageMagick)
-│
-├── cli/                       vbpl CLI。約定見 vibe-pipeline-cli SKILL
-│   ├── vbpl.ts                entry — parseArgs + dispatch noun → commands/*
-│   ├── commands/{project,pipeline,ticket,config}.ts   noun × verb 實作
-│   └── lib/{args,output,project}.ts                   參數解析 / 統一輸出 / project 解析
-│   (透過 import server/lib/* 直接讀寫 fs,不發 HTTP;bun run vbpl 入口)
-│
-├── src/                       前端。約定見 vibe-pipeline-frontend SKILL
-│   ├── App.tsx                router (BrowserRouter + Routes)
-│   ├── main.tsx               React mount,import 全域 CSS (tokens/board/notif)
-│   ├── shell/
-│   │   ├── AppShell.tsx       slot-based shell (topBar/banner/rail/main/aside/overlay)
-│   │   ├── EmptyShell.tsx     全屏自由排版 (Init 用)
-│   │   ├── TopBar.tsx
-│   │   └── Rail.tsx
-│   ├── ui/                    跨 feature 通用基礎元件
-│   │   ├── icons.tsx          ~20 個 icon + BannerIcon kind switch
-│   │   ├── Logo.tsx
-│   │   └── PickerSelect.tsx
-│   ├── features/
-│   │   ├── notifications/     NotificationsScreen + InboxColumn + NotifBanner
-│   │   ├── pipeline/          BoardScreen + FocusColumn + EmptyProject + TicketDrawer + RunHistory + DiffModal + ticketDrawer.css
-│   │   ├── pipelineCreate/    CreateCard + CreatePlaceholder
-│   │   ├── init/              InitPopup (修改後直接接 BoardScreen)
-│   │   ├── qa/                QADrawer + useQA (真接 backend)
-│   │   ├── auth/              SetupScreen + LoginScreen + SecurityTab + AddDeviceDialog + useAuthStatus + authApi + types
-│   │   ├── settings/          SettingsPopover + SettingsPopover.css(tab UI:Project / AI 任務 / 通知 / 安全)
-│   │   └── dev/               StatesGallery (狀態 gallery /dev/states)
-│   ├── lib/
-│   │   └── fcm.ts             Firebase 前端 SDK init + getToken + register + foreground handler
-│   ├── styles/                CSS(原本從 prototype 移植,phase 3-5 後 prototype variant 砍了,這些是 real UI 用的)
-│   │   ├── tokens.css         設計 token (CSS 變數,顏色/字型/spacing)
-│   │   ├── board.css          board / focus / iter-stage / ticket card
-│   │   ├── notif.css          inbox panel + strip + item
-│   │   ├── init.css           InitPopup
-│   │   ├── drawer.css         共用 drawer base(TicketDrawer + QADrawer 共用)
-│   │   └── qa.css             QADrawer
-│   ├── data/                  純 helper(STATE_COLOR / SEV_COLOR / fmtElapsed),mock seed 已全砍
-│   ├── types/                 過渡型別 (UI-only)
-│   │   ├── pipeline.ts        UI 計算用 IterState / ChatMsg 等
-│   │   └── notif.ts           InboxState / InboxFilter / NotifItem (UI display)
-│   ├── api/                   每 endpoint 一個 fetchXxx() 函式
-│   │   ├── projects.ts        /api/projects/* 全部
-│   │   └── qa.ts              /api/.../qa/* (start/turn/finalize/cancel/drafts/getDraft)
-│   ├── hooks/
-│   │   └── useActiveProject.ts  URL ?project=hash + localStorage fallback
-│   └── router/                (規劃) buildPath helper
-│
-├── server/                    後端。職責邊界見 vibe-pipeline-backend SKILL
-│   ├── index.ts               Bun.serve 入口,route 表 + authGuard middleware
-│   ├── routes/                純 dispatch,不寫業務邏輯
-│   │   ├── projects.ts        /api/projects/* (含 pipelines CRUD + git-init + reveal)
-│   │   ├── qa.ts              /api/.../qa/* (start / turn / finalize / cancel / drafts)
-│   │   ├── userConfig.ts      /api/user/config GET / PUT(跨 project per-task-class model 設定)
-│   │   ├── auth.ts            /api/auth/{status,setup-init,setup-verify,login,logout,sessions,reset}
-│   │   └── push.ts            /api/push/{config,register,unregister,tokens,test}
-│   └── lib/                   純 IO + 邏輯,不知道 HTTP
-│       ├── projectStore.ts    ~/.vibe-pipeline/state.json 讀寫
-│       ├── pipelineDir.ts     <target-repo>/.vibe-pipeline/ 偵測 / 建立 / json 讀寫
-│       ├── hash.ts            absolute path → 8-char sha256
-│       ├── dialog.ts          OS native folder picker (osascript/powershell/zenity) + revealFolder
-│       ├── userConfig.ts      ~/.vibe-pipeline/config.json(跨 project,per-task-class model/effort)
-│       ├── git.ts             hasGit / gitInit
-│       ├── git/
-│       │   └── worktree.ts    ensure / remove / prune (per pipeline,~/.vibe-pipeline/worktrees/<h>/<id>)
-│       ├── cli/
-│       │   ├── adapter.ts     CliAdapter 介面 + QASpawnOpts / RunnerSpawnOpts / SplitSpawnOpts(needsBypassPermissions 開關)
-│       │   ├── claudeAdapter.ts spawn claude CLI(perf flags + 跨 provider 時加 --dangerously-skip-permissions)
-│       │   ├── codexAdapter.ts spawn codex CLI(`-c model="..."` + sandbox + JSONL parse)
-│       │   └── index.ts       getAdapter() factory by provider
-│       ├── auth/
-│       │   ├── storage.ts     ~/.vibe-pipeline/auth.json(totp_secret_hash + sessions[])
-│       │   ├── middleware.ts  authGuard(loopback bypass + bypass paths + cookie check → /setup/login redirect)
-│       │   ├── cookie.ts      parseCookie / findSession / vp_auth cookie(HttpOnly + SameSite=Strict + 7d)
-│       │   └── pending.ts     in-memory setup_token map(setup-init → setup-verify 中間 5min 過期)
-│       ├── push/
-│       │   └── tokenStore.ts  ~/.vibe-pipeline/device_tokens.json(register / list / removeDead)
-│       ├── fcm/
-│       │   └── index.ts       firebase-admin init + fanoutPush + dead token 偵測
-│       ├── fcm.ts             (legacy 同上 path,index.ts 是新版,index 優先)
-│       ├── runner/
-│       │   ├── orchestrator.ts spawn 主 agent (claude session) + log file + recoverStale + cross-provider bypass 旗標
-│       │   ├── ticketWatcher.ts fs.watch pipeline.json + diff status → emit ticket_* notif + FCM fanout
-│       │   ├── runnerPrompt.ts RUNNER_BEHAVIOR_PROMPT (主 agent 流程 + ticket commit -F tmpfile + failed_transient 暫停 + provider-aware Task 派發)
-│       │   └── runLog.ts       parse .runtime/logs/<pid>-<ts>.log → cost/duration/turns/tokens/result/sessionId
-│       ├── notifs/
-│       │   └── store.ts       emit / list / markRead / dismiss → .runtime/notifs.jsonl
-│       └── qa/
-│           ├── claudeCli.ts   spawn claude/codex(走 adapter)+ parseReply 4-fallback + enforceContract + 確認輪 reminder
-│           ├── draftStore.ts  qa-drafts/<id>.json fs CRUD + appendTurn + markStarted
-│           ├── systemPrompt.ts  QA_BEHAVIOR_PROMPT(含確認輪契約)+ DEFAULT_OPENING_MESSAGE
-│           ├── splitTicket.ts 獨立 splitTicketSpec(老 ticket 補拆用)
-│           └── schema.ts      QA_REPLY_SCHEMA + re-export TicketSpec / QAReply / isCompleteSpec
-│
-├── shared/                    跨 backend/frontend 持久化型別
-│   └── types.ts               Project / TicketSpec / QAReply / Turn / Draft / NOTIF_EVENTS
-│
-├── design/                    Claude Design 匯出的 handoff bundle(初期設計參考,目前 prototype variant + pixel-diff 已砍)
-│   └── vibe-pipeline/
-│       ├── README.md          設計師給 coding agent 的引導
-│       ├── chats/             8 份設計過程對話 (chat1.md ~ chat8.md)
-│       └── project/           prototype HTML / proto jsx / wireframes(歷史紀錄,real code 已不引用)
-│
-├── docs/
-│   ├── CHANGELOG.md           Phase 表 / 歷次大改動 / 已 final 不做(本檔不再追歷史,看這份)
-│   ├── TODO.md                待動工清單(對應 phase 8 pipeline;落地搬走)
-│   ├── refs/                  設計文件 / 競品對照 / 歷史 spec(maintainer 用,enduser 不裝)
-│   └── vibe-pipeline/         enduser AI bundle(distributable artifact;enduser cp 進 ~/.claude/skills/vibe-pipeline/)
-│       ├── SKILL.md           enduser AI 操作手冊
-│       ├── install.md         per-OS install + trouble
-│       └── repl-runner.md     REPL 主 agent 模式 paste-ready 範本
-│
-├── .claude/
-│   ├── skills/                repo 內 maintainer SKILL(改 vibe-pipeline 自己 code 的 AI 用,不散發)
-│   │   ├── vibe-pipeline-frontend/SKILL.md  改 src/ 用
-│   │   ├── vibe-pipeline-backend/SKILL.md   改 server/ 用
-│   │   ├── vibe-pipeline-cli/SKILL.md       改 cli/ 用
-│   │   └── vibe-pipeline-e2e/SKILL.md       寫 / 改 / 跑 e2e 用
-│   └── settings.local.json    (若有) 個人 settings
-│
-└── node_modules/              (gitignored)
-```
-
-### Repo 外(runtime data,不在 repo 內)
-
-```
-~/.vibe-pipeline/              global runtime,跨 project 共用(在 user home,跟 target repo 內的 .vibe-pipeline/ 不衝突,只是同名)
-├── state.json                 { lastProject, recentProjects: [{path, lastOpenedAt}] }
-├── config.json                user-level model defaults(per-task-class qa/runner/subAgent/merge/split → provider/model/effort)
-├── auth.json                  TOTP secret 雜湊 + sessions[](Phase 5)
-├── device_tokens.json         FCM device tokens(Phase 5)
-└── worktrees/<projHash>/<pipelineId>/   git worktree per pipeline (Phase 3 落地),平行執行用
-
-<target-repo>/.vibe-pipeline/  每個 user target repo 內,由 init 建
-├── config.json                (git tracked) project-level 設定
-├── pipelines/*.json           (gitignored) 一檔一條,內含 tickets 陣列;runtime 紀錄 merge 後 redundant 於 git commit chain
-└── .runtime/                  (gitignored) 執行期暫存
-    ├── qa-drafts/<id>.json    QA 對話 draft (含 session_id,可 resume / 之後可當 memory)
-    ├── notifs.jsonl           backend emit 的事件流 (append-only,Phase 3)
-    └── logs/<pipelineId>-<ts>.log  runner 主 agent stdout/stderr (Phase 3)
-```
-
-注意:`<target-repo>/.vibe-pipeline/` **不在這個 repo 內**(除非自我 dogfood),是 vibe-pipeline 操作的 target repo 才有。跟 user home 的 `~/.vibe-pipeline/`(global state)同名但位置不同,程式上不會撞。
-
-## refs(設計與外部對照)
-
-`docs/refs/` 下有:
-
-**Active(當前還參考)**:
-
-| 檔 | 用途 |
-|---|---|
-| [`spec-2026-05-09.md`](docs/refs/spec-2026-05-09.md) | 完整 [M]/[P2]/[P3] 功能清單 |
-| [`integration-plan-v3-runner-2026-05-10.md`](docs/refs/integration-plan-v3-runner-2026-05-10.md) | Phase 3 整段(第一/二/二.五/三/四刀)落地紀錄 + 待第五刀清單 |
-| [`git-design-2026-05-09.md`](docs/refs/git-design-2026-05-09.md) | 多 pipeline 平行的 git worktree 設計 |
-| [`state-matrix-2026-05-10.md`](docs/refs/state-matrix-2026-05-10.md) | Pipeline state × condition → UI behavior 決策表(改 button / banner 前對齊) |
-| [`merge-isolation-2026-05-11.md`](docs/refs/merge-isolation-2026-05-11.md) | self-dogfood AI merge 撞 vite/bun watch 的研究紀錄;結論不做(99% user 不踩),phase 5+ 多人 self-dogfood 才回頭做 |
-| [`claude-cli-spawn-perf-2026-05-11.md`](docs/refs/claude-cli-spawn-perf-2026-05-11.md) | claude CLI spawn 加速 — QA/split/runner 三處 flag 改動量測(QA/split 省 80-90% cost)+ 風險 + 衍生 |
-| [`sync-redesign-2026-05-13.md`](docs/refs/sync-redesign-2026-05-13.md) | Sync 重構(Plan C)— 從 mode=sync ticket 拆成 pipeline.syncJob;state machine + 4 endpoints + AI 衝突解 prompt 設計 + 「靠 git 判定不靠 AI stdout」雷紀錄 |
-| [`skill-injection-2026-05-14.md`](docs/refs/skill-injection-2026-05-14.md) | 「引用重點 SKILL」設計討論 — pointer vs inline 取捨、三來源、不拆 per-AI、plugin 不自動列舉、未定項清單 + plugin cache 雷 |
-| [`worktree-env-2026-05-15.md`](docs/refs/worktree-env-2026-05-15.md) | worktree gitignored 檔複製(採 `.worktreeinclude` 慣例)+ 漏設提醒 + merge 前 secret 洩漏偵測設計 |
-| [`pause-simplify-2026-05-17.md`](docs/refs/pause-simplify-2026-05-17.md) | 拔 graceful pause,UI/API/CLI 只留「停止」(immediate SIGKILL)— 7 張 ticket 拆分 spec(待跑) |
-| [`pause-simplify-run-postmortem-2026-05-17.md`](docs/refs/pause-simplify-run-postmortem-2026-05-17.md) | pause-simplify 跑前 + 第一次 run 踩雷紀錄(8 個 bug,5 新發現,提 follow-up pipeline 拆分建議) |
-| [`fcm-push-gateway-2026-05-17.md`](docs/refs/fcm-push-gateway-2026-05-17.md) | FCM push 共用方案(maintainer host gateway,enduser 不開 Firebase) |
-| [`vbpl-server-cmd-2026-05-17.md`](docs/refs/vbpl-server-cmd-2026-05-17.md) | `vbpl server start/stop/status/restart/logs` CLI 包裝 |
-
-**Archive(已落地或一次性閱讀)**:`docs/refs/archive/` 下 — phase 1/2 計畫已落地;`docs/refs/competitor-refs.md` 是 vibe-kanban / symphony / composio-ao 競品對照合集(設計初期一次性參考)。
-
-新加 ref 寫進 `docs/refs/`,Active 加進上表;落地或不再參考時搬 `archive/`。
-
-## 開發環境
-
-```bash
-bun install                                            # 裝套件
-bun run dev                                            # fullstack:vite 5173 + backend 3001
-bun run server                                         # 只 backend → http://127.0.0.1:3001/
-bun run preview                                        # build 後 production preview → :4173
-bun run sub:dev / sub:server / sub:preview             # sub-agent 用 +100 port(3101 / 5273 / 4273)避開 user backend
-bunx tsc --noEmit                                      # TypeScript check
-bun run build                                          # 產 dist/
-```
-
-routes:
-- `/` → redirect `/board`
-- `/board` → 主介面
-- `/dev/states` → 狀態 gallery(改 RunButton / ReadyBanner 視覺驗收)
+repo 外 runtime data:`~/.vibe-pipeline/`(global state)+ `<target-repo>/.vibe-pipeline/`(per-project),細節仍在 `repo-structure.md`。
 
 ## 五 SKILL 對應路由
 
@@ -261,6 +70,11 @@ routes:
 21. **firebase-messaging-sw.js 合併 Workbox 後改 SW 要兩段都驗** — 同一個 SW 同時跑 Workbox precache/runtime cache 跟 FCM push handler(`public/firebase-messaging-sw.js` 由 vite-plugin-pwa injectManifest 注入 `self.__WB_MANIFEST` 後輸出到 `dist/firebase-messaging-sw.js`)。改 SW 程式碼時:precache 改動跑 `bun run build` 看 entries 數變化(目前 9 entries / ~640 KiB);push handler 改動要看 dist 產出的 sw 裡 push event listener 還在 + `event.waitUntil(showNotification(...))` 還在。**雷區 #10 仍適用**(Android push 必須 SW 自己 showNotification,混合 notification+data payload 不會 auto-display)。
 22. **Workbox runtime cache `/api/*` 只 cache GET** — `registerRoute` 的 filter 必含 `request.method === 'GET'`,POST/PUT/DELETE/PATCH(/api/run /pause /merge /qa/turn /ticket update 等 mutation)走網路直通,不然 mutation response 被 SWR cache 回讀就死了。SWR 策略本身對 read-only 有用(離線可顯舊 + 背景 refresh),寫操作絕對不能套。Google Fonts 那兩條 route(CacheFirst / SWR)同理只應命中 GET。
 23. **vite-plugin-pwa `registerType: 'autoUpdate'` 每次 SW 變更會 force full reload** — workbox-window 預設 `controlling` event 觸發 `window.location.reload()`,user 正在打字 / 看 modal / 跑 QA 都被打斷,體感「跟突然 refresh 一樣」。VP 改用 `registerType: 'prompt'` + `<SwUpdateBanner>` 讓 user 主動點「更新」才 reload(`src/lib/swUpdate.ts` 用 workbox-window 自管 `needRefresh` state + `messageSkipWaiting`)。要改回 `autoUpdate` 前先確認 user 體感 OK — 設計信條:**執行中操作信號才該立即冪等**,「自動 reload」由 backend 替 user 決定打斷時機,不對等。
+24. **Windows `auth.json` NTFS ACL chmod 0o600 不生效** — `~/.vibe-pipeline/auth.json` 存 TOTP secret 雜湊,程式 `fs.chmod(0o600)` 在 Windows NTFS 沒效果。個人 PC 單帳戶 OK(user profile 預設已隔離),多帳戶 / 工作機要手動右鍵 → 安全性 → 移除 Users/Everyone。
+25. **Tailscale HTTPS 不可省** — FCM service worker 要 secure context,`http://100.x.x.x:5173` 不算 secure → push 訂閱不會註冊。手機必須走 `tailscale serve --https=443 http://localhost:4173`(走 preview port,雷 #19)。
+26. **`server/index.ts` 必須 `0.0.0.0` 監聽** — 改回 `127.0.0.1` 手機連不到,Tailscale 介面也算非 loopback。
+27. **`ALLOWED_ORIGINS` 不要放 `*`** — TOTP 是 auth 層但 CORS 也是邊界,Tailscale tailnet 不該假設絕對安全。
+28. **離線 push 補送靠 FCM 不靠 VP** — 手機離線時 FCM server 暫存 28 天,VP 端不做 queue;debug 時別找 VP backend 的 queue,沒有。
 
 ## 設計信條(改 code 前對齊)
 
@@ -273,13 +87,3 @@ routes:
 5. **Critic fail ≠ ticket fail** — Iter mode 內 critic 判 FAIL 是「下一輪繼續」的訊號,不是 ticket 死了。`failed_iter_limit` 才是死(N 輪 critic 都沒過)
 
 > 註:原 spec 還有「exclusive lock 優先於並行」「無 max_iter 預設靠 stall detection」兩條;前者因目前沒 deploy / DB migration 這類資源沒實作,後者仍寫死 `iterLimit=5`。等 Phase 6 stall detection 落地後再恢復。
-
-## 手機遠端使用方式
-
-Tailscale + TOTP + FCM 完整 setup 流程(裝 / 連 / 啟通知 / FCM env 表)見 [`README.md`](README.md) §遠端存取。本段只記 README 沒提的雷:
-
-- **Windows `auth.json` NTFS ACL** — `~/.vibe-pipeline/auth.json` 存 TOTP secret 雜湊。程式 `fs.chmod(0o600)` 在 Windows NTFS 不生效,個人 PC 單帳戶 OK(user profile 目錄預設已隔離),多帳戶 / 工作機要手動右鍵 → 安全性 → 移除 Users/Everyone
-- **HTTPS 不可省** — FCM service worker 要 secure context,`http://100.x.x.x:5173` 不算 secure → push 訂閱不會註冊。手機必須走 `tailscale serve --https=443 http://localhost:5173`
-- **`server/index.ts` 必須 `0.0.0.0` 監聽** — 改回 `127.0.0.1` 手機連不到,Tailscale 介面也算非 loopback
-- **`ALLOWED_ORIGINS` 不要放 `*`** — TOTP 是 auth 層但 CORS 也是邊界,Tailscale tailnet 不該假設絕對安全
-- **離線 push 補送靠 FCM 不靠 VP** — 手機離線時 FCM server 暫存 28 天,VP 端不做 queue;debug 時別找 VP backend 的 queue,沒有
