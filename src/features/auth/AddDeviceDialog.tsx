@@ -51,10 +51,6 @@ export function AddDeviceDialog({ onClose }: { onClose: () => void }) {
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      onKeyDown={(e) => {
-        if (e.key === "Escape") onClose();
-      }}
-      tabIndex={-1}
     >
       <div className="auth-dialog-box">
         <div className="auth-dialog-title">

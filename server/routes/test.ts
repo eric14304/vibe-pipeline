@@ -5,7 +5,7 @@ import { mkdirSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import * as projectStore from "../lib/projectStore";
 import * as testMode from "../lib/testMode";
-import { writeAuth } from "../lib/auth/storage";
+import { readAuth, writeAuth } from "../lib/auth/storage";
 import { fakeFcmCalls, resetFakeFcmCalls } from "../lib/fcm";
 import { vibeHome } from "../lib/paths";
 import type { QAReply } from "../lib/qa/schema";

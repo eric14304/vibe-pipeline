@@ -3,10 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { setupInit, setupVerify, type SetupInitResp } from "./authApi";
 import "../../styles/auth.css";
 
-function svgDataUrl(svg: string): string {
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-}
-
 export function SetupScreen() {
   const navigate = useNavigate();
   const [state, setState] = useState<"loading" | "ready" | "init-error">("loading");
@@ -60,7 +56,7 @@ export function SetupScreen() {
       <div className="auth-screen">
         <div className="auth-card">
           <p className="auth-error">初始化失敗</p>
-          <button type="button" className="btn btn-primary" onClick={() => void runInit()}>
+          <button className="btn btn-primary" onClick={() => void runInit()}>
             重試
           </button>
         </div>
@@ -73,7 +69,9 @@ export function SetupScreen() {
       <div className="auth-card">
         <h1 className="auth-title">設定雙重驗證</h1>
         <p className="auth-hint">請用 Authenticator App 掃描 QR Code</p>
-        {data && <img className="auth-qr" src={svgDataUrl(data.qr_svg)} alt="TOTP QR Code" />}
+        {data && (
+          <div className="auth-qr" dangerouslySetInnerHTML={{ __html: data.qr_svg }} />
+        )}
         <form onSubmit={onSubmit} className="auth-form">
           <input
             className="auth-code-input"
@@ -83,6 +81,7 @@ export function SetupScreen() {
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
             placeholder="6 碼驗證碼"
+            autoFocus
           />
           {error && <p className="auth-error">{error}</p>}
           <button

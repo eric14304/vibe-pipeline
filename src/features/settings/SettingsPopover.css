@@ -1,56 +1,54 @@
+/* ─── Desktop popover root ────────────────────────────────────── */
+
 .settings-popover {
   position: absolute;
-  top: calc(100% + var(--space-2));
-  right: var(--space-0);
-  width: min(86rem, calc(100vw - var(--space-8)));
-  max-height: calc(100vh - var(--space-8) - var(--space-8));
+  top: calc(100% + 6px);
+  right: 0;
+  /* 固定寬度,各 tab 切換時 popover 不會抖動;720 容得下 settings-row 三欄 layout(label / control / hint)*/
+  width: min(720px, calc(100vw - 32px));
+  max-height: calc(100vh - 80px);
   overflow-y: auto;
   background: var(--bg-elevated);
-  border: var(--border-thin) solid var(--line);
-  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  border-radius: 8px;
   box-shadow: var(--shadow-lg);
-  padding: var(--space-0) var(--space-5) var(--space-4);
+  padding: 14px 16px 12px;
   z-index: 1500;
-  font-size: 0.875rem;
+  font-size: 13px;
 }
 
+/* Desktop:右上關閉 icon 隱藏(點外面 / Esc 已夠);mobile 才顯示 */
 .settings-popover-close {
   display: none;
 }
 
+/* ─── Tab bar ──────────────────────────────────────────────────── */
+
 .settings-popover-tabs {
   display: flex;
   align-items: center;
-  gap: var(--space-5);
-  margin: var(--space-0) calc(var(--space-5) * -1) var(--space-5);
-  padding: var(--space-0) var(--space-5);
-  border-bottom: var(--border-thin) solid var(--line);
+  gap: 4px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--line);
 }
 
 .settings-popover-tab {
-  min-height: 4.25rem;
-  padding: var(--space-0) var(--space-4);
-  border-bottom: calc(var(--border-thin) * 2) solid transparent;
+  padding: 7px 12px;
+  margin-bottom: -1px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
   color: var(--fg-mute);
-  font-size: 1.25rem;
-  font-weight: 650;
+  font-size: 12.5px;
+  font-weight: 500;
   cursor: pointer;
-  transition: color 120ms, border-color 120ms, background 120ms;
+  transition: color 120ms;
 }
 
 .settings-popover-tab.is-active {
   border-bottom-color: var(--accent);
   color: var(--fg);
-}
-
-.settings-popover-tab--project.is-active {
-  min-height: auto;
-  margin: var(--space-3) var(--space-0);
-  padding: var(--space-3) var(--space-8);
-  border: calc(var(--border-thin) * 2) solid var(--accent);
-  border-radius: var(--radius);
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 4%, transparent);
+  font-weight: 600;
 }
 
 .settings-popover-tabs-spacer {
@@ -61,6 +59,7 @@
   color: var(--done);
   background: var(--done-soft);
   border-color: var(--done-soft);
+  margin-bottom: 6px;
   transition: opacity 350ms ease;
 }
 
@@ -68,1008 +67,716 @@
   opacity: 0;
 }
 
-.settings-card,
-.settings-section {
-  margin-bottom: var(--space-4);
+/* ─── Field row(Project tab + 通用)─────────────────────────── */
+
+.settings-field-row {
+  display: grid;
+  grid-template-columns: 112px 1fr;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
 }
 
-.settings-card {
-  border: var(--border-thin) solid var(--line);
-  border-radius: var(--radius);
+.settings-field-label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.settings-input {
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
   background: var(--panel);
-  padding: var(--space-3) var(--space-4);
+  color: var(--fg);
+  font-size: 13px;
 }
 
-.settings-card > .settings-row,
-.settings-ai-card > .settings-row,
-.push-events-list > .settings-row {
-  border-bottom: var(--border-thin) solid var(--line);
+.settings-input--w-narrow { width: 64px; }
+.settings-input--w-mid { width: 100px; }
+.settings-input--w-full { width: 100%; box-sizing: border-box; }
+
+.settings-subhint {
+  font-size: 10.5px;
+  color: var(--fg-faint);
+  line-height: 1.5;
+  margin-left: 122px;
+  margin-bottom: 10px;
 }
 
-.settings-card > .settings-row:last-child,
-.settings-ai-card > .settings-row:last-child,
-.push-events-list > .settings-row:last-child {
-  border-bottom: none;
+.settings-subhint--top {
+  margin-left: 0;
+  margin-bottom: 0;
+}
+
+/* tab 內區塊標題(e.g. AI 任務 tab 的「全域 provider / model 設定」)*/
+.settings-section-title {
+  font-size: 12px;
+  color: var(--fg);
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.settings-inline-unit {
+  font-size: 11px;
+  color: var(--fg-faint);
+}
+
+.settings-field-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-error {
+  font-size: 11px;
+  color: var(--failed);
+  margin-bottom: 8px;
+  word-break: break-word;
+}
+
+/* ─── Push notification status ─────────────────────────────────── */
+
+.push-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12.5px;
+}
+
+.push-status-icon {
+  font-family: var(--font-mono);
+}
+
+.push-status-text {
+  color: var(--fg);
+}
+
+/* tight 版 field row 給 auto-merge toggle 那行用(下方 subhint 緊接) */
+.settings-field-row--tight {
+  margin-bottom: 4px;
+}
+
+.push-action-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.push-hint {
+  font-size: 11px;
+  color: var(--fg-faint);
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+.push-error {
+  font-size: 11px;
+  color: var(--failed);
+  margin-top: 8px;
+  padding: 8px;
+  background: color-mix(in srgb, var(--failed) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--failed) 30%, var(--line));
+  border-radius: 4px;
+  word-break: break-all;
+}
+
+/* ─── AI 任務 row(2026-05-13 拆 2 層 layout)────────────────────────
+   row1: label(左)+ selects(右,grid 對齊兩 group)
+   row2: hint(獨立一行,full width,長文字可自由換行不裁字)
+   Mobile breakpoint 改 flex column,selects 用 1fr 2fr 1fr 撐滿。 */
+
+:root {
+  --task-w-provider: 86px;
+  --task-w-model: 150px;
+  --task-w-effort: 95px;
+}
+
+.task-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.task-row-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 8px;
+  align-items: center;
+}
+
+.task-row-label {
+  font-size: 12px;
+  color: var(--fg);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-row-selects {
+  display: grid;
+  grid-template-columns: var(--task-w-provider) var(--task-w-model) var(--task-w-effort);
+  column-gap: 8px;
+}
+
+.task-row-selects > select {
+  padding: 3px 4px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--fg);
+  font-size: 11.5px;
+  font-family: var(--font-mono);
+  box-sizing: border-box;
+}
+
+.task-row-hint {
+  font-size: 10.5px;
+  color: var(--fg-faint);
+  line-height: 1.4;
+}
+
+.task-row-placeholder {
+  width: var(--task-w-provider);
+}
+
+/* ─── AI 任務 group container ──────────────────────────────────── */
+
+.task-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 8px;
+}
+
+.task-group--primary {
+  background: var(--panel);
+}
+
+.task-group--secondary {
+  background: var(--panel-2);
+  margin-bottom: 12px;
+}
+
+.task-group-hint {
+  font-size: 11px;
+  color: var(--fg-faint);
+}
+
+.settings-popover-task-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ─── Mobile ─────────────────────────────────────────────────── */
+
+@media (max-width: 767px) {
+  .settings-popover {
+    box-sizing: border-box;
+  }
+
+  .settings-popover *,
+  .settings-popover *::before,
+  .settings-popover *::after {
+    box-sizing: border-box;
+  }
+
+  .settings-popover {
+    position: fixed !important;
+    inset: 0 !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    transform: none !important;
+    width: 100vw !important;
+    min-width: 0 !important;
+    max-width: 100vw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-height: 100vh !important;
+    max-height: 100dvh !important;
+    margin: 0 !important;
+    padding: 14px 16px calc(12px + env(safe-area-inset-bottom)) !important;
+    border-radius: 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+  }
+
+  .settings-popover select,
+  .settings-popover input,
+  .settings-popover button {
+    max-width: 100%;
+  }
+
+  .settings-popover select,
+  .settings-popover input {
+    min-width: 0;
+  }
+
+  /* Mobile:label + hint 同一行(inline),selects 跨欄落第二行
+     用 .task-row 2x2 grid 接管 layout,.task-row-head 設 display:contents 把
+     label / selects 攤到外層 grid,跟 .task-row-hint 一起在 .task-row 內排版 */
+  .task-row {
+    display: grid !important;
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+      "label hint"
+      "selects selects";
+    align-items: baseline;
+    column-gap: 8px;
+    row-gap: 6px;
+  }
+
+  .task-row-head {
+    display: contents;
+  }
+
+  .task-row-label {
+    grid-area: label;
+    white-space: normal;
+  }
+
+  .task-row-hint {
+    grid-area: hint;
+  }
+
+  .task-row-selects {
+    grid-area: selects;
+    grid-template-columns: 1fr 2fr 1fr;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .task-row-selects > select {
+    width: 100% !important;
+    min-width: 0;
+  }
+
+  /* placeholder span 永遠撐第一欄(對齊 group 1 跟 group 2 的 model/effort 位置)— mobile 也不隱 */
+  .task-row-placeholder {
+    width: auto;
+  }
+
+  /* 右上關閉 icon — mobile 全螢幕,需要明顯的關閉入口 */
+  .settings-popover-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--fg-mute);
+    cursor: pointer;
+    z-index: 2;
+  }
+  .settings-popover-close:hover,
+  .settings-popover-close:focus-visible {
+    background: var(--hover);
+    color: var(--fg);
+    outline: none;
+  }
+
+  .settings-popover-footer {
+    position: sticky;
+    bottom: calc(-12px - env(safe-area-inset-bottom));
+    margin: 0 -16px calc(-12px - env(safe-area-inset-bottom));
+    padding: 10px 16px calc(12px + env(safe-area-inset-bottom)) !important;
+    background: var(--bg-elevated);
+  }
+}
+
+/* ─── Settings redesign v2 utilities(ticket S1)─────────────────
+   給 S2-S4 重排各 tab row 用,目前 SettingsPopover.tsx 還沒套。
+   設計風格對齊 docs/refs/images/settings-redesign/*.png:
+   - 每 row 三欄:左 label(icon+title+subtitle)/ 中 control / 右 hint 灰小字
+   - 卡片風:1px line border + radius + padding
+   - amber tip card:淡 amber bg + 💡 + 文字
+   - RWD <600px:row stacked(flex column)
+   Scoped spacing/radius 變數在這層宣告,不污染 tokens.css(若日後升 global 再搬)。 */
+
+.settings-popover {
+  --settings-space-1: 4px;
+  --settings-space-2: 8px;
+  --settings-space-3: 12px;
+  --settings-space-4: 16px;
+  --settings-space-5: 20px;
+}
+
+.settings-section {
+  margin-bottom: var(--settings-space-4);
+}
+.settings-section:last-child {
+  margin-bottom: 0;
+}
+
+.settings-section > .settings-section-title {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--fg);
+  margin-bottom: var(--settings-space-2);
 }
 
 .settings-row {
-  display: grid;
-  grid-template-columns: minmax(15rem, 0.75fr) minmax(20rem, 0.8fr) minmax(24rem, 1.25fr);
+  display: flex;
   align-items: center;
-  gap: var(--space-5);
-  padding: var(--space-6) var(--space-3);
-  background: transparent;
+  gap: var(--settings-space-3);
+  padding: var(--settings-space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  margin-bottom: var(--settings-space-2);
+}
+.settings-row:last-child {
+  margin-bottom: 0;
 }
 
 .settings-row-label {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  min-width: var(--space-0);
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .settings-row-label-head {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: 6px;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
   color: var(--fg);
-  font-size: 1.375rem;
-  font-weight: 750;
-  line-height: 1.25;
 }
 
-.settings-row-icon {
+.settings-row-label-head .settings-row-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 auto;
+  color: var(--fg-mute);
+  flex-shrink: 0;
 }
 
 .settings-row-label-sub {
+  font-size: 11.5px;
   color: var(--fg-mute);
-  font-size: 1.0625rem;
-  line-height: 1.45;
+  line-height: 1.4;
 }
 
 .settings-row-control {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: var(--space-2);
-  min-width: var(--space-0);
+  justify-content: flex-end;
+  gap: var(--settings-space-2);
 }
 
 .settings-row-control--multi {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(10rem, 1fr);
-  gap: var(--space-3);
-  width: 100%;
-}
-
-.settings-cost-control {
   display: flex;
-  gap: var(--space-0);
-}
-
-.settings-cost-control .settings-input {
-  max-width: 12rem;
-  border-radius: var(--radius-sm) var(--space-0) var(--space-0) var(--radius-sm);
-}
-
-.settings-row-control--wide {
-  grid-column: 2 / 4;
+  align-items: center;
+  gap: var(--settings-space-2);
+  flex-wrap: nowrap;
 }
 
 .settings-row-hint {
+  flex: 0 0 auto;
+  max-width: 220px;
   color: var(--fg-mute);
-  font-size: 1.0625rem;
-  line-height: 1.55;
-}
-
-.settings-input {
-  min-height: 3.875rem;
-  width: 100%;
-  padding: var(--space-2) var(--space-3);
-  border: var(--border-thin) solid var(--line-2);
-  border-radius: var(--radius-sm);
-  background: var(--panel);
-  color: var(--fg);
-  font-size: 1.125rem;
-}
-
-.settings-input:focus {
-  outline: var(--border-thin) solid var(--accent);
-  border-color: var(--accent);
-}
-
-.settings-input[type="number"] {
-  appearance: textfield;
-}
-
-.settings-input[type="number"]::-webkit-outer-spin-button,
-.settings-input[type="number"]::-webkit-inner-spin-button {
-  appearance: none;
-  margin: var(--space-0);
-}
-
-.settings-input--w-narrow {
-  max-width: 16rem;
-}
-
-.settings-number-stepper {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 4rem;
-  width: min(16rem, 100%);
-  overflow: hidden;
-  border: var(--border-thin) solid var(--line-2);
-  border-radius: var(--radius-sm);
-  background: var(--panel);
-}
-
-.settings-number-stepper:focus-within {
-  outline: var(--border-thin) solid var(--accent);
-  border-color: var(--accent);
-}
-
-.settings-number-stepper .settings-input {
-  min-height: 3.875rem;
-  max-width: none;
-  border: none;
-  border-radius: var(--space-0);
-  background: transparent;
-}
-
-.settings-stepper-buttons {
-  display: grid;
-  grid-template-rows: 1fr 1fr;
-  border-left: var(--border-thin) solid var(--line-2);
-  background: var(--panel-2);
-}
-
-.settings-stepper-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: var(--space-0);
-  color: var(--fg-mute);
-}
-
-.settings-stepper-btn:first-child {
-  border-bottom: var(--border-thin) solid var(--line-2);
-}
-
-.settings-stepper-btn:hover:not(:disabled) {
-  background: var(--hover);
-  color: var(--fg);
-}
-
-.settings-stepper-btn:disabled {
-  cursor: not-allowed;
-  color: var(--fg-faint);
-}
-
-.settings-stepper-btn svg {
-  width: 1.375rem;
-  height: 1.375rem;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 2.2;
-}
-
-.settings-input--w-mid {
-  max-width: 22rem;
-}
-
-.settings-inline-unit {
-  display: inline-flex;
-  min-height: 3.875rem;
-  align-items: center;
-  padding: var(--space-2) var(--space-4);
-  border: var(--border-thin) solid var(--line-2);
-  border-left: none;
-  border-radius: var(--space-0) var(--radius-sm) var(--radius-sm) var(--space-0);
-  background: var(--panel-2);
-  color: var(--fg-mute);
-  font-size: 1.0625rem;
-}
-
-.settings-info-dot,
-.settings-inline-alert-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.25rem;
-  height: 1.25rem;
-  border: var(--border-thin) solid var(--fg-faint);
-  border-radius: 50%;
-  color: var(--fg-faint);
-  font-size: 0.8125rem;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.settings-info-dot--small {
-  width: 1rem;
-  height: 1rem;
-  font-size: 0.6875rem;
-  vertical-align: middle;
-}
-
-.settings-merge-panel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  width: 100%;
-  padding: var(--space-5);
-  border: var(--border-thin) solid color-mix(in srgb, var(--accent) 28%, var(--line));
-  border-radius: var(--radius);
-  background: color-mix(in srgb, var(--accent) 8%, var(--panel));
-}
-
-.settings-merge-panel .toggle-pill,
-.push-main-toggle {
-  padding: var(--space-0);
-  border: none;
-  background: transparent;
-  color: var(--fg);
-}
-
-.settings-merge-panel .toggle-pill:hover,
-.push-main-toggle:hover {
-  background: transparent;
-}
-
-.settings-inline-alert {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border: var(--border-thin) solid color-mix(in srgb, var(--accent) 32%, var(--line));
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
-  color: var(--fg);
-  font-size: 1.0625rem;
-  line-height: 1.45;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: left;
 }
 
 .settings-tip-card {
   display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--space-5);
-  border: var(--border-thin) solid color-mix(in srgb, var(--running) 24%, var(--line));
+  align-items: flex-start;
+  gap: var(--settings-space-2);
+  padding: var(--settings-space-3);
   border-radius: var(--radius);
-  background: color-mix(in srgb, var(--running) 7%, var(--panel));
+  background: color-mix(in srgb, #d4a76a 14%, var(--panel));
+  border: 1px solid color-mix(in srgb, #d4a76a 30%, var(--line));
   color: var(--fg);
-  font-size: 1.0625rem;
+  font-size: 12px;
   line-height: 1.5;
 }
 
-.settings-tip-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.75rem;
-  height: 2.75rem;
-  border-radius: 50%;
-  background: var(--running);
-  color: var(--bg);
-  flex: 0 0 auto;
+.settings-tip-card::before {
+  content: "💡";
+  flex-shrink: 0;
+  font-size: 14px;
+  line-height: 1.2;
 }
 
-.settings-tip-icon svg {
-  width: 1.5rem;
-  height: 1.5rem;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.9;
+.settings-tip-card--no-icon::before {
+  content: none;
 }
 
-.settings-tip-copy {
-  min-width: var(--space-0);
+@media (max-width: 767px) {
+  .settings-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--settings-space-2);
+  }
+
+  .settings-row-control,
+  .settings-row-control--multi {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .settings-row-hint {
+    max-width: 100%;
+    width: 100%;
+  }
 }
 
-.settings-tip-title {
-  color: var(--fg);
-  font-size: 1.0625rem;
-  font-weight: 750;
-  line-height: 1.3;
-}
+/* ─── PWA tab — Install chip grid(S4)──────────────────────────── */
 
-.settings-tip-body {
+.settings-section-sub {
+  font-size: 11.5px;
   color: var(--fg-mute);
-  line-height: 1.45;
+  line-height: 1.5;
+  margin-top: -4px;
+  margin-bottom: var(--settings-space-3);
 }
 
-.settings-tip-card--compact {
-  padding: var(--space-3);
-}
-
-.settings-tip-card--blue {
-  border-color: color-mix(in srgb, var(--running) 24%, var(--line));
-  background: color-mix(in srgb, var(--running) 7%, var(--panel));
-}
-
-.settings-tip-card--blue .settings-tip-icon {
-  background: var(--running);
-  color: var(--bg);
-}
-
-.settings-section-heading {
+.settings-section-title-row {
   display: flex;
-  align-items: flex-start;
+  align-items: baseline;
   justify-content: space-between;
-  gap: var(--space-4);
-  margin-bottom: var(--space-4);
-}
-
-.settings-section-title,
-.settings-feature-title {
-  color: var(--fg);
-  font-size: 1.375rem;
-  font-weight: 750;
-  line-height: 1.3;
-}
-
-.settings-section-sub,
-.settings-feature-sub {
-  margin-top: var(--space-2);
-  color: var(--fg-mute);
-  font-size: 1.0625rem;
-  line-height: 1.55;
-}
-
-.settings-title-muted {
-  color: var(--fg-mute);
-  font-weight: 600;
+  gap: var(--settings-space-2);
+  margin-bottom: var(--settings-space-2);
 }
 
 .settings-section-link {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  color: var(--running);
-  font-size: 1rem;
-  font-weight: 700;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.settings-section-link::before {
-  content: "i";
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1rem;
-  height: 1rem;
-  border: var(--border-thin) solid currentColor;
-  border-radius: 50%;
-  font-size: 0.75rem;
-  font-weight: 800;
-}
-
-.settings-section-link::after {
-  content: "↗";
-  font-size: 0.875rem;
-}
-
-.settings-error,
-.settings-subhint,
-.push-error {
-  color: var(--failed);
-  font-size: 0.8125rem;
-  line-height: 1.5;
-  word-break: break-word;
-}
-
-.settings-subhint {
-  color: var(--fg-mute);
-}
-
-.settings-ai-card {
-  overflow: hidden;
-  border: var(--border-thin) solid var(--line);
-  border-radius: var(--radius);
-  background: var(--panel);
-}
-
-.settings-ai-advanced {
-  border: var(--border-thin) solid color-mix(in srgb, var(--accent) 22%, var(--line));
-  border-radius: var(--radius);
-  background: color-mix(in srgb, var(--accent) 6%, var(--panel));
-}
-
-.settings-ai-card--advanced {
-  border: none;
-  border-radius: var(--space-0);
-  background: transparent;
-}
-
-.settings-ai-advanced {
-  padding: var(--space-4);
-}
-
-.settings-ai-header,
-.settings-ai-card .ai-task-row {
-  display: grid;
-  grid-template-columns: minmax(18rem, 1.2fr) repeat(3, minmax(12rem, 0.82fr));
-  gap: var(--space-4);
-  align-items: center;
-}
-
-.settings-ai-header {
-  padding: var(--space-4) var(--space-5) var(--space-2);
-  color: var(--fg-mute);
-  font-size: 1rem;
-  font-weight: 700;
-}
-
-.settings-ai-header > span {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.settings-ai-card .ai-task-row {
-  padding: var(--space-4) var(--space-5);
-}
-
-.settings-ai-card .ai-task-row .settings-row-control {
-  display: contents;
-}
-
-.settings-ai-card .ai-task-row .settings-row-label {
-  min-width: var(--space-0);
-}
-
-.settings-ai-card--advanced .ai-task-row {
-  grid-template-columns: minmax(18rem, 1.2fr) repeat(2, minmax(12rem, 0.82fr));
-}
-
-.settings-ai-card--advanced .ai-task-row .settings-row-control--multi {
-  grid-auto-columns: minmax(10rem, 1fr);
-}
-
-.settings-advanced-head {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-4);
-  margin-bottom: var(--space-4);
-}
-
-.settings-icon-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 3.5rem;
-  height: 3.5rem;
-  border-radius: var(--radius);
-  flex: 0 0 auto;
-  font-size: 1.1rem;
-  font-weight: 800;
-}
-
-.settings-icon-badge svg {
-  width: 1.625rem;
-  height: 1.625rem;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.9;
-}
-
-.settings-icon-badge svg path:first-child:last-child {
-  fill: currentColor;
-  stroke: none;
-}
-
-.settings-row-identity {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: var(--space-4);
-  min-width: var(--space-0);
-}
-
-.settings-row-text {
-  min-width: var(--space-0);
-}
-
-.settings-ai-card .settings-row-label-head {
-  font-size: 1.125rem;
-}
-
-.settings-ai-card .settings-row-label-sub {
-  font-size: 1rem;
-}
-
-.settings-icon-badge--blue {
-  background: var(--running-soft);
-  color: var(--running);
-}
-
-.settings-icon-badge--violet {
-  background: var(--iter-soft);
-  color: var(--iter);
-}
-
-.settings-icon-badge--green {
-  background: var(--done-soft);
-  color: var(--done);
-}
-
-.settings-icon-badge--amber {
-  background: var(--accent-soft);
+  font-size: 11.5px;
   color: var(--accent);
+  text-decoration: none;
 }
+.settings-section-link:hover { text-decoration: underline; }
 
-.settings-icon-badge--red {
-  background: var(--failed-soft);
-  color: var(--failed);
-}
-
-.settings-icon-badge--teal {
-  background: var(--queued-soft);
-  color: var(--queued);
-}
-
-.settings-section--plain {
-  padding: var(--space-5);
-  border: var(--border-thin) solid var(--line);
-  border-radius: var(--radius);
-  background: var(--panel);
-}
-
-.settings-feature-row {
+.install-chip-grid {
   display: grid;
-  grid-template-columns: minmax(16rem, 0.8fr) minmax(0, 2.8fr);
-  align-items: center;
-  gap: var(--space-5);
-}
-
-.install-panel {
-  display: grid;
-  grid-template-columns: minmax(18rem, 1.1fr) minmax(17rem, 1fr) minmax(18rem, 1fr);
-  border: var(--border-thin) solid var(--line-2);
-  border-radius: var(--radius);
-  background: var(--panel);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--settings-space-2);
 }
 
 .install-chip {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: var(--space-2);
-  min-height: 8rem;
-  padding: var(--space-5);
-  border-right: var(--border-thin) solid var(--line);
-}
-
-.install-chip:last-child {
-  border-right: none;
+  gap: var(--settings-space-2);
+  padding: var(--settings-space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  min-height: 110px;
+  transition: border-color 120ms, background 120ms;
 }
 
 .install-chip--active {
-  background: color-mix(in srgb, var(--accent) 5%, transparent);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, var(--panel));
 }
 
 .install-chip-head {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: 6px;
   color: var(--fg);
 }
 
 .install-chip-icon {
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--fg-mute);
+  flex-shrink: 0;
 }
 
 .install-chip--active .install-chip-icon {
   color: var(--accent);
 }
 
-.install-chip-title,
-.install-chip-status-label {
+.install-chip-title {
+  font-size: 12px;
+  font-weight: 500;
   color: var(--fg);
-  font-size: 1.0625rem;
-  font-weight: 750;
+  line-height: 1.3;
+}
+
+.install-chip-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  justify-content: flex-end;
 }
 
 .install-chip-hint {
+  font-size: 11px;
   color: var(--fg-mute);
-  font-size: 1rem;
-  line-height: 1.55;
+  line-height: 1.5;
 }
 
 .install-chip-btn {
   align-self: flex-start;
+  padding: 4px 12px;
+  font-size: 12px;
 }
 
+/* Status chip(chip 1)— 中央大 icon + label */
 .install-chip--status {
-  display: grid;
-  grid-template-columns: auto 1fr;
   align-items: center;
-  gap: var(--space-4);
+  justify-content: center;
+  text-align: center;
 }
 
 .install-chip-status-icon {
+  width: 32px;
+  height: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.75rem;
-  height: 2.75rem;
-  border-radius: var(--radius-sm);
-  font-size: 1.125rem;
-  font-weight: 800;
-}
-
-.install-chip-status-icon svg {
-  width: 1.5rem;
-  height: 1.5rem;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.9;
-}
-
-.install-chip-text {
-  min-width: var(--space-0);
-}
-
-.install-inline-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  margin: var(--space-0) var(--space-2);
-  border: var(--border-thin) solid var(--line-2);
-  border-radius: var(--radius-sm);
-  color: var(--fg-mute);
-  vertical-align: middle;
-}
-
-.install-inline-icon svg {
-  width: 1.125rem;
-  height: 1.125rem;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 2;
-}
-
-.install-chip-status-icon--ok {
-  background: var(--done-soft);
-  color: var(--done);
-}
-
-.install-chip-status-icon--warn {
-  background: var(--failed-soft);
-  color: var(--failed);
-}
-
-.install-chip-status-icon--neutral {
-  background: var(--done-soft);
-  color: var(--done);
-}
-
-.settings-notify-section {
-  padding: var(--space-5);
-  border: var(--border-thin) solid var(--line);
-  border-radius: var(--radius);
-  background: var(--panel);
-}
-
-.settings-push-card {
-  margin-bottom: var(--space-4);
-  padding: var(--space-4);
-}
-
-.push-status-banner {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-4);
-  border: var(--border-thin) solid color-mix(in srgb, var(--failed) 28%, var(--line));
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--failed) 7%, var(--panel));
-  margin-bottom: var(--space-4);
-}
-
-.push-status-banner-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.75rem;
-  height: 2.75rem;
-  border: var(--border-thin) solid var(--failed);
   border-radius: 50%;
+  font-size: 16px;
+  font-weight: 600;
+}
+.install-chip-status-icon--ok {
+  background: color-mix(in srgb, var(--done) 18%, transparent);
+  color: var(--done);
+}
+.install-chip-status-icon--warn {
+  background: color-mix(in srgb, var(--failed) 18%, transparent);
   color: var(--failed);
-  font-size: 1rem;
+}
+.install-chip-status-icon--neutral {
+  background: color-mix(in srgb, var(--fg-mute) 14%, transparent);
+  color: var(--fg-mute);
 }
 
-.push-status-banner-icon svg {
-  width: 1.375rem;
-  height: 1.375rem;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.9;
-}
-
-.push-status-banner--info {
-  border-color: color-mix(in srgb, var(--running) 28%, var(--line));
-  background: color-mix(in srgb, var(--running) 7%, var(--panel));
-}
-
-.push-status-banner--info .push-status-banner-icon {
-  border-color: var(--running);
-  color: var(--running);
-  font-weight: 800;
-}
-
-.push-status-info-mark {
-  font-size: 1rem;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.push-status-banner-text {
-  color: var(--failed);
-  font-size: 1rem;
-  font-weight: 750;
-  line-height: 1.35;
-}
-
-.push-status-banner--info .push-status-banner-text {
+.install-chip-status-label {
+  font-size: 13px;
+  font-weight: 500;
   color: var(--fg);
 }
 
-.push-status-banner-sub {
-  margin-top: var(--space-1);
-  color: var(--fg-mute);
-  font-size: 0.9375rem;
+.install-chip--tone-warn { border-color: color-mix(in srgb, var(--failed) 30%, var(--line)); }
+
+/* ─── PWA tab — Push status banner + events list(S4)──────────── */
+
+.push-status-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--settings-space-3);
+  padding: var(--settings-space-3);
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--failed) 35%, var(--line));
+  background: color-mix(in srgb, var(--failed) 8%, var(--panel));
+  margin-bottom: var(--settings-space-3);
+}
+
+.push-status-banner--info {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
+  background: color-mix(in srgb, var(--accent) 6%, var(--panel));
+}
+
+.push-status-banner-text {
+  flex: 1 1 auto;
+  font-size: 12.5px;
   font-weight: 500;
-  line-height: 1.45;
+  color: var(--fg);
+  min-width: 0;
+}
+
+.push-status-banner-sub {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--fg-mute);
+  margin-top: 2px;
+  line-height: 1.4;
 }
 
 .push-status-banner-btn {
-  padding: var(--space-3) var(--space-5);
-  border: var(--border-thin) solid var(--failed);
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--failed);
-  font-size: 0.9375rem;
-  font-weight: 750;
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--failed) 50%, var(--line));
+  background: var(--failed);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 120ms;
 }
-
-.push-status-banner-btn:disabled,
-.toggle-pill.is-disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
+.push-status-banner-btn:hover { opacity: 0.88; }
+.push-status-banner-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .push-main-toggle {
-  margin-bottom: var(--space-4);
-  font-size: 1rem;
-  font-weight: 700;
+  width: 100%;
+  margin-bottom: var(--settings-space-3);
+  justify-content: flex-start;
 }
 
 .push-events-list {
-  overflow: hidden;
-  border: var(--border-thin) solid var(--line);
-  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--settings-space-2);
 }
 
 .push-events-list.is-disabled {
-  opacity: 1;
+  opacity: 0.55;
 }
 
 .push-event-row {
-  grid-template-columns: minmax(0, 1fr) auto minmax(11rem, auto);
-  padding: var(--space-3);
+  margin-bottom: 0;
 }
 
 .push-row-disabled {
-  background: color-mix(in srgb, var(--fg-mute) 3%, transparent);
+  background: color-mix(in srgb, var(--fg-mute) 5%, var(--panel));
+}
+
+.push-row-disabled .toggle-pill {
+  pointer-events: none;
 }
 
 .push-event-icon {
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  font-size: 1rem;
-  font-weight: 800;
+  background: color-mix(in srgb, currentColor 15%, transparent);
+  font-size: 12px;
+  font-weight: 600;
   line-height: 1;
 }
 
-.push-event-icon svg {
-  width: 1.375rem;
-  height: 1.375rem;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 2;
-}
-
-.push-event-icon text {
-  fill: currentColor;
-  stroke: none;
-  font-family: var(--font-ui);
-  font-size: 0.6875rem;
-  font-weight: 800;
-}
-
-.push-event-icon--done {
-  background: var(--running-soft);
-  color: var(--running);
-}
-
-.push-event-icon--failed {
-  background: var(--failed-soft);
-  color: var(--failed);
-}
-
-.push-event-icon--paused {
-  background: var(--paused-soft);
-  color: var(--paused);
-}
-
-.push-event-icon--iter {
-  background: var(--iter-soft);
-  color: var(--iter);
-}
-
 .push-event-hint {
-  display: none;
+  color: var(--failed);
+  font-weight: 500;
+  margin-top: 2px;
 }
 
-.push-event-lock {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  color: var(--fg-faint);
-  white-space: nowrap;
-}
-
-.push-event-lock-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: currentColor;
-}
-
-.push-event-lock-icon svg {
-  width: 1.125rem;
-  height: 1.125rem;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 2;
-}
-
-.push-error {
-  margin-top: var(--space-3);
-  padding: var(--space-3);
-  border: var(--border-thin) solid color-mix(in srgb, var(--failed) 28%, var(--line));
-  border-radius: var(--radius-sm);
-  background: var(--failed-soft);
-}
-
-@media (max-width: 37.5rem) {
-  .settings-popover {
-    position: fixed;
-    inset: var(--space-0);
-    width: 100vw;
-    max-height: 100dvh;
-    height: 100dvh;
-    padding: var(--space-0) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom));
-    border-radius: var(--space-0);
-  }
-
-  .settings-popover-close {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    position: absolute;
-    top: var(--space-3);
-    right: var(--space-3);
-    width: 2rem;
-    height: 2rem;
-    border-radius: var(--radius-sm);
-    color: var(--fg-mute);
-    z-index: 2;
-  }
-
-  .settings-popover-close:hover,
-  .settings-popover-close:focus-visible {
-    background: var(--hover);
-    color: var(--fg);
-  }
-
-  .settings-popover-tabs {
-    gap: var(--space-2);
-    margin: var(--space-0) calc(var(--space-4) * -1) var(--space-4);
-    padding: var(--space-0) var(--space-4);
-    overflow-x: auto;
-  }
-
-  .settings-popover-tab {
-    min-height: 3.25rem;
-    flex: 0 0 auto;
-    font-size: 0.9375rem;
-  }
-
-  .settings-popover-tab--project.is-active {
-    padding: var(--space-2) var(--space-4);
-  }
-
-  .settings-row,
-  .settings-row--auto-merge,
-  .settings-ai-header,
-  .settings-ai-card .ai-task-row,
-  .settings-ai-card--advanced .ai-task-row,
-  .settings-feature-row,
-  .push-event-row {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--space-3);
-  }
-
-  .settings-ai-header {
-    display: none;
-  }
-
-  .settings-row-control,
-  .settings-row-control--multi,
-  .settings-row-control--wide,
-  .settings-ai-card .ai-task-row .settings-row-control {
-    display: grid;
-    grid-template-columns: 1fr;
-    width: 100%;
-  }
-
-  .settings-inline-unit {
-    border-left: var(--border-thin) solid var(--line-2);
-    border-radius: var(--radius-sm);
-  }
-
-  .settings-section-heading,
-  .settings-advanced-head,
-  .push-status-banner {
-    grid-template-columns: 1fr;
-    flex-direction: column;
-  }
-
-  .install-panel {
+@media (max-width: 767px) {
+  .install-chip-grid {
     grid-template-columns: 1fr;
   }
 
   .install-chip {
-    min-height: auto;
-    border-right: none;
-    border-bottom: var(--border-thin) solid var(--line);
+    min-height: 0;
   }
 
-  .install-chip:last-child {
-    border-bottom: none;
-  }
-
-  .push-event-lock {
-    white-space: normal;
+  .install-chip--status {
+    flex-direction: row;
+    text-align: left;
+    justify-content: flex-start;
   }
 }

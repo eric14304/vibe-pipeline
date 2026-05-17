@@ -62,8 +62,8 @@ export function AuditTimeline({
           )}
           {!error && entries && entries.length > 0 && (
             <div className="audit-list">
-              {entries.map((e) => (
-                <AuditRow key={`${e.ts}-${e.from}-${e.to}-${e.source}-${e.sourceDetail ?? ""}`} entry={e} />
+              {entries.map((e, i) => (
+                <AuditRow key={`${e.ts}-${i}`} entry={e} />
               ))}
             </div>
           )}

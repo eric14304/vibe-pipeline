@@ -504,7 +504,7 @@ function SpecReview({
           </div>
           <ol className="qadr-split-list">
             {splitInto!.map((s, i) => (
-              <li key={`${s.title}-${s.mode}`}>
+              <li key={i}>
                 <span className="qadr-split-num mono">#{i + 1}</span>
                 <span>{s.title}</span>
                 <span className={"chip ticket-mode qadr-split-mode-chip" + (s.mode === "iter" ? " is-iter" : "")}>
