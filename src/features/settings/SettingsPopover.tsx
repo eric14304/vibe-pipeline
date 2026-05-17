@@ -280,18 +280,11 @@ function PushNotificationsSection({
   );
 }
 
-// PWA 行為 hint(install 之外的)— 放 PWA tab 上半部「PWA 相關資訊」
+// PWA 行為 hint — 只留真正需要 user 知道的(其他靠 UX 自然體會)
 function PwaInfoHint() {
   return (
-    <div style={{ marginTop: "var(--space-3)" }}>
-      <div className="settings-section-title">PWA 行為提醒</div>
-      <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: "var(--fg-mute)", lineHeight: 1.6 }}>
-        <li>離線時上方會顯紅色「離線」chip,重連顯綠色「已連線」2.5 秒。</li>
-        <li>有新版會在底部跳橘色 banner「有新版可更新」,點才更新(不會強制 reload)。</li>
-        <li>離線時仍能進畫面看上次快取資料;但啟動 / 暫停 pipeline 等操作需 backend 連線。</li>
-        <li>iOS Safari 安裝走「分享 → 加入主畫面」;Android Chrome / 桌面 Chrome 走網址列右側「⊕ 安裝」icon。</li>
-        <li>切到別 App 太久 OS 會回收 PWA,切回時會 reload(SW cache 會讓 reload 接近無感)。</li>
-      </ul>
+    <div className="push-hint" style={{ marginTop: "var(--space-2)" }}>
+      離線可看快取,但啟動 / 暫停 pipeline 需連線。iOS 安裝走「分享 → 加入主畫面」。
     </div>
   );
 }
