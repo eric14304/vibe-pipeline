@@ -3,6 +3,7 @@ import * as api from "../../api/projects";
 import * as userConfigApi from "../../api/userConfig";
 import { SecurityTab } from "../auth/SecurityTab";
 import { useAuthStatus } from "../auth/useAuthStatus";
+import { useInstallPrompt } from "../../hooks/useInstallPrompt";
 import {
   getPermission,
   getStoredToken,
@@ -275,6 +276,50 @@ function PushNotificationsSection({
           {lastError}
         </div>
       )}
+    </div>
+  );
+}
+
+function InstallAppSection({ onActionError }: { onActionError?: (message: string) => void }) {
+  const { canInstall, installed, promptInstall } = useInstallPrompt();
+  const [busy, setBusy] = useState(false);
+
+  async function onClick() {
+    setBusy(true);
+    try {
+      const outcome = await promptInstall();
+      if (outcome === "unavailable") {
+        onActionError?.("此瀏覽器無法觸發安裝,請改用瀏覽器選單的「安裝 App」");
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  let label = "安裝 App";
+  if (installed) label = "已安裝";
+  else if (busy) label = "處理中…";
+
+  return (
+    <div style={{ marginTop: "var(--space-3)" }}>
+      <div className="settings-section-title">安裝為 App</div>
+      <div className="push-action-row">
+        <button
+          type="button"
+          className="btn"
+          disabled={installed || !canInstall || busy}
+          onClick={() => void onClick()}
+        >
+          {label}
+        </button>
+      </div>
+      <div className="push-hint">
+        {installed
+          ? "已加入桌面 / 主畫面,可直接從 App 圖示開啟。"
+          : canInstall
+            ? "加入桌面 / 主畫面後可全螢幕開啟,推播也更穩。"
+            : "瀏覽器尚未提示可安裝;iOS Safari 請用「分享 → 加入主畫面」。"}
+      </div>
     </div>
   );
 }
@@ -892,12 +937,15 @@ export function SettingsPopover({
       </>}
 
       {activeTab === "notifications" && (
-        <PushNotificationsSection
-          userCfg={userCfg}
-          pushSaving={pushSaving}
-          onTogglePushEvent={updatePushEvent}
-          onActionError={onActionError}
-        />
+        <>
+          <PushNotificationsSection
+            userCfg={userCfg}
+            pushSaving={pushSaving}
+            onTogglePushEvent={updatePushEvent}
+            onActionError={onActionError}
+          />
+          <InstallAppSection onActionError={onActionError} />
+        </>
       )}
 
       {activeTab === "security" && authStatus?.bound === true && (
