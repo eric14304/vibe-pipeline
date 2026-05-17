@@ -794,7 +794,7 @@ function OverflowMenu({
             <MenuItem
               icon={<span style={{ color: pipeline.autoMerge ? "var(--done)" : "var(--fg-faint)" }}>{pipeline.autoMerge ? "●" : "○"}</span>}
               label="自動合併"
-              hint={lockedByState ? "running 中,暫不可改" : pipeline.autoMerge ? "已開啟" : "未開啟"}
+              hint={lockedByState ? "執行中無法操作" : pipeline.autoMerge ? "已開啟" : "未開啟"}
               disabled={lockedByState}
               onClick={() => {
                 onToggleAutoMerge(pipeline.id, !pipeline.autoMerge);
@@ -827,7 +827,7 @@ function OverflowMenu({
             <MenuItem
               icon={<ProhibitIcon />}
               label="清除 worktree"
-              hint={lockedByState ? "running 中" : ""}
+              hint={lockedByState ? "執行中無法操作" : ""}
               disabled={lockedByState}
               onClick={async () => {
                 setOpen(false);
@@ -854,7 +854,7 @@ function OverflowMenu({
             <MenuItem
               icon={<RefreshIcon />}
               label="重跑全部"
-              hint={lockedByState ? "running 中" : ""}
+              hint={lockedByState ? "執行中無法操作" : ""}
               disabled={lockedByState}
               onClick={async () => {
                 setOpen(false);
@@ -883,7 +883,7 @@ function OverflowMenu({
             <MenuItem
               icon={<TrashIcon />}
               label="刪除 pipeline"
-              hint={lockedByState ? "running 中" : ""}
+              hint={lockedByState ? "執行中無法操作" : ""}
               disabled={lockedByState}
               danger
               onClick={async () => {
