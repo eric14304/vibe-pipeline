@@ -26,6 +26,7 @@ const E2E_PORT = "3003";
 
 const TEST_ENV: Record<string, string> = {
   VP_TEST_MODE: "mock",
+  VP_DISABLE_AUTH: "0",
   VP_HOME_OVERRIDE: TEST_HOME,
   PORT: BACKEND_PORT,
   E2E_FRONTEND_PORT: FRONTEND_PORT,

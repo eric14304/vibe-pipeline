@@ -40,7 +40,6 @@ export function LoginScreen() {
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
             placeholder="6 碼驗證碼"
-            autoFocus
           />
           {error && <p className="auth-error">{error}</p>}
           <button

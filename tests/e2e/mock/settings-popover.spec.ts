@@ -138,8 +138,8 @@ test("AI 任務 tab：改 qa.model autosave → reload 持久 + GET /user/config
   const aiRows = popover.locator(".settings-row.ai-task-row");
   const firstRow = aiRows.first();
   const selects = firstRow.locator("select");
-  // qa: showProvider=true, showEffort=false → 預期 2 個 select(provider / model)
-  await expect(selects).toHaveCount(2);
+  // qa: showProvider=true, showEffort=true → provider / model / effort 三個 select
+  await expect(selects).toHaveCount(3);
 
   // model 第二個 select。預設 claude-sonnet-4-6,改成 claude-opus-4-7
   const modelSelect = selects.nth(1);
@@ -175,4 +175,36 @@ test("PWA tab：切到時 install + push 區塊渲染(不戳真權限,只看畫�
   await expect(popover.locator(".settings-section-title", { hasText: "推播通知" })).toBeVisible();
   // 主 toggle label「啟用推播通知」永遠在
   await expect(popover.locator(".push-main-toggle")).toBeVisible();
+});
+
+test("PWA tab：推播主 toggle / 通知事件 toggle 可切換並 autosave", async ({ page, context }) => {
+  await context.grantPermissions(["notifications"], {
+    origin: `http://127.0.0.1:${process.env.E2E_FRONTEND_PORT ?? "5175"}`,
+  });
+  await page.addInitScript(() => {
+    Object.defineProperty(Notification, "permission", { configurable: true, get: () => "granted" });
+    Notification.requestPermission = () => Promise.resolve("granted" as NotificationPermission);
+    localStorage.setItem("fcm_token", "mock-token");
+  });
+  await page.goto(`/board?project=${proj.hash}`);
+  await openSettings(page);
+  const popover = page.locator(".settings-popover");
+  await popover.getByRole("button", { name: "PWA" }).click();
+
+  const mainToggle = popover.locator(".push-main-toggle input[type='checkbox']");
+  await expect(mainToggle).toBeChecked();
+
+  const doneRow = popover.locator(".push-event-row", { hasText: "Ticket 完成通知" });
+  const doneToggle = doneRow.locator("input[type='checkbox']");
+  await expect(doneToggle).toBeEnabled();
+  await doneRow.locator(".toggle-pill-track").click();
+  await expect
+    .poll(() => fetchUserConfig(), { timeout: 8000, intervals: [200, 300, 500] })
+    .toMatchObject({
+      pushEvents: { ticket_done: false },
+    });
+
+  await popover.locator(".push-main-toggle .toggle-pill-track").click();
+  await expect(mainToggle).not.toBeChecked();
+  await expect(doneToggle).toBeDisabled();
 });

@@ -434,7 +434,6 @@
     inset: 0;
     width: 100vw;
     height: 100vh;
-    height: 100dvh;
     overflow: hidden;
   }
 
@@ -444,9 +443,15 @@
     width: 100vw;
     max-width: none;
     height: 100vh;
-    height: 100dvh;
     border-left: 0;
     box-shadow: none;
+  }
+
+  @supports (height: 100dvh) {
+    .qadr-stage,
+    .qadr-drawer {
+      height: 100dvh;
+    }
   }
 
   .qadr-body,

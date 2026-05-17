@@ -330,6 +330,14 @@ export function TopBar({
               setError(null);
             }
           }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && !busy) {
+              setBrowseOpen(false);
+              setBrowseData(null);
+              setError(null);
+            }
+          }}
+          tabIndex={-1}
         >
           <div className="modal-card browse-modal-card">
             <div className="modal-title">瀏覽資料夾</div>
