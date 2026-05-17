@@ -62,6 +62,12 @@ export function BoardScreen({
     [activeId, searchParams, setSearchParams]
   );
   const [activeTab, setActiveTab] = useState<"rail" | "focus">("focus");
+  // hash mount race grace period — 200ms 內顯「載入中」,過了還 !hash 才顯「請選專案」
+  const [hashGraceExpired, setHashGraceExpired] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setHashGraceExpired(true), 200);
+    return () => clearTimeout(t);
+  }, []);
   const [creating, setCreating] = useState(startCreating);
   const [tick, setTick] = useState(0);
   const [reloadKey, setReloadKey] = useState(0);
@@ -463,15 +469,17 @@ export function BoardScreen({
   }
 
   if (!hash) {
-    // 統一顯「載入中…」— PWA mobile reload race(localStorage 第一 frame 偶發拿不到)會讓 hash 短暫 null,
-    // 跳「沒有選擇專案」誤判。真的沒選 project 的 user 看 TopBar 切換器自己選。
+    // 短 grace period(200ms)防 PWA mobile mount race 一閃「請選專案」;
+    // 過了 grace 還 !hash → 真的沒選,顯預設提示對齊 TopBar「選擇專案」字樣
     return (
       <AppShell
         density={density}
         rootClassName={shellRootClass}
         topBar={topBar}
         rail={<Rail pipelines={[]} activeId="" onSelect={() => {}} />}
-        main={<EmptyProject message="載入中…" hint="" pointToTopBar={false} />}
+        main={hashGraceExpired
+          ? <EmptyProject />
+          : <EmptyProject message="載入中…" hint="" pointToTopBar={false} />}
         aside={inboxAside}
         mobileTabBar={mobileTabBar}
       />
