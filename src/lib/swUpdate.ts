@@ -56,6 +56,18 @@ export function registerSW(opts: RegisterOpts = {}) {
   wb.register().catch((err) => {
     console.error("[swUpdate] register failed", err);
   });
+
+  // workbox-window 預設只在 register 那一次 check update,之後不 polling。
+  // PWA 切回 / 長期開著時也要能 detect 新版 → 兩條 trigger:
+  // 1) 切回 visible 時(切 app 回來)
+  // 2) 每 60s polling 一次(長期開著的 case)
+  const checkUpdate = () => {
+    if (wb && document.visibilityState === "visible") {
+      wb.update().catch(() => {});
+    }
+  };
+  document.addEventListener("visibilitychange", checkUpdate);
+  setInterval(checkUpdate, 60_000);
 }
 
 export function updateSW() {

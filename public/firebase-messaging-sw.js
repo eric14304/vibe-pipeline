@@ -1,4 +1,4 @@
-// SW build marker v2 — change to trigger update banner
+// SW build marker v4 — change to trigger update banner
 import { precacheAndRoute, createHandlerBoundToURL } from "workbox-precaching";
 import { registerRoute, NavigationRoute } from "workbox-routing";
 import { StaleWhileRevalidate, CacheFirst } from "workbox-strategies";
@@ -41,49 +41,19 @@ registerRoute(
   })
 );
 
-importScripts("https://www.gstatic.com/firebasejs/12.13.0/firebase-app-compat.js");
-importScripts("https://www.gstatic.com/firebasejs/12.13.0/firebase-messaging-compat.js");
-
-let messagingInstance = null;
+// DEBUG:暫時拔掉 firebase importScripts + ensureMessaging 邏輯,排除 evaluation failed
+// 是否來自 importScripts() 跨 origin 拿 firebase compat。push 走原生 push event handler(下方留)。
+// 若拔掉後 SW 能起來 → firebase importScripts 是元兇,改方案:用 firebase modular API + vite bundle。
+// importScripts("https://www.gstatic.com/firebasejs/12.13.0/firebase-app-compat.js");
+// importScripts("https://www.gstatic.com/firebasejs/12.13.0/firebase-messaging-compat.js");
 
 async function ensureMessaging() {
-  if (messagingInstance) return messagingInstance;
-  const res = await fetch("/api/push/config");
-  if (!res.ok) throw new Error("failed to fetch /api/push/config");
-  const cfg = await res.json();
-  if (!firebase.apps || firebase.apps.length === 0) {
-    firebase.initializeApp({
-      apiKey: cfg.apiKey,
-      authDomain: cfg.authDomain,
-      projectId: cfg.projectId,
-      storageBucket: cfg.storageBucket,
-      messagingSenderId: cfg.messagingSenderId,
-      appId: cfg.appId,
-    });
-  }
-  messagingInstance = firebase.messaging();
-  messagingInstance.onBackgroundMessage((payload) => {
-    const title =
-      (payload.notification && payload.notification.title) ||
-      (payload.data && payload.data.title) ||
-      "Vibe Pipeline";
-    const body =
-      (payload.notification && payload.notification.body) ||
-      (payload.data && payload.data.body) ||
-      "";
-    const data = payload.data || {};
-    self.registration.showNotification(title, {
-      body,
-      icon: "/icon-192.png",
-      badge: "/icon-192.png",
-      data,
-    });
-  });
-  return messagingInstance;
+  // noop — firebase SDK 暫時不載
+  return null;
 }
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(ensureMessaging().catch((e) => console.error("[sw] init failed", e)));
+  event.waitUntil(Promise.resolve());
 });
 
 self.addEventListener("message", (event) => {
