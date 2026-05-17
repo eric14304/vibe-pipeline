@@ -794,7 +794,7 @@ function OverflowMenu({
             <MenuItem
               icon={<span style={{ color: pipeline.autoMerge ? "var(--done)" : "var(--fg-faint)" }}>{pipeline.autoMerge ? "●" : "○"}</span>}
               label="自動合併"
-              hint={lockedByState ? "running 中,暫不可改" : pipeline.autoMerge ? "on" : "off"}
+              hint={lockedByState ? "running 中,暫不可改" : pipeline.autoMerge ? "已開啟" : "未開啟"}
               disabled={lockedByState}
               onClick={() => {
                 onToggleAutoMerge(pipeline.id, !pipeline.autoMerge);
@@ -805,7 +805,7 @@ function OverflowMenu({
             <MenuItem
               icon={<HistoryIcon />}
               label="執行紀錄"
-              hint="主 agent 啟動紀錄"
+              hint=""
               onClick={() => {
                 setOpen(false);
                 onShowHistory();
@@ -816,7 +816,7 @@ function OverflowMenu({
             <MenuItem
               icon={<FolderIcon />}
               label="開啟 worktree"
-              hint="檔案總管"
+              hint=""
               onClick={() => {
                 setOpen(false);
                 onRevealWorktree(pipeline.id);
@@ -827,7 +827,7 @@ function OverflowMenu({
             <MenuItem
               icon={<ProhibitIcon />}
               label="清除 worktree"
-              hint={lockedByState ? "running 中" : "git worktree remove + 刪 dir"}
+              hint={lockedByState ? "running 中" : ""}
               disabled={lockedByState}
               onClick={async () => {
                 setOpen(false);
@@ -854,7 +854,7 @@ function OverflowMenu({
             <MenuItem
               icon={<RefreshIcon />}
               label="重跑全部"
-              hint={lockedByState ? "running 中" : "重置 done/failed → draft"}
+              hint={lockedByState ? "running 中" : ""}
               disabled={lockedByState}
               onClick={async () => {
                 setOpen(false);
@@ -883,7 +883,7 @@ function OverflowMenu({
             <MenuItem
               icon={<TrashIcon />}
               label="刪除 pipeline"
-              hint={lockedByState ? "running 中" : "順手 prune worktree"}
+              hint={lockedByState ? "running 中" : ""}
               disabled={lockedByState}
               danger
               onClick={async () => {
