@@ -2,7 +2,7 @@
   position: absolute;
   top: calc(100% + var(--space-2));
   right: var(--space-0);
-  width: min(56rem, calc(100vw - var(--space-8)));
+  width: min(86rem, calc(100vw - var(--space-8)));
   max-height: calc(100vh - var(--space-8) - var(--space-8));
   overflow-y: auto;
   background: var(--bg-elevated);
@@ -28,11 +28,11 @@
 }
 
 .settings-popover-tab {
-  min-height: 2.75rem;
-  padding: var(--space-0) var(--space-3);
+  min-height: 4.25rem;
+  padding: var(--space-0) var(--space-4);
   border-bottom: calc(var(--border-thin) * 2) solid transparent;
   color: var(--fg-mute);
-  font-size: 0.9375rem;
+  font-size: 1.25rem;
   font-weight: 650;
   cursor: pointer;
   transition: color 120ms, border-color 120ms, background 120ms;
@@ -45,8 +45,8 @@
 
 .settings-popover-tab--project.is-active {
   min-height: auto;
-  margin: var(--space-2) var(--space-0);
-  padding: var(--space-2) var(--space-4);
+  margin: var(--space-3) var(--space-0);
+  padding: var(--space-3) var(--space-8);
   border: calc(var(--border-thin) * 2) solid var(--accent);
   border-radius: var(--radius);
   color: var(--accent);
@@ -94,10 +94,10 @@
 
 .settings-row {
   display: grid;
-  grid-template-columns: minmax(11rem, 0.75fr) minmax(14rem, 0.8fr) minmax(16rem, 1.25fr);
+  grid-template-columns: minmax(15rem, 0.75fr) minmax(20rem, 0.8fr) minmax(24rem, 1.25fr);
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-2);
+  gap: var(--space-5);
+  padding: var(--space-6) var(--space-3);
   background: transparent;
 }
 
@@ -113,8 +113,8 @@
   align-items: center;
   gap: var(--space-2);
   color: var(--fg);
-  font-size: 0.9375rem;
-  font-weight: 700;
+  font-size: 1.375rem;
+  font-weight: 750;
   line-height: 1.25;
 }
 
@@ -127,7 +127,7 @@
 
 .settings-row-label-sub {
   color: var(--fg-mute);
-  font-size: 0.8125rem;
+  font-size: 1.0625rem;
   line-height: 1.45;
 }
 
@@ -163,19 +163,19 @@
 
 .settings-row-hint {
   color: var(--fg-mute);
-  font-size: 0.8125rem;
-  line-height: 1.5;
+  font-size: 1.0625rem;
+  line-height: 1.55;
 }
 
 .settings-input {
-  min-height: 2.25rem;
+  min-height: 3.875rem;
   width: 100%;
-  padding: var(--space-1) var(--space-2);
+  padding: var(--space-2) var(--space-3);
   border: var(--border-thin) solid var(--line-2);
   border-radius: var(--radius-sm);
   background: var(--panel);
   color: var(--fg);
-  font-size: 0.875rem;
+  font-size: 1.125rem;
 }
 
 .settings-input:focus {
@@ -199,8 +199,8 @@
 
 .settings-number-stepper {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 2.25rem;
-  width: min(11rem, 100%);
+  grid-template-columns: minmax(0, 1fr) 4rem;
+  width: min(16rem, 100%);
   overflow: hidden;
   border: var(--border-thin) solid var(--line-2);
   border-radius: var(--radius-sm);
@@ -213,7 +213,7 @@
 }
 
 .settings-number-stepper .settings-input {
-  min-height: 2.25rem;
+  min-height: 3.875rem;
   max-width: none;
   border: none;
   border-radius: var(--space-0);
@@ -250,8 +250,8 @@
 }
 
 .settings-stepper-btn svg {
-  width: 0.875rem;
-  height: 0.875rem;
+  width: 1.375rem;
+  height: 1.375rem;
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -265,15 +265,15 @@
 
 .settings-inline-unit {
   display: inline-flex;
-  min-height: 2.25rem;
+  min-height: 3.875rem;
   align-items: center;
-  padding: var(--space-1) var(--space-2);
+  padding: var(--space-2) var(--space-4);
   border: var(--border-thin) solid var(--line-2);
   border-left: none;
   border-radius: var(--space-0) var(--radius-sm) var(--radius-sm) var(--space-0);
   background: var(--panel-2);
   color: var(--fg-mute);
-  font-size: 0.8125rem;
+  font-size: 1.0625rem;
 }
 
 .settings-info-dot,
@@ -325,26 +325,26 @@
 .settings-inline-alert {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2);
+  gap: var(--space-3);
+  padding: var(--space-3);
   border: var(--border-thin) solid color-mix(in srgb, var(--accent) 32%, var(--line));
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--accent) 8%, transparent);
   color: var(--fg);
-  font-size: 0.8125rem;
+  font-size: 1.0625rem;
   line-height: 1.45;
 }
 
 .settings-tip-card {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-3);
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
   border: var(--border-thin) solid color-mix(in srgb, var(--running) 24%, var(--line));
   border-radius: var(--radius);
   background: color-mix(in srgb, var(--running) 7%, var(--panel));
   color: var(--fg);
-  font-size: 0.8125rem;
+  font-size: 1.0625rem;
   line-height: 1.5;
 }
 
@@ -352,8 +352,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 2.75rem;
+  height: 2.75rem;
   border-radius: 50%;
   background: var(--running);
   color: var(--bg);
@@ -361,8 +361,8 @@
 }
 
 .settings-tip-icon svg {
-  width: 1rem;
-  height: 1rem;
+  width: 1.5rem;
+  height: 1.5rem;
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -376,8 +376,8 @@
 
 .settings-tip-title {
   color: var(--fg);
-  font-size: 0.8125rem;
-  font-weight: 700;
+  font-size: 1.0625rem;
+  font-weight: 750;
   line-height: 1.3;
 }
 
@@ -411,17 +411,17 @@
 .settings-section-title,
 .settings-feature-title {
   color: var(--fg);
-  font-size: 1rem;
-  font-weight: 700;
+  font-size: 1.375rem;
+  font-weight: 750;
   line-height: 1.3;
 }
 
 .settings-section-sub,
 .settings-feature-sub {
-  margin-top: var(--space-1);
+  margin-top: var(--space-2);
   color: var(--fg-mute);
-  font-size: 0.8125rem;
-  line-height: 1.45;
+  font-size: 1.0625rem;
+  line-height: 1.55;
 }
 
 .settings-title-muted {
@@ -434,7 +434,7 @@
   align-items: center;
   gap: var(--space-1);
   color: var(--running);
-  font-size: 0.8125rem;
+  font-size: 1rem;
   font-weight: 700;
   text-decoration: none;
   white-space: nowrap;
@@ -503,9 +503,9 @@
 }
 
 .settings-ai-header {
-  padding: var(--space-3) var(--space-3) var(--space-1);
+  padding: var(--space-4) var(--space-5) var(--space-2);
   color: var(--fg-mute);
-  font-size: 0.8125rem;
+  font-size: 1rem;
   font-weight: 700;
 }
 
@@ -516,7 +516,7 @@
 }
 
 .settings-ai-card .ai-task-row {
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-4) var(--space-5);
 }
 
 .settings-ai-card .ai-task-row .settings-row-control {
@@ -546,17 +546,17 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 3.5rem;
+  height: 3.5rem;
   border-radius: var(--radius);
   flex: 0 0 auto;
-  font-size: 0.875rem;
+  font-size: 1.1rem;
   font-weight: 800;
 }
 
 .settings-icon-badge svg {
-  width: 1.125rem;
-  height: 1.125rem;
+  width: 1.625rem;
+  height: 1.625rem;
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -582,11 +582,11 @@
 }
 
 .settings-ai-card .settings-row-label-head {
-  font-size: 0.875rem;
+  font-size: 1.125rem;
 }
 
 .settings-ai-card .settings-row-label-sub {
-  font-size: 0.75rem;
+  font-size: 1rem;
 }
 
 .settings-icon-badge--blue {
@@ -645,9 +645,9 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: var(--space-1);
-  min-height: 4.5rem;
-  padding: var(--space-3);
+  gap: var(--space-2);
+  min-height: 8rem;
+  padding: var(--space-5);
   border-right: var(--border-thin) solid var(--line);
 }
 
@@ -678,14 +678,14 @@
 .install-chip-title,
 .install-chip-status-label {
   color: var(--fg);
-  font-size: 0.875rem;
-  font-weight: 700;
+  font-size: 1.0625rem;
+  font-weight: 750;
 }
 
 .install-chip-hint {
   color: var(--fg-mute);
-  font-size: 0.75rem;
-  line-height: 1.5;
+  font-size: 1rem;
+  line-height: 1.55;
 }
 
 .install-chip-btn {
@@ -703,16 +703,16 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 2.75rem;
+  height: 2.75rem;
   border-radius: var(--radius-sm);
-  font-size: 0.875rem;
+  font-size: 1.125rem;
   font-weight: 800;
 }
 
 .install-chip-status-icon svg {
-  width: 1rem;
-  height: 1rem;
+  width: 1.5rem;
+  height: 1.5rem;
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -728,9 +728,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.25rem;
-  height: 1.25rem;
-  margin: var(--space-0) var(--space-1);
+  width: 2rem;
+  height: 2rem;
+  margin: var(--space-0) var(--space-2);
   border: var(--border-thin) solid var(--line-2);
   border-radius: var(--radius-sm);
   color: var(--fg-mute);
@@ -738,8 +738,8 @@
 }
 
 .install-inline-icon svg {
-  width: 0.75rem;
-  height: 0.75rem;
+  width: 1.125rem;
+  height: 1.125rem;
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -790,17 +790,17 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 2.75rem;
+  height: 2.75rem;
   border: var(--border-thin) solid var(--failed);
   border-radius: 50%;
   color: var(--failed);
-  font-size: 0.8125rem;
+  font-size: 1rem;
 }
 
 .push-status-banner-icon svg {
-  width: 1rem;
-  height: 1rem;
+  width: 1.375rem;
+  height: 1.375rem;
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -827,8 +827,8 @@
 
 .push-status-banner-text {
   color: var(--failed);
-  font-size: 0.8125rem;
-  font-weight: 700;
+  font-size: 1rem;
+  font-weight: 750;
   line-height: 1.35;
 }
 
@@ -861,8 +861,8 @@
 }
 
 .push-main-toggle {
-  margin-bottom: var(--space-3);
-  font-size: 0.8125rem;
+  margin-bottom: var(--space-4);
+  font-size: 1rem;
   font-weight: 700;
 }
 
@@ -886,17 +886,17 @@
 }
 
 .push-event-icon {
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 2.75rem;
+  height: 2.75rem;
   border-radius: 50%;
-  font-size: 0.8125rem;
+  font-size: 1rem;
   font-weight: 800;
   line-height: 1;
 }
 
 .push-event-icon svg {
-  width: 1rem;
-  height: 1rem;
+  width: 1.375rem;
+  height: 1.375rem;
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -952,8 +952,8 @@
 }
 
 .push-event-lock-icon svg {
-  width: 0.875rem;
-  height: 0.875rem;
+  width: 1.125rem;
+  height: 1.125rem;
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
