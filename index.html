@@ -25,6 +25,14 @@
         0%, 100% { opacity: 0.35; }
         50% { opacity: 0.85; }
       }
+      /* React mount 取代 #root 子節點時 fade in,消「啪」一下切換感 */
+      #root > *:not(#vp-mount-loader) {
+        animation: vp-fade-in 180ms ease-out;
+      }
+      @keyframes vp-fade-in {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
     </style>
     <script>
       // Set theme class synchronously before any CSS or React loads (no first-paint flash).
