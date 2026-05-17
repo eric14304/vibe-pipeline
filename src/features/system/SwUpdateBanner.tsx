@@ -12,7 +12,7 @@ export function SwUpdateBanner() {
       <span className="sw-update-banner__text">有新版可更新</span>
       <button
         type="button"
-        className="btn btn-primary sw-update-banner__btn"
+        className="sw-update-banner__btn"
         onClick={() => updateSW()}
       >
         更新
