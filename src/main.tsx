@@ -5,6 +5,7 @@ import { registerSW } from "./lib/swUpdate";
 import "./styles/tokens.css";
 import "./styles/board.css";
 import "./styles/notif.css";
+import "./styles/swUpdate.css";
 
 registerSW();
 

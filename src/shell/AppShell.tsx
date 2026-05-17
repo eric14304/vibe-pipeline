@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { TopBar } from "./TopBar";
+import { SwUpdateBanner } from "../features/system/SwUpdateBanner";
 
 export function AppShell({
   rootClassName = "",
@@ -33,6 +34,7 @@ export function AppShell({
       </div>
       {mobileTabBar}
       {overlay}
+      <SwUpdateBanner />
     </div>
   );
 }
