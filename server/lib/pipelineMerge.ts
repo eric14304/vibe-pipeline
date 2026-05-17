@@ -107,7 +107,10 @@ export async function triggerMerge(opts: {
       await pipelineDir.mutatePipeline(projectPath, pipelineId, (p) => ({
         ...p,
         tickets: (p.tickets ?? []).filter((t) => t.mode !== "merge" || t.id !== appendedId),
-      }));
+      }), {
+        source: "merge-ai-spawn-rollback",
+        sourceDetail: "spawn failed, remove appended merge ticket",
+      });
     } catch {
       // pipeline 不見就算了,反正 spawn 也失敗
     }
@@ -201,6 +204,9 @@ export async function autoMergeNoAI(opts: {
           state: "merged",
           lastAutoMergeError: undefined,
         };
+      }, {
+        source: "merge-mechanical-already",
+        sourceDetail: "ahead=0 → already merged, sync state",
       });
     } catch {
       // pipeline 不見就算了
@@ -238,7 +244,10 @@ export async function autoMergeNoAI(opts: {
         mergedAt: ts,
         mergeCommit,
         lastAutoMergeError: undefined,
-      }));
+      }), {
+        source: "merge-mechanical-success",
+        sourceDetail: `git merge --no-ff ${mergeCommit.hash.slice(0, 7)}`,
+      });
     } catch {
       // pipeline 不見就算了,git 已 merge 成功
     }

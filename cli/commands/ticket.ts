@@ -138,7 +138,10 @@ async function ticketAdd(args: ParsedArgs): Promise<void> {
   await pipelineDir.mutatePipeline(proj.path, pipelineId!, (p) => ({
     ...p,
     tickets: [...(p.tickets ?? []), ticket],
-  }));
+  }), {
+    source: "cli-ticket-add",
+    sourceDetail: `add ticket ${ticket.title}`,
+  });
 
   if (isJsonMode()) {
     okJson(ticket);
@@ -192,6 +195,9 @@ async function ticketUpdate(args: ParsedArgs): Promise<void> {
     const i = arr.findIndex((t) => String(t.n) === ticketRef || t.id === ticketRef);
     if (i !== -1) arr[i] = updated;
     return { ...p, tickets: arr };
+  }, {
+    source: "cli-ticket-update",
+    sourceDetail: `update ticket ${ticketRef}`,
   });
 
   if (isJsonMode()) {
@@ -220,7 +226,10 @@ async function ticketRemove(args: ParsedArgs): Promise<void> {
   await pipelineDir.mutatePipeline(proj.path, pipelineId!, (p) => ({
     ...p,
     tickets: (p.tickets ?? []).filter((t) => !(String(t.n) === ticketRef || t.id === ticketRef)),
-  }));
+  }), {
+    source: "cli-ticket-remove",
+    sourceDetail: `remove ticket ${ticketRef}`,
+  });
 
   if (isJsonMode()) {
     okJson({ removed: true, id: removed.id, n: removed.n });

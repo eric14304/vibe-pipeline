@@ -12,7 +12,7 @@ import { readdirSync, existsSync, unlinkSync, statSync } from "node:fs";
 import { join } from "node:path";
 import * as pipelineDir from "../pipelineDir";
 
-import type { RunSummary, RunDetail } from "../../../shared/types";
+import type { RunSummary, RunDetail, Provider } from "../../../shared/types";
 export type { RunSummary, RunDetail };
 
 const FILENAME_RE = /^(.+)-(\d+)\.log$/;
@@ -114,16 +114,20 @@ function parseFullLog(filename: string, logPath: string, text: string): RunDetai
   let result: string | null = null;
   let sessionId: string | null = null;
   let tokens: RunSummary["tokens"] = null;
+  let provider: Provider | null = null;
+  let model: string | null = null;
 
   if (stdout) {
     const firstNonEmpty = stdout.split(/\r?\n/).find((l) => l.trim().length > 0) ?? "";
     const isCodex = /"type"\s*:\s*"thread\.started"/.test(firstNonEmpty);
     if (isCodex) {
+      provider = "codex";
       const parsed = parseCodexJsonl(stdout);
       sessionId = parsed.sessionId;
       numTurns = parsed.numTurns;
       result = parsed.result;
       tokens = parsed.tokens;
+      model = parsed.model;
       costUsd = null;
       try {
         const mtimeMs = statSync(logPath).mtimeMs;
@@ -145,7 +149,9 @@ function parseFullLog(filename: string, logPath: string, text: string): RunDetai
             cache_read_input_tokens?: number;
             cache_creation_input_tokens?: number;
           };
+          modelUsage?: Record<string, unknown>;
         };
+        provider = "claude";
         costUsd = j.total_cost_usd ?? null;
         durationMs = j.duration_ms ?? null;
         numTurns = j.num_turns ?? null;
@@ -158,6 +164,13 @@ function parseFullLog(filename: string, logPath: string, text: string): RunDetai
             cacheRead: j.usage.cache_read_input_tokens ?? 0,
             cacheCreate: j.usage.cache_creation_input_tokens ?? 0,
           };
+        }
+        if (j.modelUsage && typeof j.modelUsage === "object") {
+          const firstKey = Object.keys(j.modelUsage)[0];
+          if (firstKey) {
+            // 剝離 "[1m]" 等 context window 後綴,保留主 model id
+            model = firstKey.replace(/\[[^\]]*\]$/, "");
+          }
         }
       } catch {
         // not parseable — leave nulls
@@ -177,6 +190,8 @@ function parseFullLog(filename: string, logPath: string, text: string): RunDetai
     tokens,
     sessionId,
     hasStderr: stderr.length > 0,
+    provider,
+    model,
     stdout,
     stderr,
   };
@@ -187,6 +202,7 @@ type CodexParsed = {
   numTurns: number | null;
   result: string | null;
   tokens: RunSummary["tokens"];
+  model: string | null;
 };
 
 function parseCodexJsonl(stdout: string): CodexParsed {
@@ -199,6 +215,7 @@ function parseCodexJsonl(stdout: string): CodexParsed {
   let reasoning = 0;
   let sawTurn = false;
   let sawUsage = false;
+  let model: string | null = null;
 
   for (const line of stdout.split(/\r?\n/)) {
     const trimmed = line.trim();
@@ -207,6 +224,7 @@ function parseCodexJsonl(stdout: string): CodexParsed {
       const ev = JSON.parse(trimmed) as {
         type?: string;
         thread_id?: string;
+        model?: string;
         item?: { type?: string; text?: string };
         usage?: {
           input_tokens?: number;
@@ -217,6 +235,7 @@ function parseCodexJsonl(stdout: string): CodexParsed {
       };
       if (ev.type === "thread.started" && typeof ev.thread_id === "string") {
         sessionId = ev.thread_id;
+        if (typeof ev.model === "string") model = ev.model;
       } else if (ev.type === "turn.started") {
         numTurns++;
         sawTurn = true;
@@ -241,5 +260,6 @@ function parseCodexJsonl(stdout: string): CodexParsed {
     tokens: sawUsage
       ? { input, output, cacheRead, cacheCreate: 0, reasoning }
       : null,
+    model,
   };
 }

@@ -8,6 +8,7 @@ import {
   renameSync,
 } from "node:fs";
 import { currentBranch } from "./git";
+import { appendStateChange } from "./auditLog";
 import type { Pipeline } from "../../shared/types";
 
 const DIR = ".vibe-pipeline";
@@ -267,8 +268,40 @@ export async function readPipeline(projectPath: string, id: string): Promise<unk
   }
 }
 
-export async function writePipeline(projectPath: string, id: string, data: unknown): Promise<void> {
+// writePipeline 多 optional `opts`:
+//   - source:audit log 內記「誰寫的」,沒傳 → 'unknown'。
+//   - sourceDetail:同上,附帶上下文。
+//   - prevStateHint:caller(mutatePipeline / 已讀過 disk 的 caller)把舊 state 傳進來,
+//                   避免再讀一次。沒傳就自己讀 disk 拿舊 state。
+// 寫入後若 prev.state !== next.state → appendStateChange。
+export async function writePipeline(
+  projectPath: string,
+  id: string,
+  data: unknown,
+  opts?: { source?: string; sourceDetail?: string; prevStateHint?: string },
+): Promise<void> {
+  let prevState: string | undefined = opts?.prevStateHint;
+  if (prevState === undefined) {
+    try {
+      const before = (await readPipeline(projectPath, id)) as { state?: unknown } | null;
+      prevState = typeof before?.state === "string" ? before.state : undefined;
+    } catch {
+      prevState = undefined;
+    }
+  }
   await writeJson(pipelineFile(projectPath, id), data);
+  const nextStateRaw = (data as { state?: unknown } | null)?.state;
+  const nextState = typeof nextStateRaw === "string" ? nextStateRaw : undefined;
+  if (prevState !== nextState && (prevState !== undefined || nextState !== undefined)) {
+    appendStateChange({
+      projectPath,
+      pipelineId: id,
+      from: prevState ?? "(none)",
+      to: nextState ?? "(none)",
+      source: opts?.source ?? "unknown",
+      sourceDetail: opts?.sourceDetail,
+    });
+  }
 }
 
 // pipeline.json read-modify-write 的 race-safe helper:read → 同步 mutator → write,
@@ -287,11 +320,19 @@ export async function mutatePipeline(
   projectPath: string,
   id: string,
   mutator: (p: Pipeline) => Pipeline,
+  opts?: { source?: string; sourceDetail?: string },
 ): Promise<Pipeline> {
   const cur = (await readPipeline(projectPath, id)) as Pipeline | null;
   if (!cur) throw new Error("Pipeline not found: " + id);
+  const prevState = typeof (cur as { state?: unknown }).state === "string"
+    ? ((cur as { state: string }).state)
+    : undefined;
   const next = mutator(cur);
-  await writePipeline(projectPath, id, next);
+  await writePipeline(projectPath, id, next, {
+    source: opts?.source,
+    sourceDetail: opts?.sourceDetail,
+    prevStateHint: prevState,
+  });
   return next;
 }
 
@@ -331,7 +372,11 @@ export async function appendMergeTicket(opts: {
       endedAt: undefined,
       reason: undefined,
     };
-    await writePipeline(projectPath, pipelineId, { ...p, tickets });
+    await writePipeline(projectPath, pipelineId, { ...p, tickets }, {
+      source: "appendMergeTicket",
+      sourceDetail: "reuse existing merge ticket",
+      prevStateHint: typeof p.state === "string" ? p.state : undefined,
+    });
     return { ok: true, ticket: tickets[existingIdx], reused: true };
   }
   const nextN = tickets.reduce((m, t) => Math.max(m, typeof t.n === "number" ? t.n : 0), 0) + 1;
@@ -350,7 +395,11 @@ export async function appendMergeTicket(opts: {
     _synthetic: true, // user 不可改 / 不可刪;runner 完成後 set state=merged
   };
   tickets.push(ticket);
-  await writePipeline(projectPath, pipelineId, { ...p, tickets });
+  await writePipeline(projectPath, pipelineId, { ...p, tickets }, {
+    source: "appendMergeTicket",
+    sourceDetail: "append new merge ticket",
+    prevStateHint: typeof p.state === "string" ? p.state : undefined,
+  });
   return { ok: true, ticket, reused: false };
 }
 

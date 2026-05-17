@@ -150,6 +150,7 @@ async function handle(req: Request): Promise<Response> {
     if (rest === "/config" && method === "GET") return projects.getConfig(hash);
     if (rest === "/config" && method === "PUT") return projects.updateConfig(hash, req);
     if (rest === "/runtime" && method === "GET") return projects.getRuntime(hash);
+    if (rest === "/audit" && method === "GET") return projects.listProjectAudit(hash, req);
     if (rest === "/pipelines" && method === "GET") return projects.listPipelines(hash);
     if (rest === "/pipelines" && method === "POST") return projects.createPipeline(hash, req);
     const pipelineMatch = rest.match(/^\/pipelines\/([a-z0-9_-]+)$/);
@@ -211,6 +212,11 @@ async function handle(req: Request): Promise<Response> {
       return projects.pipelineDiff(hash, diffFullMatch[1]);
     }
 
+    const pipelineAuditMatch = rest.match(/^\/pipelines\/([a-z0-9_-]+)\/audit$/);
+    if (pipelineAuditMatch && method === "GET") {
+      return projects.listPipelineAudit(hash, pipelineAuditMatch[1], req);
+    }
+
     const pipelineRunsListMatch = rest.match(/^\/pipelines\/([a-z0-9_-]+)\/runs$/);
     if (pipelineRunsListMatch && method === "GET") {
       return projects.listPipelineRuns(hash, pipelineRunsListMatch[1]);
@@ -227,6 +233,7 @@ async function handle(req: Request): Promise<Response> {
     }
 
     if (rest === "/notifs" && method === "GET") return projects.listNotifs(hash);
+    if (rest === "/notif" && method === "POST") return projects.postNotif(hash, req);
     if (rest === "/notifs/mark-all-read" && method === "POST")
       return projects.markAllNotifsRead(hash);
     if (rest === "/notifs/dismiss-all" && method === "POST")

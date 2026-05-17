@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import "../../styles/drawer.css";
 import "./ticketDrawer.css";
 import { RunHistory } from "./RunHistory";
+import { AuditTimeline } from "./AuditTimeline";
 
 // Pipeline-level 執行紀錄 drawer。從 pipeline header OverflowMenu 開,
 // 顯示該 pipeline 跑過的所有 runner spawn(cost / duration / result / token)。
@@ -65,6 +66,7 @@ export function PipelineHistoryDrawer({
           </div>
         </div>
         <div className="drawer-body">
+          <AuditTimeline projectHash={projectHash} pipelineId={pipelineId} />
           <RunHistory projectHash={projectHash} pipelineId={pipelineId} />
         </div>
       </div>

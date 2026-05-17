@@ -147,7 +147,7 @@ export function StatesGallery() {
             <div className="mono" style={{ fontSize: 11, color: "var(--fg-faint)", marginBottom: 8 }}>
               {c.label}
             </div>
-            <RunButton pipeline={c.pipeline} lastRun={c.lastRun ? { ...c.lastRun, filename: "x", logPath: "x", startedAt: 0, exitCode: 0, costUsd: 0, numTurns: 0, result: null, tokens: null, sessionId: null, hasStderr: false } : null} />
+            <RunButton pipeline={c.pipeline} lastRun={c.lastRun ? { ...c.lastRun, filename: "x", logPath: "x", startedAt: 0, exitCode: 0, costUsd: 0, numTurns: 0, result: null, tokens: null, sessionId: null, hasStderr: false, provider: null, model: null } : null} />
           </div>
         ))}
       </div>

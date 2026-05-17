@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { existsSync, appendFileSync, readFileSync, writeFileSync } from "node:fs";
 import { ensureRuntime } from "../pipelineDir";
-import type { NotifEventType, NotifRecord } from "../../../shared/types";
+import type { NotifEventType, NotifRecord, NotifSeverity } from "../../../shared/types";
 export type { NotifRecord };
 
 function file(projectPath: string): string {
@@ -19,6 +19,7 @@ export function emit(
     title: string;
     sub?: string;
     pipelineId?: string;
+    sev?: NotifSeverity;
   }
 ): NotifRecord {
   const r: NotifRecord = {
@@ -29,6 +30,7 @@ export function emit(
     ts: Date.now(),
     unread: true,
     pipelineId: params.pipelineId,
+    sev: params.sev,
   };
   appendFileSync(file(projectPath), JSON.stringify(r) + "\n");
   return r;

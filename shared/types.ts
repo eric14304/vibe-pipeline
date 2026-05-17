@@ -360,6 +360,8 @@ export type RunSummary = {
   } | null;
   sessionId: string | null;
   hasStderr: boolean;
+  provider: Provider | null;
+  model: string | null;
 };
 
 export type RunDetail = RunSummary & {
@@ -432,7 +434,11 @@ export type NotifEventType =
   // P3(SKILL / 跨 pipeline / 排程)
   | "skill_candidate"
   | "cross_pipeline_pattern"
-  | "scheduler_fired";
+  | "scheduler_fired"
+  // Frontend 主動 emit(action toast 同步留 inbox history),sev 由 caller 決定
+  | "frontend_action_failed"
+  | "frontend_action_warn"
+  | "frontend_action_info";
 
 export type NotifEventMeta = {
   sev: NotifSeverity;
@@ -441,6 +447,8 @@ export type NotifEventMeta = {
 };
 
 // 持久化的 notif 紀錄(append-only 寫進 .runtime/notifs.jsonl)
+// sev 是 optional override — 多數 type 的 sev 來自 NOTIF_EVENTS 字典查詢;
+// frontend_action_* 由 caller 動態決定 sev,寫進記錄裡,UI 讀出時優先用 record.sev。
 export type NotifRecord = {
   id: string;
   type: NotifEventType;
@@ -449,6 +457,7 @@ export type NotifRecord = {
   ts: number;
   unread: boolean;
   pipelineId?: string;
+  sev?: NotifSeverity;
 };
 
 export const NOTIF_EVENTS: Record<NotifEventType, NotifEventMeta> = {
@@ -488,4 +497,9 @@ export const NOTIF_EVENTS: Record<NotifEventType, NotifEventMeta> = {
   skill_candidate: { sev: "info", phase: "P3", label: "新 SKILL 候選" },
   cross_pipeline_pattern: { sev: "info", phase: "P3", label: "跨 pipeline 模式偵測" },
   scheduler_fired: { sev: "muted", phase: "P3", label: "排程觸發" },
+
+  // Frontend 主動 emit:三種預設 sev,實際 sev 以 NotifRecord.sev override 為準
+  frontend_action_failed: { sev: "block", phase: "P2", label: "前端動作失敗" },
+  frontend_action_warn: { sev: "info", phase: "P2", label: "前端動作警告" },
+  frontend_action_info: { sev: "muted", phase: "P2", label: "前端動作紀錄" },
 };

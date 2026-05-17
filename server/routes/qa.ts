@@ -264,6 +264,9 @@ export async function finalize(hash: string, draftId: string, req: Request): Pro
             ];
       newTickets = built;
       return { ...p, tickets: [...existingTickets, ...built] };
+    }, {
+      source: "api-qa-finalize",
+      sourceDetail: `append ${splitInto && splitInto.length > 0 ? splitInto.length + " split tickets" : "1 ticket"}`,
     });
   } catch (e) {
     return err("internal_error", e instanceof Error ? e.message : String(e), 500);
@@ -379,6 +382,9 @@ export async function splitTicket(
       merged.forEach((t, i) => { t.n = i + 1; });
       resultNewTickets = merged.slice(curIdx, curIdx + built.length);
       return { ...p, tickets: merged };
+    }, {
+      source: "api-ticket-split",
+      sourceDetail: `split ticket ${ticketId} into ${split.length}`,
     });
   } catch (e) {
     return err("internal_error", e instanceof Error ? e.message : String(e), 500);
@@ -433,6 +439,9 @@ export async function deleteTicket(
       // renumber n 1..N
       merged.forEach((t, i) => { t.n = i + 1; });
       return { ...p, tickets: merged };
+    }, {
+      source: "api-ticket-delete",
+      sourceDetail: `delete ticket ${ticketId}`,
     });
   } catch (e) {
     return err("internal_error", e instanceof Error ? e.message : String(e), 500);

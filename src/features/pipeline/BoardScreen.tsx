@@ -80,6 +80,46 @@ export function BoardScreen({
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const unreadCount = items.filter((i) => i.unread).length;
 
+  // 失敗 / 警告 / 成功 訊息走同一條路:toast(5s 自消)+ 同步 emit notif 進 Inbox 留 history。
+  // ticket A2:解決原 toast 過 5s 找不到的問題。Inbox 可用 frontend filter 單獨看這類紀錄。
+  // pipelineIdFallback 用當前 activeId(若 caller 沒帶),失敗動作通常綁在某條 pipeline 上
+  function notifyAndShow(
+    msg: string,
+    opts: {
+      kind: "failed" | "warn" | "info";
+      sub?: string;
+      pipelineId?: string;
+    }
+  ) {
+    setActionError(msg);
+    if (!hash) return;
+    const type =
+      opts.kind === "failed"
+        ? "frontend_action_failed"
+        : opts.kind === "warn"
+        ? "frontend_action_warn"
+        : "frontend_action_info";
+    const sev = opts.kind === "failed" ? "block" : opts.kind === "warn" ? "info" : "muted";
+    api
+      .postNotif(hash, {
+        type,
+        title: msg,
+        sub: opts.sub,
+        pipelineId: opts.pipelineId ?? activeId ?? undefined,
+        sev,
+      })
+      .catch(() => {});
+  }
+  function notifyError(msg: string, opts?: { sub?: string; pipelineId?: string }) {
+    notifyAndShow(msg, { kind: "failed", ...opts });
+  }
+  function notifyWarn(msg: string, opts?: { sub?: string; pipelineId?: string }) {
+    notifyAndShow(msg, { kind: "warn", ...opts });
+  }
+  function notifyInfo(msg: string, opts?: { sub?: string; pipelineId?: string }) {
+    notifyAndShow(msg, { kind: "info", ...opts });
+  }
+
   function markRead(id: string) {
     setItems((arr) => arr.map((it) => (it.id === id ? { ...it, unread: false } : it)));
     if (hash) api.markNotifRead(hash, id).catch(() => {});
@@ -322,9 +362,9 @@ export function BoardScreen({
       setActiveId(created.id);
       setActiveTab("focus");
       setCreating(false);
-      setActionError(`✓ pipeline "${name}" 已建立`);
+      notifyInfo(`✓ pipeline "${name}" 已建立`, { pipelineId: created.id });
     } catch (e) {
-      setActionError(`建立 pipeline 失敗: ${e instanceof Error ? e.message : String(e)}`);
+      notifyError(`建立 pipeline 失敗: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
@@ -349,7 +389,12 @@ export function BoardScreen({
       settingsSlot={
         <SettingsButton
           hash={hash}
-          onActionError={setActionError}
+          onActionError={(message) => {
+            // Settings / Security / Push tab 的 action 失敗訊息亦寫進 Inbox 留 history
+            const looksOk = message.trim().startsWith("✓");
+            if (looksOk) notifyInfo(message);
+            else notifyError(message);
+          }}
           onConfigSaved={(cfg) => {
             setMaxParallel(cfg.defaults.max_parallel);
             setDefaultAutoMerge(!!cfg.defaults.auto_merge);
@@ -494,14 +539,15 @@ export function BoardScreen({
             setPipelines((arr) =>
               arr.map((p) => (p.id === result.pipeline.id ? result.pipeline : p))
             );
-            setActionError(
+            notifyInfo(
               result.splitCount > 1
                 ? `✓ 已建立 ${result.splitCount} 張 ticket`
-                : "✓ ticket 已建立"
+                : "✓ ticket 已建立",
+              { pipelineId: result.pipeline.id }
             );
           }
         } catch (e) {
-          setActionError(`送出 ticket 失敗: ${e instanceof Error ? e.message : String(e)}`);
+          notifyError(`送出 ticket 失敗: ${e instanceof Error ? e.message : String(e)}`);
         }
       }}
     />
@@ -536,9 +582,11 @@ export function BoardScreen({
         try {
           await api.savePipeline(project.hash, active.id, next);
           setReloadKey((k) => k + 1);
-          setActionError("✓ ticket 已重置回 draft");
+          notifyInfo("✓ ticket 已重置回 draft", { pipelineId: active.id });
         } catch (e) {
-          setActionError(`重置 ticket 失敗: ${e instanceof Error ? e.message : String(e)}`);
+          notifyError(`重置 ticket 失敗: ${e instanceof Error ? e.message : String(e)}`, {
+            pipelineId: active.id,
+          });
         }
       }}
       isSplitting={splittingTicketId === openTicket?.id}
@@ -548,14 +596,16 @@ export function BoardScreen({
         try {
           const r = await qaApi.splitTicket(project.hash, active.id, ticketId);
           if ("nothingToSplit" in r) {
-            setActionError("✓ AI 認為這張 ticket 不需拆");
+            notifyInfo("✓ AI 認為這張 ticket 不需拆", { pipelineId: active.id });
           } else {
-            setActionError(`✓ 已拆成 ${r.count} 張 ticket`);
+            notifyInfo(`✓ 已拆成 ${r.count} 張 ticket`, { pipelineId: active.id });
             setOpenTicket(null); // 關 drawer,讓 user 看到新 ticket 列表
           }
           setReloadKey((k) => k + 1);
         } catch (e) {
-          setActionError(`AI 拆分失敗: ${e instanceof Error ? e.message : String(e)}`);
+          notifyError(`AI 拆分失敗: ${e instanceof Error ? e.message : String(e)}`, {
+            pipelineId: active.id,
+          });
         } finally {
           setSplittingTicketId(null);
         }
@@ -566,9 +616,11 @@ export function BoardScreen({
           await qaApi.deleteTicket(project.hash, active.id, ticketId);
           setOpenTicket(null);
           setReloadKey((k) => k + 1);
-          setActionError("✓ ticket 已刪除");
+          notifyInfo("✓ ticket 已刪除", { pipelineId: active.id });
         } catch (e) {
-          setActionError(`刪除 ticket 失敗: ${e instanceof Error ? e.message : String(e)}`);
+          notifyError(`刪除 ticket 失敗: ${e instanceof Error ? e.message : String(e)}`, {
+            pipelineId: active.id,
+          });
         }
       }}
       onToggleMode={async (ticketId, nextMode) => {
@@ -583,7 +635,9 @@ export function BoardScreen({
           await api.savePipeline(project.hash, active.id, next);
           setReloadKey((k) => k + 1);
         } catch (e) {
-          setActionError(`切換 mode 失敗: ${e instanceof Error ? e.message : String(e)}`);
+          notifyError(`切換 mode 失敗: ${e instanceof Error ? e.message : String(e)}`, {
+            pipelineId: active.id,
+          });
         }
       }}
       onChangeIterLimit={async (ticketId, limit) => {
@@ -598,7 +652,9 @@ export function BoardScreen({
           await api.savePipeline(project.hash, active.id, next);
           setReloadKey((k) => k + 1);
         } catch (e) {
-          setActionError(`改 iter 上限失敗: ${e instanceof Error ? e.message : String(e)}`);
+          notifyError(`改 iter 上限失敗: ${e instanceof Error ? e.message : String(e)}`, {
+            pipelineId: active.id,
+          });
         }
       }}
     />
@@ -674,9 +730,11 @@ export function BoardScreen({
               try {
                 await api.runPipeline(project.hash, pid);
                 setReloadKey((k) => k + 1);
-                setActionError("✓ pipeline 已啟動,runner 接手中…");
+                notifyInfo("✓ pipeline 已啟動,runner 接手中…", { pipelineId: pid });
               } catch (e) {
-                setActionError(`開始運行失敗: ${e instanceof Error ? e.message : String(e)}`);
+                notifyError(`開始運行失敗: ${e instanceof Error ? e.message : String(e)}`, {
+                  pipelineId: pid,
+                });
               }
             }}
             onStop={async (pid) => {
@@ -684,9 +742,11 @@ export function BoardScreen({
               try {
                 await api.pausePipeline(project.hash, pid);
                 setReloadKey((k) => k + 1);
-                setActionError("✓ 已停止 pipeline");
+                notifyInfo("✓ 已停止 pipeline", { pipelineId: pid });
               } catch (e) {
-                setActionError(`停止失敗: ${e instanceof Error ? e.message : String(e)}`);
+                notifyError(`停止失敗: ${e instanceof Error ? e.message : String(e)}`, {
+                  pipelineId: pid,
+                });
               }
             }}
             onDelete={async (pid) => {
@@ -700,9 +760,11 @@ export function BoardScreen({
                   if (pid === activeId) setActiveId(next[0]?.id ?? "");
                   return next;
                 });
-                setActionError(`✓ pipeline "${targetName}" 已刪除`);
+                notifyInfo(`✓ pipeline "${targetName}" 已刪除`, { pipelineId: pid });
               } catch (e) {
-                setActionError(`刪除失敗: ${e instanceof Error ? e.message : String(e)}`);
+                notifyError(`刪除失敗: ${e instanceof Error ? e.message : String(e)}`, {
+                  pipelineId: pid,
+                });
               }
             }}
             onRename={async (pid, newName) => {
@@ -716,9 +778,11 @@ export function BoardScreen({
                 setPipelines((arr) =>
                   arr.map((p) => (p.id === pid ? next : p))
                 );
-                setActionError(`✓ 已改名為 "${newName}"`);
+                notifyInfo(`✓ 已改名為 "${newName}"`, { pipelineId: pid });
               } catch (e) {
-                setActionError(`改名失敗: ${e instanceof Error ? e.message : String(e)}`);
+                notifyError(`改名失敗: ${e instanceof Error ? e.message : String(e)}`, {
+                  pipelineId: pid,
+                });
               }
             }}
             onResetAll={async (pid) => {
@@ -744,9 +808,11 @@ export function BoardScreen({
                 await api.savePipeline(project.hash, pid, next);
                 setReloadKey((k) => k + 1);
                 const cnt = next.tickets.filter((t) => t.status === "draft").length;
-                setActionError(`✓ 已重置 ${cnt} 張 ticket 回 draft`);
+                notifyInfo(`✓ 已重置 ${cnt} 張 ticket 回 draft`, { pipelineId: pid });
               } catch (e) {
-                setActionError(`重跑全部失敗: ${e instanceof Error ? e.message : String(e)}`);
+                notifyError(`重跑全部失敗: ${e instanceof Error ? e.message : String(e)}`, {
+                  pipelineId: pid,
+                });
               }
             }}
             existingNames={pipelines.map((p) => p.name)}
@@ -755,7 +821,9 @@ export function BoardScreen({
               try {
                 await api.revealWorktree(project.hash, pid);
               } catch (e) {
-                setActionError(`開啟 worktree 失敗: ${e instanceof Error ? e.message : String(e)}`);
+                notifyError(`開啟 worktree 失敗: ${e instanceof Error ? e.message : String(e)}`, {
+                  pipelineId: pid,
+                });
               }
             }}
             onPruneWorktree={async (pid) => {
@@ -763,9 +831,11 @@ export function BoardScreen({
               try {
                 await api.pruneWorktree(project.hash, pid);
                 setReloadKey((k) => k + 1);
-                setActionError("✓ worktree 已清除");
+                notifyInfo("✓ worktree 已清除", { pipelineId: pid });
               } catch (e) {
-                setActionError(`清除 worktree 失敗: ${e instanceof Error ? e.message : String(e)}`);
+                notifyError(`清除 worktree 失敗: ${e instanceof Error ? e.message : String(e)}`, {
+                  pipelineId: pid,
+                });
               }
             }}
             onMerge={async (pid) => {
@@ -775,13 +845,17 @@ export function BoardScreen({
                 const r = await api.mergePipeline(project.hash, pid);
                 setReloadKey((k) => k + 1);
                 if (r.mode === "mechanical") {
-                  setActionError(r.alreadyMerged ? "✓ 已合併過" : `✓ 合併完成(純 git,無 AI)`);
+                  notifyInfo(r.alreadyMerged ? "✓ 已合併過" : `✓ 合併完成(純 git,無 AI)`, {
+                    pipelineId: pid,
+                  });
                 } else {
                   const n = r.conflictFiles?.length ?? 0;
-                  setActionError(`⚠ 撞 ${n} 衝突檔,AI 開始解中(約 2 分鐘)…`);
+                  notifyWarn(`⚠ 撞 ${n} 衝突檔,AI 開始解中(約 2 分鐘)…`, { pipelineId: pid });
                 }
               } catch (e) {
-                setActionError(`觸發合併失敗: ${e instanceof Error ? e.message : String(e)}`);
+                notifyError(`觸發合併失敗: ${e instanceof Error ? e.message : String(e)}`, {
+                  pipelineId: pid,
+                });
               }
             }}
             onSync={async (pid) => {
@@ -790,20 +864,26 @@ export function BoardScreen({
                 const r = await api.syncPipeline(project.hash, pid);
                 setReloadKey((k) => k + 1);
                 if (r.state === "done") {
-                  setActionError(
+                  notifyInfo(
                     r.behind && r.behind > 0
                       ? "✓ 同步完成(git merge 直接成功,無需 AI)"
-                      : "✓ worktree 已是最新,無需同步"
+                      : "✓ worktree 已是最新,無需同步",
+                    { pipelineId: pid }
                   );
                 } else if (r.state === "conflict_await") {
-                  setActionError(`⚠ git merge 撞到 ${r.conflictFiles?.length ?? 0} 個衝突,modal 已跳出等決定`);
+                  notifyWarn(
+                    `⚠ git merge 撞到 ${r.conflictFiles?.length ?? 0} 個衝突,modal 已跳出等決定`,
+                    { pipelineId: pid }
+                  );
                 } else if (r.state === "failed") {
-                  setActionError("✕ 同步失敗,看 pipeline 上的提示");
+                  notifyError("✕ 同步失敗,看 pipeline 上的提示", { pipelineId: pid });
                 } else {
-                  setActionError("同步啟動中…");
+                  notifyInfo("同步啟動中…", { pipelineId: pid });
                 }
               } catch (e) {
-                setActionError(`觸發同步失敗: ${e instanceof Error ? e.message : String(e)}`);
+                notifyError(`觸發同步失敗: ${e instanceof Error ? e.message : String(e)}`, {
+                  pipelineId: pid,
+                });
               }
             }}
             onSyncConfirmAi={async (pid) => {
@@ -811,9 +891,12 @@ export function BoardScreen({
               try {
                 await api.syncConfirmAi(project.hash, pid);
                 setReloadKey((k) => k + 1);
-                setActionError("✓ AI 解衝突已啟動");
+                notifyInfo("✓ AI 解衝突已啟動", { pipelineId: pid });
               } catch (e) {
-                setActionError(`啟動 AI 解衝突失敗: ${e instanceof Error ? e.message : String(e)}`);
+                notifyError(
+                  `啟動 AI 解衝突失敗: ${e instanceof Error ? e.message : String(e)}`,
+                  { pipelineId: pid }
+                );
               }
             }}
             onSyncCancel={async (pid) => {
@@ -821,9 +904,11 @@ export function BoardScreen({
               try {
                 await api.syncCancel(project.hash, pid);
                 setReloadKey((k) => k + 1);
-                setActionError("✓ 已取消同步,worktree 已回原狀");
+                notifyInfo("✓ 已取消同步,worktree 已回原狀", { pipelineId: pid });
               } catch (e) {
-                setActionError(`取消同步失敗: ${e instanceof Error ? e.message : String(e)}`);
+                notifyError(`取消同步失敗: ${e instanceof Error ? e.message : String(e)}`, {
+                  pipelineId: pid,
+                });
               }
             }}
             onSyncDismiss={async (pid) => {
@@ -832,7 +917,9 @@ export function BoardScreen({
                 await api.syncDismiss(project.hash, pid);
                 setReloadKey((k) => k + 1);
               } catch (e) {
-                setActionError(`清掉同步狀態失敗: ${e instanceof Error ? e.message : String(e)}`);
+                notifyError(`清掉同步狀態失敗: ${e instanceof Error ? e.message : String(e)}`, {
+                  pipelineId: pid,
+                });
               }
             }}
             onToggleAutoMerge={async (pid, nextValue) => {
@@ -844,15 +931,16 @@ export function BoardScreen({
               setPipelines((arr) => arr.map((p) => (p.id === pid ? next : p)));
               try {
                 await api.savePipeline(project.hash, pid, next);
-                setActionError(
-                  nextValue
-                    ? "✓ 已啟用自動合併"
-                    : "✓ 已關閉自動合併"
+                notifyInfo(
+                  nextValue ? "✓ 已啟用自動合併" : "✓ 已關閉自動合併",
+                  { pipelineId: pid }
                 );
               } catch (e) {
                 // rollback
                 setPipelines((arr) => arr.map((p) => (p.id === pid ? target : p)));
-                setActionError(`切換自動合併失敗: ${e instanceof Error ? e.message : String(e)}`);
+                notifyError(`切換自動合併失敗: ${e instanceof Error ? e.message : String(e)}`, {
+                  pipelineId: pid,
+                });
               }
             }}
           />
@@ -945,11 +1033,13 @@ function SettingsButton({
 }
 
 function toNotifItem(r: api.NotifRecord): NotifItem {
-  const sev = (SEV_BY_EVENT[r.type] ?? "muted") as "block" | "info" | "muted";
+  // record.sev override 優先(frontend_action_* 用 caller 帶的 sev);否則查字典
+  const sev = (r.sev ?? SEV_BY_EVENT[r.type] ?? "muted") as "block" | "info" | "muted";
   const { icon, iconKind } = iconFor(sev);
   const { ts, since } = fmtTs(r.ts);
   return {
     id: r.id,
+    type: r.type,
     sev,
     icon,
     iconKind,
