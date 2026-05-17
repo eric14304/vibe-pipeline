@@ -126,6 +126,11 @@ function RunCard({
           <span className={"tdrw-run-status " + (ok ? "is-ok" : "is-fail")}>
             exit {run.exitCode ?? "?"}
           </span>
+          <span className="tdrw-run-status" title="provider · model">
+            {run.provider || run.model
+              ? `${run.provider ?? "—"} · ${run.model ?? "—"}`
+              : "—"}
+          </span>
           {run.result && (
             <span className="tdrw-run-result" title={run.result}>
               {run.result}

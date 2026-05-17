@@ -360,6 +360,8 @@ export type RunSummary = {
   } | null;
   sessionId: string | null;
   hasStderr: boolean;
+  provider: Provider | null;
+  model: string | null;
 };
 
 export type RunDetail = RunSummary & {
