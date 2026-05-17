@@ -559,6 +559,9 @@
   color: var(--fg);
   letter-spacing: -0.005em;
   min-width: 0;
+  /* 中英混合 + 全形括弧 / 「/」沒空白時 browser 不知斷行,title 撐爆 row 蓋住 chip */
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .ticket-goal {
   margin-top: 4px;

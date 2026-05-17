@@ -103,6 +103,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; bo
   background: var(--panel-2); color: var(--fg-mute);
   border: 1px solid var(--line);
   white-space: nowrap;
+  flex-shrink: 0; /* flex row 內 title 太長時,chip 不被壓縮(撞重疊) */
 }
 .chip-state { padding-left: 5px; }
 .chip-state .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
