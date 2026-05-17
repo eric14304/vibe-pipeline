@@ -143,9 +143,13 @@ vibe-pipeline/
 │       └── project/           prototype HTML / proto jsx / wireframes(歷史紀錄,real code 已不引用)
 │
 ├── docs/
-│   ├── SKILL.md               主 SKILL — enduser AI 操作手冊(distributable artifact;enduser cp 進 ~/.claude/skills/vibe-pipeline/SKILL.md)
-│   ├── install.md             完整 install 手冊(per-OS / trouble),README §CLI pointer 過來
-│   └── refs/                  設計文件 / 競品對照 / 歷史 spec(maintainer 用,enduser 不裝)
+│   ├── CHANGELOG.md           Phase 表 / 歷次大改動 / 已 final 不做(本檔不再追歷史,看這份)
+│   ├── TODO.md                待動工清單(對應 phase 8 pipeline;落地搬走)
+│   ├── refs/                  設計文件 / 競品對照 / 歷史 spec(maintainer 用,enduser 不裝)
+│   └── vibe-pipeline/         enduser AI bundle(distributable artifact;enduser cp 進 ~/.claude/skills/vibe-pipeline/)
+│       ├── SKILL.md           enduser AI 操作手冊
+│       ├── install.md         per-OS install + trouble
+│       └── repl-runner.md     REPL 主 agent 模式 paste-ready 範本
 │
 ├── .claude/
 │   ├── skills/                repo 內 maintainer SKILL(改 vibe-pipeline 自己 code 的 AI 用,不散發)
