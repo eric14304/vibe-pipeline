@@ -1075,12 +1075,18 @@ export function ReadyBanner({
         t.status === "failed_transient" ||
         t.status === "paused")
   );
+  // 正在跑 AI merge ticket(append 後 ready / running)→ banner 切「合併中」+ button 收起,
+  // 避免「✓ ... 可以合併進 main」字樣繼續顯示讓 user 誤判成「合併成功」
+  const mergingTicket = pipeline.tickets.find(
+    (t) => t.mode === "merge" && (t.status === "ready" || t.status === "running")
+  );
+  const isMerging = !!mergingTicket && !isMerged;
 
   return (
     <div
       className={
         "banner fade-up " +
-        (isMerged ? "banner-ready" : failedMerge ? "banner-paused" : "banner-ready")
+        (isMerged ? "banner-ready" : failedMerge || isMerging ? "banner-paused" : "banner-ready")
       }
     >
       <span
@@ -1090,6 +1096,8 @@ export function ReadyBanner({
             ? "var(--fg-mute)"
             : failedMerge
             ? "var(--failed)"
+            : isMerging
+            ? "var(--running)"
             : "var(--done)",
         }}
       >
@@ -1101,13 +1109,15 @@ export function ReadyBanner({
             ? `已合併入 ${baseBranch}`
             : failedMerge
             ? `合併失敗 — 點下方重試或先處理 working tree`
+            : isMerging
+            ? `⏳ AI 合併中(撞衝突,正在解 — 約 2 分鐘)…`
             : `所有 ticket 都 ✓ — 可以合併進 ${baseBranch}`}
         </div>
         <div className="banner-desc mono">
           {pipeline.branch} → {baseBranch} · {commitCount} commit{commitCount === 1 ? "" : "s"}
         </div>
       </div>
-      {onMerge && !isMerged && (
+      {onMerge && !isMerged && !isMerging && (
         <button type="button"
           className="btn btn-primary"
           onClick={async () => {

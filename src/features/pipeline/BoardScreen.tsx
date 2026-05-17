@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AppShell } from "../../shell/AppShell";
 import { Rail } from "../../shell/Rail";
 import { TopBar } from "../../shell/TopBar";
@@ -36,7 +37,21 @@ export function BoardScreen({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
-  const [activeId, setActiveId] = useState<string>("");
+  // activeId 持久化到 URL ?pipeline=<id> — F5 / 分享連結 / 上一頁都不丟。
+  // URL 是 source of truth,setActiveId wrapper 同時 push URL。
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeId = searchParams.get("pipeline") ?? "";
+  const setActiveId = useCallback(
+    (next: string | ((prev: string) => string)) => {
+      const resolved = typeof next === "function" ? next(activeId) : next;
+      if (resolved === activeId) return;
+      const p = new URLSearchParams(searchParams);
+      if (resolved) p.set("pipeline", resolved);
+      else p.delete("pipeline");
+      setSearchParams(p, { replace: false });
+    },
+    [activeId, searchParams, setSearchParams]
+  );
   const [activeTab, setActiveTab] = useState<"rail" | "focus">("focus");
   const [creating, setCreating] = useState(startCreating);
   const [tick, setTick] = useState(0);
@@ -733,7 +748,7 @@ export function BoardScreen({
                   setActionError(r.alreadyMerged ? "✓ 已合併過" : `✓ 合併完成(純 git,無 AI)`);
                 } else {
                   const n = r.conflictFiles?.length ?? 0;
-                  setActionError(`⚠ 撞 ${n} 衝突檔,AI 接手中…`);
+                  setActionError(`⚠ 撞 ${n} 衝突檔,AI 開始解中(約 2 分鐘)…`);
                 }
               } catch (e) {
                 setActionError(`觸發合併失敗: ${e instanceof Error ? e.message : String(e)}`);
