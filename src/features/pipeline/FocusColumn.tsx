@@ -7,7 +7,7 @@ import { MODE_LABELS } from "../../api/qa";
 import { useConfirm } from "../../ui/ConfirmDialog";
 import { DiffModal } from "./DiffModal";
 import { useApi } from "../../hooks/useApi";
-import type { IterStage, Pipeline, Ticket, TicketStatus } from "../../types/pipeline";
+import type { IterStage, Pipeline, PipelineState, Ticket, TicketStatus } from "../../types/pipeline";
 import * as api from "../../api/projects";
 import type { RunSummary } from "../../api/projects";
 import "./focus.css";
@@ -17,7 +17,7 @@ import "./focus.css";
 export function RunButton({
   pipeline,
   onRun,
-  onPause,
+  onStop,
   lastRun,
   spawning = false,
   queuePosition,
@@ -25,9 +25,7 @@ export function RunButton({
 }: {
   pipeline: Pipeline;
   onRun?: (id: string) => void;
-  // mode: graceful = 等 ticket 收完(預設);immediate = 立即殺 runner child(資料可能不完整)
-  // queued state 的「取消排隊」不帶 mode(沒 runner 在跑,backend 自己處理)
-  onPause?: (id: string, mode?: "graceful" | "immediate") => void;
+  onStop?: (id: string) => void;
   lastRun?: RunSummary | null;
   // user 點 開始/繼續/重試 後 → 等 polling 看到 state 跳出 planning/paused/failed 為止
   // 避開「點下去看似沒反應」的視覺空窗(POST 回來到第一個 ticket 真跑可能 0-7s)
@@ -36,10 +34,9 @@ export function RunButton({
   // syncJob.state ∈ {merging, conflict_await, ai_running} → RunButton 一律 disabled,避免撞 worktree
   syncActive?: boolean;
 }) {
-  const s = pipeline.state;
+  const s = pipeline.state as PipelineState;
   const noTickets = pipeline.tickets.length === 0;
   const lastDur = lastRun?.durationMs ? fmtDuration(lastRun.durationMs) : null;
-  const confirm = useConfirm();
 
   // sync 進行中:RunButton 完全鎖,顯示「同步中」覆蓋,避免 user 誤觸發 runner 撞 worktree
   if (syncActive) {
@@ -71,42 +68,14 @@ export function RunButton({
   switch (s) {
     case "running":
       return (
-        <span className="run-btn-pair">
-          <button
-            type="button"
-            className="btn"
-            onClick={() => onPause?.(pipeline.id, "graceful")}
-            title="等當前 ticket 自然收尾後停(資料完整)"
-          >
-            ⏸ 暫停
-          </button>
-          <button
-            type="button"
-            className="btn btn-danger run-btn-stop-now"
-            onClick={async () => {
-              const ok = await confirm({
-                title: "立即停止 pipeline?",
-                warning: "會直接殺掉 runner / sub-agent,當前 ticket 進度可能不完整(尚未 commit 的改動仍在 worktree)",
-                description: "建議先試「暫停」等 ticket 自然收尾。只在 runner 卡死或要快速放手時用立即停止。",
-                confirmLabel: "立即停止",
-                cancelLabel: "取消",
-                danger: true,
-              });
-              if (ok) onPause?.(pipeline.id, "immediate");
-            }}
-            title="立即殺 runner child(危險:資料可能不完整)"
-          >
-            ⏹ 立即停止
-          </button>
-        </span>
-      );
-    case "stopping":
-      return (
-        <button type="button" className="btn" disabled title="停止中…">
-          <span className="qadr-thinking-dots">
-            <span /><span /><span />
-          </span>{" "}
-          停止中
+        <button
+          type="button"
+          className="btn btn-danger run-btn-stop-now"
+          onClick={() => onStop?.(pipeline.id)}
+          title="停止"
+          aria-label="停止"
+        >
+          ⏹ 停止
         </button>
       );
     case "queued": {
@@ -115,8 +84,8 @@ export function RunButton({
         <button
           type="button"
           className="btn"
-          onClick={() => onPause?.(pipeline.id)}
-          title="取消排隊(改回 paused)"
+          onClick={() => onStop?.(pipeline.id)}
+          title="取消排隊"
           style={{ color: "var(--queued)", borderColor: "var(--queued)" }}
         >
           ⏳ {posLabel}
@@ -179,7 +148,7 @@ export function FocusColumn({
   onAddTicket,
   hasActiveDraft = false,
   onRun,
-  onPause,
+  onStop,
   onDelete,
   onRename,
   onResetAll,
@@ -202,7 +171,7 @@ export function FocusColumn({
   onAddTicket?: (pipelineId: string) => void;
   hasActiveDraft?: boolean;
   onRun?: (pipelineId: string) => void;
-  onPause?: (pipelineId: string, mode?: "graceful" | "immediate") => void;
+  onStop?: (pipelineId: string) => void;
   onDelete?: (pipelineId: string) => void;
   onRename?: (pipelineId: string, newName: string) => void;
   onResetAll?: (pipelineId: string) => void;
@@ -239,11 +208,11 @@ export function FocusColumn({
   }, [projectHash, pipeline.id, pipeline.state]);
 
   // Worktree diff stat — fetch once on mount(讓 paused/ready 也看得到歷史 diff),
-  // running/stopping 時 poll 每 3s 看即時進度。merged 後不打(已合進 base 沒意義)。
+  // running 時 poll 每 3s 看即時進度。merged 後不打(已合進 base 沒意義)。
   // DiffModal 開關 — 由 head 上 chip 點擊觸發,任何 banner 不在的狀態都看得到
   const [diffOpen, setDiffOpen] = useState(false);
   const diffStatEnabled = !!projectHash && pipeline.state !== "merged" && pipeline.state !== "planning";
-  const diffLive = pipeline.state === "running" || pipeline.state === "stopping";
+  const diffLive = pipeline.state === "running";
   const { data: diffStat } = useApi<api.DiffStat | null>(
     () => (diffStatEnabled ? api.getDiffStat(projectHash!, pipeline.id) : Promise.resolve(null)),
     {
@@ -255,13 +224,13 @@ export function FocusColumn({
 
   // Sync status — worktree 落後 base 幾個 commit。planning 沒 worktree 不抓;merged 仍然抓
   // (merged 不是終態,branch/worktree 還在,可以繼續加 ticket / sync / 再 merge)。
-  // 跟 diffStat 同節奏:running/stopping 才 poll(base 那時可能被別條 pipeline 推進);
+  // 跟 diffStat 同節奏:running 才 poll(base 那時可能被別條 pipeline 推進);
   // 其他 state 一次抓完,不同 pipeline.state 自動 refetch。
   // syncJob.state 也當 deps:user 點 ✕ 關掉 done/failed chip → syncJob undefined → 觸發 refetch
   // 否則 chip 消失但「落後 N · 同步」按鈕要等下次 polling 才出現
   const syncJobState = pipeline.syncJob?.state;
   const syncEnabled = !!projectHash && pipeline.state !== "planning";
-  const syncLive = pipeline.state === "running" || pipeline.state === "stopping";
+  const syncLive = pipeline.state === "running";
   const { data: syncStatus } = useApi<api.SyncStatus | null>(
     () => (syncEnabled ? api.getSyncStatus(projectHash!, pipeline.id) : Promise.resolve(null)),
     {
@@ -312,7 +281,6 @@ export function FocusColumn({
       pipeline.syncJob.state === "ai_running");
   const lockedByState =
     pipeline.state === "running" ||
-    pipeline.state === "stopping" ||
     pipeline.state === "queued" ||
     syncActive;
 
@@ -362,7 +330,7 @@ export function FocusColumn({
             <span
               className={
                 "dot" +
-                (pipeline.state === "running" || pipeline.state === "stopping" ? " pulse" : "")
+                (pipeline.state === "running" ? " pulse" : "")
               }
               style={{ background: stateColor }}
             />{" "}{stateLabel}
@@ -406,7 +374,6 @@ export function FocusColumn({
             behindFallback={behind}
             pipelineBusy={
               pipeline.state === "running" ||
-              pipeline.state === "stopping" ||
               pipeline.state === "queued"
             }
             tick={tick}
@@ -445,7 +412,7 @@ export function FocusColumn({
                 setSpawning(true);
                 onRun?.(pid);
               }}
-              onPause={onPause}
+              onStop={onStop}
               lastRun={lastRun}
               spawning={spawning}
               queuePosition={queuePosition}
@@ -540,7 +507,7 @@ function SyncStatusBar({
         className="sync-chip"
         title={
           pipelineBusy
-            ? `落後 ${pipeline.baseBranch || "base"} ${behindFallback} commit(pipeline 在跑,等 pause/ready 才能 sync)`
+            ? `落後 ${pipeline.baseBranch || "base"} ${behindFallback} commit(pipeline 在跑,等停止後或 ready 才能 sync)`
             : `落後 ${pipeline.baseBranch || "base"} ${behindFallback} commit · 點擊先試 git merge,衝突才呼叫 AI`
         }
         disabled={pipelineBusy}
@@ -979,7 +946,7 @@ function MenuItem({
 }
 
 // 可編輯的 pipeline title — 點 ✎ 進編輯模式,Enter 存,Esc 取消。
-// 重名 / 格式不對 / running / stopping 不准存。
+// 重名 / 格式不對 / running 不准存。
 function FocusTitle({
   pipeline,
   onRename,
@@ -1011,7 +978,6 @@ function FocusTitle({
   const valid = trimmed.length > 0 && formatOk && !taken;
   const lockedByState =
     pipeline.state === "running" ||
-    pipeline.state === "stopping" ||
     pipeline.state === "queued";
 
   function commit() {

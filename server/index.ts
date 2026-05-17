@@ -165,7 +165,7 @@ async function handle(req: Request): Promise<Response> {
       const id = pipelineRunMatch[1];
       const action = pipelineRunMatch[2];
       if (action === "run") return projects.runPipeline(hash, id);
-      // pause 與 stop 共用 handler;body { mode } 區分 graceful / immediate
+      // pause 與 stop 共用 handler;固定立即停止
       if (action === "pause" || action === "stop") return projects.pausePipeline(hash, id, req);
       if (action === "merge") return projects.mergePipeline(hash, id);
       if (action === "sync") return projects.syncPipeline(hash, id);
@@ -321,7 +321,7 @@ console.log(`vibe-pipeline backend listening on http://${server.hostname}:${serv
 void initFCM();
 
 // Crash recovery: 啟動時掃所有有 .vibe-pipeline/ 的 recent project,
-// 若 pipeline.state="running" 或 "stopping" 但 process 不在 (server 重啟),標 paused
+// 若 pipeline.state="running" 但 process 不在 (server 重啟),標 paused
 (async () => {
   try {
     const recents = await projectStore.listRecent();

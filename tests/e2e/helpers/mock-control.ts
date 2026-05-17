@@ -29,7 +29,6 @@ export type RunnerScriptTicket = {
 export type RunnerScript = {
   tickets: RunnerScriptTicket[];
   finalState?: "ready" | "paused" | "failed" | "merged";
-  pauseAfterTicketIndex?: number;
 };
 
 async function post(path: string, body: unknown): Promise<unknown> {

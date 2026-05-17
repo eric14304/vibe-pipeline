@@ -136,16 +136,10 @@ export function runPipeline(hash: string, id: string): Promise<{ ok: true }> {
   return call<{ ok: true }>(`/api/projects/${hash}/pipelines/${id}/run`, { method: "POST" });
 }
 
-// mode 預設 graceful(等 ticket 收完);immediate = 立即殺 runner child(資料可能不完整)
-// backend 同 endpoint /stop 也支援(/pause 是別名),body 帶 { mode }
-export function pausePipeline(
-  hash: string,
-  id: string,
-  mode: "graceful" | "immediate" = "graceful"
-): Promise<{ ok: true }> {
+// backend /pause 與 /stop 同義:立即停止 runner child,並把 running ticket 標 paused。
+export function pausePipeline(hash: string, id: string): Promise<{ ok: true }> {
   return call<{ ok: true }>(`/api/projects/${hash}/pipelines/${id}/pause`, {
     method: "POST",
-    body: { mode },
   });
 }
 

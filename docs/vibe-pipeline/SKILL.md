@@ -57,7 +57,7 @@ vbpl config set <key> <value>                          # e.g. runner.model claud
 
 ```bash
 vbpl pipeline run <pipelineId>                         # 啟動 runner
-vbpl pipeline stop <pipelineId>                        # 暫停(runner 跑完當前 ticket 就停)
+vbpl pipeline stop <pipelineId>                        # 停止(SIGKILL runner → state=paused;按「繼續」從 critic 階段接續)
 vbpl pipeline merge <pipelineId>                       # 合併回 base(先試 git,衝突才 AI)
 vbpl pipeline sync <pipelineId>                        # 把 base 拉進 pipeline worktree
 vbpl pipeline sync <id> --ai                           # 衝突時讓 AI 解
@@ -156,7 +156,7 @@ vbpl pipeline sync <id> --cancel                       # 取消同步
 | `NO_BACKEND` | backend server 沒起 | 「先跑 `bun run server`」 |
 | `NO_PROJECT` | resolveProject 找不到 | 「--project <hash> 指定 / 或先 `vbpl project add <path>`」 |
 | `NOT_INITIALIZED` | project 沒 `.vibe-pipeline/` | 「跑 vbpl project add,首次進去 web UI 點自動初始化」 |
-| `STATE_GUARD` | operation 不允許在當前 state | 看 state(running 要先 pause / merged 不准 run) |
+| `STATE_GUARD` | operation 不允許在當前 state | 看 state(running 要先「停止」/ merged 不准 run) |
 | `working_tree_dirty` | merge 時 main repo 髒 | 「先 commit / stash 再 merge」 |
 
 ## 完整參考

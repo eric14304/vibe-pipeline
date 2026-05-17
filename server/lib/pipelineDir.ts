@@ -145,7 +145,7 @@ async function writeJson(path: string, data: unknown): Promise<void> {
   const tmp = path + ".tmp";
   await Bun.write(tmp, text);
   try {
-    renameSync(tmp, path);
+    await renameWithWindowsRetry(tmp, path);
   } catch (e) {
     try {
       unlinkSync(tmp);
@@ -154,6 +154,23 @@ async function writeJson(path: string, data: unknown): Promise<void> {
     }
     throw e;
   }
+}
+
+async function renameWithWindowsRetry(tmp: string, path: string): Promise<void> {
+  const delays = process.platform === "win32" ? [0, 20, 50, 100, 200] : [0];
+  let lastErr: unknown;
+  for (const delay of delays) {
+    if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
+    try {
+      renameSync(tmp, path);
+      return;
+    } catch (e) {
+      lastErr = e;
+      const code = (e as { code?: string }).code;
+      if (code !== "EPERM" && code !== "EBUSY") break;
+    }
+  }
+  throw lastErr;
 }
 
 // idempotent:`.vibe-pipeline/` 已存在但內容缺(早期 partial init 失敗留的殘骸)→ 補齊;

@@ -55,6 +55,12 @@
 
 ---
 
+## 2026-05-17 大改動
+
+- **Pause 簡化:graceful 路徑全拔**。原設計「按暫停 → state=stopping → runner 跑完當前 ticket → ack 標 paused」拔掉,改成 stop = SIGKILL child → state=paused immediate。動機:user 按下停止就是想立刻停(燒錢 / 跑歪 / 改主意),等一張 ticket 跑完反直覺;graceful ack 還讓 prompt / state machine / UI 三層各養 stopping 分支,維護不對稱。落地分四 ticket:t1 backend(orchestrator stop + 拔 prompt 內 stopping 處理)/ t2 frontend(雙按鈕「暫停 / 終止」合一為「停止」)/ t3 CLI(`vbpl pipeline stop` 描述改 immediate)/ t4 e2e(stop sequence 改驗 running → paused 無中介)/ t5 docs 同步本檔。`recoverStale` 保留收 legacy `stopping` 殘留(舊 pipeline.json 升級無痛)。詳細紀錄 [CLAUDE.md 雷區 #18](../CLAUDE.md);歷史 graceful 設計保留在 [`refs/integration-plan-v3-runner-2026-05-10.md`](refs/integration-plan-v3-runner-2026-05-10.md)
+
+---
+
 ## 已 final 決定(不再討論,搬到這段表示不會做)
 
 - **Theme 偏好 → localStorage**(URL `?theme=` 仍 override)

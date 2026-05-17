@@ -122,7 +122,7 @@ flowchart TB
 - **跨 provider sub-agent**:claude main → Task tool;codex → Bash 直呼 `codex exec`
 - **PWA + Tailscale + TOTP**:桌機跑 server,手機透過 Tailscale HTTPS 連入,非 loopback 強制 TOTP,FCM push ticket 事件到手機
 - **CLI `vbpl`**:4 nouns(project / pipeline / ticket / config)+ `--json` mode;spawn 操作走 backend HTTP 避免子程孤兒
-- **狀態恢復**:server 重啟時自動掃 pipeline 收斂 stale `running`/`stopping`;runtime watchdog 抓死 PID
+- **狀態恢復**:server 重啟時自動掃 pipeline 收斂 stale `running` → paused(legacy `stopping` 殘留也一併修);runtime watchdog 抓死 PID
 
 ---
 

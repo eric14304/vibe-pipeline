@@ -6,7 +6,7 @@ claude CLI 自動載 CLAUDE.md + 對應 SKILL,codex 不會,所以本檔導你過
 
 ## 動 code 前**必讀**(FIRST action,不可略)
 
-1. Read 同目錄 `CLAUDE.md`(專案結構、Phase 進度、決策、雷區 #1-16)
+1. Read 同目錄 `CLAUDE.md`(專案結構、Phase 進度、決策、雷區 #1-18)
 2. 依任務範圍 Read 對應 SKILL:
    - 改 `src/`(前端 / 畫面 / 元件 / styles / route / API 串接) → `.claude/skills/vibe-pipeline-frontend/SKILL.md`
    - 改 `server/`(Bun server / fs / spawn / runner / QA / budget) → `.claude/skills/vibe-pipeline-backend/SKILL.md`
@@ -14,7 +14,7 @@ claude CLI 自動載 CLAUDE.md + 對應 SKILL,codex 不會,所以本檔導你過
    - 寫 / 改 / 跑 E2E(Playwright mock + real) → `.claude/skills/vibe-pipeline-e2e/SKILL.md`
    - scope / 決策 / 完整功能清單 / 外部產品對照 → `docs/vibe-pipeline/SKILL.md`(主 SKILL,enduser 安裝對象;source bundle 在 `docs/vibe-pipeline/`)
 
-CLAUDE.md 的「不踩的雷」段(目前 #1-16)是最容易踩的坑,**先讀完再動手**,避免重蹈覆轍。
+CLAUDE.md 的「不踩的雷」段(目前 #1-18)是最容易踩的坑,**先讀完再動手**,避免重蹈覆轍。
 
 ## 維護
 

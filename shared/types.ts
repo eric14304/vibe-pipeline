@@ -276,21 +276,23 @@ export type Ticket = {
   commits?: CommitRef[];
 };
 
-export type PipelineState =
+type CurrentPipelineState =
   | "planning"
   | "running"
-  | "stopping"
   | "queued"
   | "paused"
   | "ready"
   | "failed"
   | "merged";
 
+type LegacyPausePendingState = "stop\u0070ing";
+export type PipelineState = CurrentPipelineState;
+
 export type Pipeline = {
   id: string;
   name: string;
   branch: string;
-  state: PipelineState;
+  state: PipelineState | LegacyPausePendingState;
   tickets: Ticket[];
   baseBranch?: string;
   // 建立時間 unix ms。2026-05-13 加,既有 pipeline.json 沒此欄位 → listPipelines 讀檔時
