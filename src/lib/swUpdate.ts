@@ -33,7 +33,9 @@ export function registerSW(opts: RegisterOpts = {}) {
   if (!("serviceWorker" in navigator)) return;
 
   const swUrl = "/firebase-messaging-sw.js";
-  wb = new Workbox(swUrl);
+  // 明指 type:'classic' — SW build 用 IIFE format(vite.config.ts injectManifest.rollupFormat:'iife'),
+  // 內含 importScripts() 載 firebase compat,只能在 classic SW 內合法。workbox-window 預設可能改 module 撞炸
+  wb = new Workbox(swUrl, { type: "classic" });
 
   wb.addEventListener("waiting", () => {
     setNeedRefresh(true);
