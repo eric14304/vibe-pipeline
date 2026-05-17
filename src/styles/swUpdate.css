@@ -1,43 +1,71 @@
+/* SW 有新版可更新 banner — 上方中央 fixed,accent 配色明顯,跟其他 board card 區分 */
 .sw-update-banner {
   position: fixed;
-  right: 16px;
-  bottom: 16px;
-  z-index: 2100;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px 10px 14px;
-  background: var(--panel-2);
-  color: var(--fg);
-  border: 1px solid var(--line-2);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-md);
-  max-width: calc(100vw - 32px);
+  gap: 12px;
+  padding: 8px 10px 8px 16px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 999px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
+  font-family: inherit;
+  letter-spacing: 0.03em;
+  max-width: calc(100vw - 24px);
 }
 
 .sw-update-banner__text {
   font-size: 13px;
   font-weight: 500;
-  color: var(--fg);
+  color: #fff;
+  white-space: nowrap;
 }
 
 .sw-update-banner__btn {
-  padding: 4px 10px;
+  padding: 4px 14px;
   font-size: 12px;
+  font-weight: 600;
+  background: #fff;
+  color: var(--accent);
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.sw-update-banner__btn:hover {
+  background: rgba(255, 255, 255, 0.9);
 }
 
 .sw-update-banner__close {
   width: 24px;
   height: 24px;
-  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
   line-height: 1;
+  background: transparent;
+  border: 0;
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  border-radius: 50%;
+  padding: 0;
+}
+.sw-update-banner__close:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.18);
 }
 
 @media (max-width: 600px) {
   .sw-update-banner {
-    left: 12px;
-    right: 12px;
-    bottom: 12px;
-    justify-content: space-between;
+    top: 8px;
+    padding: 7px 8px 7px 14px;
+    gap: 8px;
+  }
+  .sw-update-banner__text {
+    font-size: 12.5px;
   }
 }
