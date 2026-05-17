@@ -5,6 +5,7 @@ import { StatesGallery } from "./features/dev/StatesGallery";
 import { SetupScreen } from "./features/auth/SetupScreen";
 import { LoginScreen } from "./features/auth/LoginScreen";
 import { ConfirmProvider } from "./ui/ConfirmDialog";
+import { OnlineStatusBadge } from "./shell/OnlineStatusBadge";
 import { initFCM, setupForegroundHandler } from "./lib/fcm";
 
 // Theme priority: URL ?theme=  →  localStorage  →  default light
@@ -78,6 +79,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <ConfirmProvider>
+        <OnlineStatusBadge />
         <Routes>
           <Route path="/" element={<Navigate to="/board" replace />} />
           <Route path="/board" element={<BoardRoute />} />
