@@ -539,3 +539,243 @@
     width: 100%;
   }
 }
+
+/* ─── PWA tab — Install chip grid(S4)──────────────────────────── */
+
+.settings-section-sub {
+  font-size: 11.5px;
+  color: var(--fg-mute);
+  line-height: 1.5;
+  margin-top: -4px;
+  margin-bottom: var(--settings-space-3);
+}
+
+.settings-section-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--settings-space-2);
+  margin-bottom: var(--settings-space-2);
+}
+
+.settings-section-link {
+  font-size: 11.5px;
+  color: var(--accent);
+  text-decoration: none;
+}
+.settings-section-link:hover { text-decoration: underline; }
+
+.install-chip-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--settings-space-2);
+}
+
+.install-chip {
+  display: flex;
+  flex-direction: column;
+  gap: var(--settings-space-2);
+  padding: var(--settings-space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  min-height: 110px;
+  transition: border-color 120ms, background 120ms;
+}
+
+.install-chip--active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, var(--panel));
+}
+
+.install-chip-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fg);
+}
+
+.install-chip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg-mute);
+  flex-shrink: 0;
+}
+
+.install-chip--active .install-chip-icon {
+  color: var(--accent);
+}
+
+.install-chip-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg);
+  line-height: 1.3;
+}
+
+.install-chip-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  justify-content: flex-end;
+}
+
+.install-chip-hint {
+  font-size: 11px;
+  color: var(--fg-mute);
+  line-height: 1.5;
+}
+
+.install-chip-btn {
+  align-self: flex-start;
+  padding: 4px 12px;
+  font-size: 12px;
+}
+
+/* Status chip(chip 1)— 中央大 icon + label */
+.install-chip--status {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.install-chip-status-icon {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 16px;
+  font-weight: 600;
+}
+.install-chip-status-icon--ok {
+  background: color-mix(in srgb, var(--done) 18%, transparent);
+  color: var(--done);
+}
+.install-chip-status-icon--warn {
+  background: color-mix(in srgb, var(--failed) 18%, transparent);
+  color: var(--failed);
+}
+.install-chip-status-icon--neutral {
+  background: color-mix(in srgb, var(--fg-mute) 14%, transparent);
+  color: var(--fg-mute);
+}
+
+.install-chip-status-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg);
+}
+
+.install-chip--tone-warn { border-color: color-mix(in srgb, var(--failed) 30%, var(--line)); }
+
+/* ─── PWA tab — Push status banner + events list(S4)──────────── */
+
+.push-status-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--settings-space-3);
+  padding: var(--settings-space-3);
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--failed) 35%, var(--line));
+  background: color-mix(in srgb, var(--failed) 8%, var(--panel));
+  margin-bottom: var(--settings-space-3);
+}
+
+.push-status-banner--info {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
+  background: color-mix(in srgb, var(--accent) 6%, var(--panel));
+}
+
+.push-status-banner-text {
+  flex: 1 1 auto;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--fg);
+  min-width: 0;
+}
+
+.push-status-banner-sub {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--fg-mute);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+.push-status-banner-btn {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--failed) 50%, var(--line));
+  background: var(--failed);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 120ms;
+}
+.push-status-banner-btn:hover { opacity: 0.88; }
+.push-status-banner-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.push-main-toggle {
+  width: 100%;
+  margin-bottom: var(--settings-space-3);
+  justify-content: flex-start;
+}
+
+.push-events-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--settings-space-2);
+}
+
+.push-events-list.is-disabled {
+  opacity: 0.55;
+}
+
+.push-event-row {
+  margin-bottom: 0;
+}
+
+.push-row-disabled {
+  background: color-mix(in srgb, var(--fg-mute) 5%, var(--panel));
+}
+
+.push-row-disabled .toggle-pill {
+  pointer-events: none;
+}
+
+.push-event-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: color-mix(in srgb, currentColor 15%, transparent);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.push-event-hint {
+  color: var(--failed);
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+@media (max-width: 600px) {
+  .install-chip-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .install-chip {
+    min-height: 0;
+  }
+
+  .install-chip--status {
+    flex-direction: row;
+    text-align: left;
+    justify-content: flex-start;
+  }
+}

@@ -49,11 +49,41 @@ type ProjectConfirmedValues = {
 type TaskConfirmedValue = Provider | ModelName | Effort;
 type TaskConfirmedValues = Partial<Record<`task:${TaskClass}:${TaskField}`, TaskConfirmedValue>>;
 
-const PUSH_EVENT_LABELS: Array<{ key: PushEventKey; label: string }> = [
-  { key: "ticket_done", label: "Ticket 完成" },
-  { key: "ticket_failed", label: "Ticket 失敗" },
-  { key: "pipeline_paused", label: "Pipeline 暫停需回應" },
-  { key: "auto_merge_conflict", label: "AI 接手解衝突" },
+const PUSH_EVENT_META: Array<{
+  key: PushEventKey;
+  label: string;
+  sub: string;
+  icon: string;
+  iconColor: string;
+}> = [
+  {
+    key: "ticket_done",
+    label: "Ticket 完成通知",
+    sub: "當 Ticket 完成時收到通知",
+    icon: "✓",
+    iconColor: "var(--done)",
+  },
+  {
+    key: "ticket_failed",
+    label: "Ticket 失敗通知",
+    sub: "當 Ticket 失敗時收到通知",
+    icon: "✕",
+    iconColor: "var(--failed)",
+  },
+  {
+    key: "pipeline_paused",
+    label: "Pipeline 暫停通知",
+    sub: "當 Pipeline 暫停需回應時收到通知",
+    icon: "⏸",
+    iconColor: "var(--accent)",
+  },
+  {
+    key: "auto_merge_conflict",
+    label: "AI 衝突處理通知",
+    sub: "當 AI 接手解衝突時收到通知",
+    icon: "AI",
+    iconColor: "var(--accent)",
+  },
 ];
 
 const TASK_ICON: Record<TaskClass, string> = {
@@ -207,25 +237,50 @@ function PushNotificationsSection({
   }
 
   const enabled = permission === "granted" && !!token;
-  const disabled = supported === false || permission === "denied" || loading || supported === null;
-  const hint = supported === false
-    ? "此瀏覽器不支援 Web Push。"
-    : permission === "denied"
-      ? "已被瀏覽器封鎖,請至網址列設定重新允許後再回此頁啟用。"
-      : loading
-        ? "處理中…"
-        : null;
+  const mainDisabled = supported === false || loading || supported === null;
+  const eventsDisabled = !enabled;
+
+  async function recheckPermission() {
+    // permission==='default' → 觸發 requestPermission(走完整 enable 流程,連帶註冊 token)
+    // permission==='denied' / 'granted' 也走 enable;denied 會丟錯,被 catch 後 refreshPermission 重讀
+    await enable();
+  }
 
   return (
     <div>
+      {supported === false ? (
+        <div className="push-status-banner push-status-banner--info">
+          <div className="push-status-banner-text">此瀏覽器不支援 Web Push</div>
+        </div>
+      ) : permission !== "granted" ? (
+        <div className="push-status-banner push-status-banner--warn">
+          <div className="push-status-banner-text">
+            尚未允許通知權限
+            <div className="push-status-banner-sub">
+              {permission === "denied"
+                ? "已被瀏覽器封鎖,請至網址列設定重新允許後再回此頁啟用"
+                : "請允許瀏覽器顯示通知,才能收到推播訊息"}
+            </div>
+          </div>
+          <button
+            type="button"
+            className="push-status-banner-btn"
+            onClick={() => void recheckPermission()}
+            disabled={loading}
+          >
+            {loading ? "處理中…" : "重新檢查權限"}
+          </button>
+        </div>
+      ) : null}
+
       <label
-        className={"toggle-pill mono" + (enabled ? " is-on" : "")}
-        style={{ opacity: disabled ? 0.55 : 1, cursor: disabled ? "not-allowed" : "pointer" }}
+        className={"toggle-pill mono push-main-toggle" + (enabled ? " is-on" : "")}
+        style={{ opacity: mainDisabled ? 0.55 : 1, cursor: mainDisabled ? "not-allowed" : "pointer" }}
       >
         <input
           type="checkbox"
           checked={enabled}
-          disabled={disabled}
+          disabled={mainDisabled}
           onChange={(e) => {
             if (e.target.checked) void enable();
             else void disable();
@@ -234,33 +289,54 @@ function PushNotificationsSection({
         <span className="toggle-pill-track" aria-hidden>
           <span className="toggle-pill-thumb" />
         </span>
-        {enabled ? "推播通知 已啟用" : "啟用推播通知"}
+        啟用推播通知
       </label>
-      {hint && <div className="push-hint" style={{ marginTop: 6 }}>{hint}</div>}
-      {enabled && (
-        <div className="settings-popover-task-grid" aria-label="推播事件" style={{ marginTop: "var(--space-3)" }}>
-          {PUSH_EVENT_LABELS.map((item) => {
-            const checked = userCfg?.pushEvents[item.key] ?? true;
-            return (
-              <label
-                key={item.key}
-                className={"toggle-pill mono" + (checked ? " is-on" : "")}
-              >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  disabled={!userCfg || !!pushSaving[item.key]}
-                  onChange={(e) => onTogglePushEvent(item.key, e.target.checked)}
-                />
-                <span className="toggle-pill-track" aria-hidden>
-                  <span className="toggle-pill-thumb" />
-                </span>
-                {item.label}
-              </label>
-            );
-          })}
-        </div>
-      )}
+
+      <div className={"push-events-list" + (eventsDisabled ? " is-disabled" : "")} aria-label="推播事件">
+        {PUSH_EVENT_META.map((item, idx) => {
+          const checked = (userCfg?.pushEvents[item.key] ?? true) && enabled;
+          const rowDisabled = eventsDisabled || !userCfg || !!pushSaving[item.key];
+          return (
+            <div
+              key={item.key}
+              className={"settings-row push-event-row" + (eventsDisabled ? " push-row-disabled" : "")}
+            >
+              <div className="settings-row-label">
+                <div className="settings-row-label-head">
+                  <span
+                    className="settings-row-icon push-event-icon"
+                    aria-hidden
+                    style={{ color: item.iconColor }}
+                  >
+                    {item.icon}
+                  </span>
+                  {item.label}
+                </div>
+                <div className="settings-row-label-sub">{item.sub}</div>
+                {idx === 0 && eventsDisabled && (
+                  <div className="settings-row-label-sub push-event-hint">請先啟用推播通知</div>
+                )}
+              </div>
+              <div className="settings-row-control">
+                <label
+                  className={"toggle-pill mono" + (checked ? " is-on" : "")}
+                  style={{ cursor: rowDisabled ? "not-allowed" : "pointer" }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={rowDisabled}
+                    onChange={(e) => onTogglePushEvent(item.key, e.target.checked)}
+                  />
+                  <span className="toggle-pill-track" aria-hidden>
+                    <span className="toggle-pill-thumb" />
+                  </span>
+                </label>
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
       {lastError && (
         <div className="mono push-error">
@@ -271,18 +347,20 @@ function PushNotificationsSection({
   );
 }
 
-// PWA 行為 hint — 只留真正需要 user 知道的(其他靠 UX 自然體會)
-function PwaInfoHint() {
-  return (
-    <div className="push-hint" style={{ marginTop: "var(--space-2)" }}>
-      離線可看快取,但啟動 / 暫停 pipeline 需連線。iOS 安裝走「分享 → 加入主畫面」。
-    </div>
-  );
+function detectPlatform(): "ios" | "chromium" | "other" {
+  if (typeof navigator === "undefined") return "other";
+  const ua = navigator.userAgent;
+  const isIOS = /iPhone|iPad|iPod/i.test(ua) || (ua.includes("Mac") && "ontouchend" in document);
+  if (isIOS) return "ios";
+  // Chrome / Edge / Android Chrome / Samsung Internet 都帶 Chrome,且非 iOS
+  if (/Chrome|CriOS|EdgA?|Edg|SamsungBrowser/i.test(ua)) return "chromium";
+  return "other";
 }
 
 function InstallAppSection({ onActionError }: { onActionError?: (message: string) => void }) {
   const { canInstall, installed, promptInstall } = useInstallPrompt();
   const [busy, setBusy] = useState(false);
+  const platform = detectPlatform();
 
   async function onClick() {
     setBusy(true);
@@ -296,24 +374,82 @@ function InstallAppSection({ onActionError }: { onActionError?: (message: string
     }
   }
 
-  // button 只在「真能 prompt」(canInstall + 未 install)才顯,避免 disabled button 誤導 user 點不動以為壞。
-  // 已 install / 不能 prompt 都改純文字提示。
+  const statusLabel = installed
+    ? "已安裝"
+    : platform === "other"
+      ? "此瀏覽器不支援"
+      : "尚未安裝";
+  const statusIcon = installed ? "✓" : platform === "other" ? "!" : "○";
+  const statusTone: "ok" | "warn" | "neutral" = installed ? "ok" : platform === "other" ? "warn" : "neutral";
+
   return (
-    <div style={{ marginTop: "var(--space-3)" }}>
+    <div className="settings-section">
       <div className="settings-section-title">安裝為 App</div>
-      {canInstall && !installed && (
-        <div className="push-action-row">
-          <button type="button" className="btn" disabled={busy} onClick={() => void onClick()}>
-            {busy ? "處理中…" : "安裝 App"}
-          </button>
+      <div className="settings-section-sub">將 App 加入主畫面,可隨時使用快捷啟動,並支援接收推播通知</div>
+
+      <div className="install-chip-grid">
+        {/* chip 1:狀態 */}
+        <div className={"install-chip install-chip--status install-chip--tone-" + statusTone}>
+          <div className={"install-chip-status-icon install-chip-status-icon--" + statusTone} aria-hidden>
+            {statusIcon}
+          </div>
+          <div className="install-chip-status-label">{statusLabel}</div>
         </div>
-      )}
-      <div className="push-hint">
-        {installed
-          ? "✓ 已加入桌面 / 主畫面,可直接從 App 圖示開啟。"
-          : canInstall
-            ? "加入桌面 / 主畫面後可全螢幕開啟,推播也更穩。"
-            : "瀏覽器沒提示可安裝(可能已安裝過 / iOS Safari / 不支援);若要安裝請用瀏覽器網址列右側「⊕ 安裝」icon,或 iOS Safari「分享 → 加入主畫面」。"}
+
+        {/* chip 2:Chrome / Edge / Android */}
+        <div className={"install-chip" + (platform === "chromium" ? " install-chip--active" : "")}>
+          <div className="install-chip-head">
+            <span className="install-chip-icon" aria-hidden>
+              <svg width="22" height="22" viewBox="0 0 48 48" fill="none">
+                <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="2.5" />
+                <circle cx="24" cy="24" r="7" stroke="currentColor" strokeWidth="2.5" />
+                <path d="M24 4 L24 17" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                <path d="M6.7 34 L18 27.5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                <path d="M41.3 34 L30 27.5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+              </svg>
+            </span>
+            <div className="install-chip-title">Chrome / Edge / Android</div>
+          </div>
+          <div className="install-chip-body">
+            {installed ? (
+              <div className="install-chip-hint">已安裝</div>
+            ) : canInstall ? (
+              <button
+                type="button"
+                className="btn install-chip-btn"
+                disabled={busy}
+                onClick={() => void onClick()}
+              >
+                {busy ? "處理中…" : "安裝"}
+              </button>
+            ) : (
+              <div className="install-chip-hint">
+                點瀏覽器網址列右側<br />
+                「⊕ 安裝」icon
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* chip 3:iOS Safari */}
+        <div className={"install-chip" + (platform === "ios" ? " install-chip--active" : "")}>
+          <div className="install-chip-head">
+            <span className="install-chip-icon" aria-hidden>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                <path d="M12 3 L12 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <path d="M8 7 L12 3 L16 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M5 12 L5 19 A2 2 0 0 0 7 21 L17 21 A2 2 0 0 0 19 19 L19 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </span>
+            <div className="install-chip-title">iOS Safari</div>
+          </div>
+          <div className="install-chip-body">
+            <div className="install-chip-hint">
+              點下方「分享」<br />
+              選「加入主畫面」
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -964,15 +1100,25 @@ export function SettingsPopover({
       {activeTab === "notifications" && (
         <>
           <InstallAppSection onActionError={onActionError} />
-          <PwaInfoHint />
-          <div style={{ height: 1, background: "var(--line)", margin: "var(--space-4) 0" }} />
-          <div className="settings-section-title">推播通知</div>
-          <PushNotificationsSection
-            userCfg={userCfg}
-            pushSaving={pushSaving}
-            onTogglePushEvent={updatePushEvent}
-            onActionError={onActionError}
-          />
+          <div className="settings-section">
+            <div className="settings-section-title-row">
+              <div className="settings-section-title">推播通知</div>
+              <a
+                className="settings-section-link"
+                href="https://web.dev/articles/push-notifications-overview"
+                target="_blank"
+                rel="noreferrer"
+              >
+                了解更多
+              </a>
+            </div>
+            <PushNotificationsSection
+              userCfg={userCfg}
+              pushSaving={pushSaving}
+              onTogglePushEvent={updatePushEvent}
+              onActionError={onActionError}
+            />
+          </div>
         </>
       )}
 
