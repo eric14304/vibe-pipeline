@@ -20,6 +20,34 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DependencyList } from "react";
 
+// in-memory cache(跨 component / 跨 mount 共用,session 內)
+const memCache = new Map<string, unknown>();
+const LS_PREFIX = "vp-cache:";
+
+function readCache<T>(key: string): T | null {
+  if (memCache.has(key)) return memCache.get(key) as T;
+  try {
+    const raw = localStorage.getItem(LS_PREFIX + key);
+    if (raw) {
+      const parsed = JSON.parse(raw) as T;
+      memCache.set(key, parsed);
+      return parsed;
+    }
+  } catch {
+    // ignore — quota / parse error
+  }
+  return null;
+}
+
+function writeCache<T>(key: string, data: T): void {
+  memCache.set(key, data);
+  try {
+    localStorage.setItem(LS_PREFIX + key, JSON.stringify(data));
+  } catch {
+    // quota exceeded / serialize error — memory still有,LS skip
+  }
+}
+
 export interface UseApiOptions {
   intervalMs?: number;
   gate?: boolean;
@@ -27,6 +55,9 @@ export interface UseApiOptions {
   refetchOnVisible?: boolean;
   refetchOnFocus?: boolean;
   deps?: DependencyList;
+  // 設了 cacheKey → mount 立刻顯 cached(in-memory + localStorage),背景 fetch 更新
+  // (stale-while-revalidate)。PWA reload 體感像沒 reload(立刻看到上次資料)
+  cacheKey?: string;
 }
 
 export interface UseApiResult<T> {
@@ -46,9 +77,13 @@ export function useApi<T>(
     refetchOnVisible = true,
     refetchOnFocus = true,
     deps = [],
+    cacheKey,
   } = opts;
 
-  const [data, setData] = useState<T | null>(null);
+  // mount 時若有 cacheKey + cache 存在 → 立刻 hydrate(背景 fetch 仍跑)
+  const [data, setData] = useState<T | null>(() =>
+    cacheKey ? readCache<T>(cacheKey) : null
+  );
   const [error, setError] = useState<Error | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -70,6 +105,7 @@ export function useApi<T>(
           if (cancelled) return;
           setData(v);
           setError(null);
+          if (cacheKey) writeCache(cacheKey, v);
         })
         .catch((e) => {
           if (cancelled) return;
@@ -102,7 +138,7 @@ export function useApi<T>(
       if (refetchOnVisible) document.removeEventListener("visibilitychange", onVisible);
       if (refetchOnFocus) window.removeEventListener("focus", onFocus);
     };
-  }, [intervalMs, gate, idleMs, refetchOnVisible, refetchOnFocus, reloadKey, ...deps]);
+  }, [intervalMs, gate, idleMs, refetchOnVisible, refetchOnFocus, reloadKey, cacheKey, ...deps]);
 
   return { data, error, refetch };
 }

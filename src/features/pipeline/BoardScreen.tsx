@@ -256,7 +256,14 @@ export function BoardScreen({
       const sorted = [...((arr as Pipeline[]) ?? [])].sort((a, b) => tsOf(b) - tsOf(a));
       return { projectHash, pipelines: sorted };
     },
-    { intervalMs: 1500, gate: !!project?.hasInit, deps: [project, reloadKey] }
+    {
+      intervalMs: 1500,
+      gate: !!project?.hasInit,
+      deps: [project, reloadKey],
+      // PWA reload 體感 — mount 立刻顯上次 pipelines 快照(不等 network);背景 fetch 更新。
+      // hash 變動就換 cache key,避免顯到別 project 的舊資料
+      cacheKey: project?.hash ? `pipelines:${project.hash}` : undefined,
+    }
   );
   useEffect(() => {
     if (!project?.hasInit || project.hash !== hash) {
