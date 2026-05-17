@@ -16,6 +16,9 @@ export default defineConfig({
       injectManifest: {
         globPatterns: ["**/*.{js,css,html,svg,png,ico,webmanifest,json}"],
         maximumFileSizeToCacheInBytes: 5_000_000,
+        // 必須 'iife':SW 內部用 importScripts() 載 firebase compat,ESM SW(預設 'es')
+        // 內 importScripts() 不合法 → 'ServiceWorker script evaluation failed'
+        rollupFormat: "iife",
       },
     }),
   ],
