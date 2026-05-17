@@ -317,7 +317,7 @@ export function BoardScreen({
       return { projectHash, pipelines: sorted };
     },
     {
-      intervalMs: 1500,
+      intervalMs: 5000,
       gate: !!project?.hasInit,
       deps: [project, reloadKey],
       // PWA reload 體感 — mount 立刻顯上次 pipelines 快照(不等 network);背景 fetch 更新。
