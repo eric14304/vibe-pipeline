@@ -8,19 +8,22 @@
     <link rel="apple-touch-icon" href="/icon.svg" />
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#d4956d" />
-    <!-- 初始 body bg 對齊 theme,避免 React mount 前 white flash -->
+    <!-- 初始 body bg 對齊 theme,避免 React mount 前 white flash。
+         placeholder 不依賴外部 asset(避免 PWA offline / SW 沒 cache 時破圖) -->
     <style>
       html { background: #f7f4ee; }
       html:not(.light) { background: #1c1916; }
       body { margin: 0; }
       #vp-mount-loader {
         position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
-        flex-direction: column; gap: 12px;
-        font-family: 'Noto Sans TC', sans-serif;
+        font-family: 'Noto Sans TC', system-ui, sans-serif;
+        font-size: 13px; letter-spacing: 0.1em;
+        color: #d4956d;
+        animation: vp-pulse 1.4s ease-in-out infinite;
       }
-      #vp-mount-loader img { opacity: 0.7; }
-      #vp-mount-loader .vp-mount-msg {
-        font-size: 12px; color: #888; letter-spacing: 0.05em;
+      @keyframes vp-pulse {
+        0%, 100% { opacity: 0.35; }
+        50% { opacity: 0.85; }
       }
     </style>
     <script>
@@ -42,12 +45,24 @@
   </head>
   <body>
     <div id="root">
-      <!-- React mount 前 placeholder:避免 PWA reload 白屏一閃。React mount 後整段被取代 -->
-      <div id="vp-mount-loader">
-        <img src="/icon.svg" width="48" height="48" alt="" />
-        <div class="vp-mount-msg">載入中…</div>
-      </div>
+      <!-- React mount 前 placeholder:避免 PWA reload 白屏一閃。React mount 後整段被 root.render 取代。
+           不放 img / 外部 asset(避免 PWA offline / network 不可達時破圖) -->
+      <div id="vp-mount-loader">vibe-pipeline</div>
     </div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // 10 秒 React 還沒 mount(main.tsx 載失敗 / network 卡 / SW stale)→ 顯重試按鈕
+      setTimeout(function () {
+        var el = document.getElementById('vp-mount-loader');
+        if (!el) return; // React 已 mount,placeholder 不存在
+        el.innerHTML =
+          '<div style="display:flex;flex-direction:column;align-items:center;gap:10px">' +
+          '<div>vibe-pipeline 載入失敗</div>' +
+          '<button type="button" onclick="location.reload()" style="padding:6px 14px;border:1px solid currentColor;background:transparent;color:inherit;border-radius:6px;cursor:pointer;font-family:inherit;font-size:12px">重新整理</button>' +
+          '</div>';
+        el.style.animation = 'none';
+        el.style.opacity = '0.85';
+      }, 10000);
+    </script>
   </body>
 </html>
