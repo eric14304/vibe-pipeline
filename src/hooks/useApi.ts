@@ -124,15 +124,32 @@ export function useApi<T>(
     run();
 
     let timerId: ReturnType<typeof setInterval> | null = null;
-    if (typeof intervalMs === "number" && intervalMs > 0) {
+
+    const stopTimer = () => {
+      if (timerId !== null) {
+        clearInterval(timerId);
+        timerId = null;
+      }
+    };
+    const startTimer = () => {
+      if (timerId !== null) return;
+      if (typeof intervalMs !== "number" || intervalMs <= 0) return;
       const effective = gate ? intervalMs : typeof idleMs === "number" && idleMs > 0 ? idleMs : null;
       if (effective !== null) {
         timerId = setInterval(run, effective);
       }
-    }
+    };
+
+    // hidden 完全暫停 polling(0 network),visible 立刻 refetch + 恢復 interval
+    if (!document.hidden) startTimer();
 
     const onVisible = () => {
-      if (!document.hidden) run();
+      if (document.hidden) {
+        stopTimer();
+      } else {
+        run();
+        startTimer();
+      }
     };
     const onFocus = () => {
       run();
@@ -142,7 +159,7 @@ export function useApi<T>(
 
     return () => {
       cancelled = true;
-      if (timerId !== null) clearInterval(timerId);
+      stopTimer();
       if (refetchOnVisible) document.removeEventListener("visibilitychange", onVisible);
       if (refetchOnFocus) window.removeEventListener("focus", onFocus);
     };
