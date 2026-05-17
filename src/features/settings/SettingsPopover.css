@@ -4,8 +4,8 @@
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
-  /* 固定寬度,各 tab 切換時 popover 不會抖動;480 容得下 AI 任務 grid */
-  width: min(480px, calc(100vw - 32px));
+  /* 固定寬度,各 tab 切換時 popover 不會抖動;720 容得下 settings-row 三欄 layout(label / control / hint)*/
+  width: min(720px, calc(100vw - 32px));
   max-height: calc(100vh - 80px);
   overflow-y: auto;
   background: var(--bg-elevated);
@@ -453,6 +453,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
   font-size: 13px;
   font-weight: 500;
   color: var(--fg);
@@ -520,7 +521,7 @@
   content: none;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 767px) {
   .settings-row {
     flex-direction: column;
     align-items: stretch;
@@ -764,7 +765,7 @@
   margin-top: 2px;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 767px) {
   .install-chip-grid {
     grid-template-columns: 1fr;
   }
