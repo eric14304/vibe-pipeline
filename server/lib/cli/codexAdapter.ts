@@ -152,15 +152,15 @@ function commonExecArgs(model: string, effort: string): string[] {
   // 移除 --ignore-user-config(2026-05-13 雷):那 flag 會把 ~/.codex/config.toml 的
   // provider 設定(e.g. ChatGPT auth 模式 `provider = codex_local_access`)也 ignore 掉,
   // fallback 用 default OpenAI API 模式,但 auth.json 內若是 internal/beta key 會 401。
-  // 保留 --ignore-rules(rules 不影響 auth)+ -c mcp_servers={}(避免 MCP 干擾)。
+  // 保留 --ignore-rules(rules 不影響 auth)。
+  // 2026-05-17:拔 -c mcp_servers={},允許 user MCP pass-through(例 playwright MCP 截圖驗 UI)。
+  // 風險:user 自定 MCP 可能干擾 runner — 接受;不接受可加 whitelist(目前不做)。
   return [
     "codex",
     "exec",
     "--json",
     "--skip-git-repo-check",
     "--ignore-rules",
-    "-c",
-    "mcp_servers={}",
     "-c",
     `model="${model}"`,
     "-c",
