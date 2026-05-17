@@ -234,9 +234,69 @@ backend 一律回 `{ ok: true, data }` 或 `{ ok: false, error: { code, message 
 - 跨畫面跳轉**保留 query param**(`navigate(\`/drawer?project=\${project}&ticket=\${id}\`)`)
 - 寫一個 `src/router/buildPath.ts` helper 集中所有 route 構造,避免散落字串
 
+## PWA(Workbox + FCM 合併 SW)
+
+2026-05-17 起 build 走 vite-plugin-pwa `injectManifest`,跟既有 `firebase-messaging-sw.js` 合併為單一 SW。改 SW / install UX / manifest 前先看本段。
+
+### SW 檔位置與來源
+
+- **來源**:`public/firebase-messaging-sw.js`(repo 內,手寫)
+- **build 後**:`dist/firebase-messaging-sw.js`(plugin 把 `self.__WB_MANIFEST` inline,SW 路徑跟檔名都不變)
+- **dev mode 不發 SW**(雷區 #19)— `bun run dev` 5173 上 SW 不註冊,改邏輯後一律 `bun run build && bun run preview`(4173)驗
+
+### vite.config.ts plugin 設定要點
+
+```
+VitePWA({
+  strategies: 'injectManifest',
+  srcDir: 'public',
+  filename: 'firebase-messaging-sw.js',
+  injectRegister: false,                       // 註冊由 src/lib/fcm.ts 管,不讓 plugin 搶
+  injectManifest: { maximumFileSizeToCacheInBytes: 5_000_000 }
+})
+```
+
+`injectRegister: false` 是關鍵:plugin 不自己生 register script,SW 註冊仍由 `src/lib/fcm.ts:99`(`navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' })`)在 user 啟用 push 時做。
+
+### SW 內部三段共存
+
+`public/firebase-messaging-sw.js` 從上到下:
+
+1. **Workbox precache** — `precacheAndRoute(self.__WB_MANIFEST || [])`
+2. **Workbox runtime cache**(4 條 `registerRoute`)
+   - NavigationRoute → fallback `/index.html`
+   - `/api/*` GET → StaleWhileRevalidate(`cacheName: 'api-cache'`,filter 含 `request.method === 'GET'`,雷區 #21)
+   - `fonts.googleapis.com` → SWR
+   - `fonts.gstatic.com` → CacheFirst
+3. **FCM 段** — `importScripts(firebase-app + firebase-messaging)` + `messaging.onBackgroundMessage` + push event listener + `notificationclick` + `install`/`activate` 的 `skipWaiting()`/`clients.claim()`
+
+改任何一段都跑 `bun run build` 看 precache entries 數變化 + 開 `dist/firebase-messaging-sw.js` 確認另兩段還在(雷區 #20)。
+
+### Install prompt UX
+
+- `src/hooks/useInstallPrompt.ts` — 監聽 `beforeinstallprompt`(`preventDefault` + 存 event)、`appinstalled`、`matchMedia('(display-mode: standalone)')`,回傳 `{ canInstall, isInstalled, isBusy, promptInstall }`
+- `src/features/settings/SettingsPopover.tsx`「通知」tab 末尾 `<InstallAppSection>` 用上述 hook
+  - 已安裝 / 不支援 → disabled + 文字提示
+  - iOS Safari fallback 顯「請用分享 → 加入主畫面」hint
+
+### manifest
+
+- 手寫的 `public/manifest.json` 是 `index.html` 唯一 link 的 manifest(name / short_name / start_url / display:standalone / theme_color #d4956d / background_color / icons + 新增 description / lang `zh-Hant` / dir / orientation `any` / categories `[productivity, developer]` / shortcuts:看 Board → `/board`,設定 → `/?settings=1`,各帶 192 icon)
+- plugin 會另外產一份 `manifest.webmanifest`,**並存但不 link**(避免 plugin 不認手寫欄位導致資訊掉)
+
+### Lighthouse 驗收
+
+```
+bun run build && bun run preview
+# 開 http://localhost:4173 → DevTools → Lighthouse → PWA category → Analyze
+```
+
+目標 ≥ 90。Installable / SW / manifest 三條 check 都要過。改 manifest / SW / icon 後固定跑一次。
+
 ## 觸發本 SKILL 的場景
 
 - 改 `src/features/*` / `src/shell/*` / `src/ui/*` / `src/styles/*` / `src/App.tsx`
 - 加新畫面 / 新 route / 新 modal / popover
 - 動 token / theme / button 強度分級
 - 改 mobile RWD 或 portal 行為
+- 改 PWA / SW / manifest / install prompt(對應「PWA(Workbox + FCM 合併 SW)」段)

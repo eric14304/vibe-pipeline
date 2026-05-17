@@ -1,14 +1,32 @@
 {
   "name": "Vibe Pipeline",
   "short_name": "VibePipeline",
+  "description": "多 AI agent 的 ticket / pipeline 編排器,執行 AI 跑、審核 AI 審,自動迴圈直到通過。",
+  "lang": "zh-Hant",
+  "dir": "ltr",
   "start_url": "/",
   "display": "standalone",
+  "orientation": "any",
+  "categories": ["productivity", "developer"],
   "background_color": "#1c1916",
   "theme_color": "#d4956d",
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
     { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ],
+  "shortcuts": [
+    {
+      "name": "看 Board",
+      "short_name": "Board",
+      "url": "/board",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "設定",
+      "short_name": "設定",
+      "url": "/?settings=1",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
   ]
 }
-

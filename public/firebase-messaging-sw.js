@@ -1,3 +1,45 @@
+import { precacheAndRoute, createHandlerBoundToURL } from "workbox-precaching";
+import { registerRoute, NavigationRoute } from "workbox-routing";
+import { StaleWhileRevalidate, CacheFirst } from "workbox-strategies";
+import { ExpirationPlugin } from "workbox-expiration";
+import { CacheableResponsePlugin } from "workbox-cacheable-response";
+
+// vite-plugin-pwa injectManifest 注入點:build 時被取代成 precache manifest array
+precacheAndRoute(self.__WB_MANIFEST || []);
+
+// SPA navigation fallback → precached /index.html(offline 也能進畫面)
+registerRoute(new NavigationRoute(createHandlerBoundToURL("/index.html")));
+
+// /api/* GET → SWR(reload 立刻顯舊 + 背景 refresh);非 GET 不快取
+registerRoute(
+  ({ url, request }) => request.method === "GET" && url.pathname.startsWith("/api/"),
+  new StaleWhileRevalidate({
+    cacheName: "api-cache",
+    plugins: [new CacheableResponsePlugin({ statuses: [200] })],
+  })
+);
+
+// Google Fonts CSS
+registerRoute(
+  ({ url }) => url.origin === "https://fonts.googleapis.com",
+  new StaleWhileRevalidate({
+    cacheName: "google-fonts-stylesheets",
+    plugins: [new CacheableResponsePlugin({ statuses: [0, 200] })],
+  })
+);
+
+// Google Fonts files(woff2 etc)
+registerRoute(
+  ({ url }) => url.origin === "https://fonts.gstatic.com",
+  new CacheFirst({
+    cacheName: "google-fonts-webfonts",
+    plugins: [
+      new CacheableResponsePlugin({ statuses: [0, 200] }),
+      new ExpirationPlugin({ maxEntries: 30, maxAgeSeconds: 7 * 24 * 3600 }),
+    ],
+  })
+);
+
 importScripts("https://www.gstatic.com/firebasejs/12.13.0/firebase-app-compat.js");
 importScripts("https://www.gstatic.com/firebasejs/12.13.0/firebase-messaging-compat.js");
 
