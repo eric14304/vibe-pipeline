@@ -173,6 +173,25 @@ vbpl pipeline merge <id>                                        # 合併回 base
 
 ---
 
+## Service Worker / PWA 行為(2026-05-17 Workbox 整合)
+
+build pipeline 透過 [vite-plugin-pwa](https://vite-pwa-org.netlify.app/) `injectManifest` 模式,把 Workbox precache manifest 注入既有的 `public/firebase-messaging-sw.js`,產出 `dist/firebase-messaging-sw.js`。**同一份 SW 同時跑 Workbox(precache + runtime cache + navigation fallback)跟 FCM(push handler + notificationclick)**,不再分兩個 SW。
+
+- **Precache**:所有 build 產物(JS / CSS / HTML / SVG / PNG,目前 9 entries / ~640 KiB),首次打開後立刻可離線顯靜態 shell
+- **Runtime cache**
+  - `/api/*` GET → StaleWhileRevalidate(cache name `api-cache`,排除非 GET;reload 立刻顯舊資料 + 背景 refresh)
+  - Google Fonts `fonts.googleapis.com` / `fonts.gstatic.com` → CacheFirst / SWR
+- **Navigation fallback**:離線 / SPA route 一律 fallback `/index.html`,可進畫面顯舊 cache(不再純白頁)
+- **FCM push handler**:原 `messaging.onBackgroundMessage` + `notificationclick` 邏輯維持,跟 Workbox 共存於同 SW;雷區 #10 仍適用(Android 必須 SW 自己 `showNotification`)
+- **dev mode 不註冊 SW** — `bun run dev`(5173)用 vite-plugin-pwa 預設行為,不會起 SW;要驗 PWA / precache / install prompt 必須 `bun run build && bun run preview`(4173)
+- **SW 註冊入口**仍是 `src/lib/fcm.ts`(user 在「設定 → 通知」啟用 push 時才 register),plugin `injectRegister: false` 不搶
+- **安裝 App**按鈕在「**設定 → 通知**」tab 末尾:Chromium 系(Edge / Chrome / Android Chrome)抓 `beforeinstallprompt` event 觸發系統安裝;iOS Safari 走「分享 → 加入主畫面」(按鈕顯 fallback 提示)
+- **PWA manifest** 在 `public/manifest.json`,補了 description / lang `zh-Hant` / dir / orientation `any` / categories / shortcuts(看 Board / 開設定)/ 既有 name / icons / theme_color #d4956d 維持。`manifest.webmanifest`(plugin 產)跟 `manifest.json`(手寫)並存,`index.html` 只 link 後者
+
+跑 Lighthouse PWA audit:`bun run build && bun run preview` → 開 http://localhost:4173 → DevTools → Lighthouse → PWA category。
+
+---
+
 ## Repo 結構
 
 ```
