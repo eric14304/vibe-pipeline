@@ -131,9 +131,9 @@ description: vibe-pipeline 後端 / 執行層的職責邊界、約定與 invaria
   - 對 AI:跑中 pipeline → 一律 `vbpl pipeline stop` + `vbpl ticket update/add/remove` + `vbpl pipeline run`,不准 Python / Edit / mv 直接 patch `.vibe-pipeline/pipelines/*.json`
   - paused pipeline 改動雖無 race risk,**仍走 vbpl** 維持單一 mutation 通道(future MCP scope / audit log 才能 cover)
 
-## Phase 6 候選(動到的話走 ScopeReport)
+## 待動工(動到走 ScopeReport)
 
-清單在 [`CHANGELOG.md`](../../../docs/CHANGELOG.md) §Phase 6 候選。backend 相關:budget tracker UI 配套 endpoint / SQLite log 改造 / transient retry fixture / codex provider 收斂(從 runner 拿掉)。
+清單在 [`docs/TODO.md`](../../../docs/TODO.md)(對應 phase 8 pipeline)。backend 相關:#1 FCM gateway / #2 vbpl server cmd / #5 secret 洩漏偵測 / #7 backend self-heal / #8 pipeline delete cascade / #10 worktree staleness。
 
 ## 觸發本 SKILL 的場景
 

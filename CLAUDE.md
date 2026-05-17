@@ -14,10 +14,7 @@
 - Sub-agent 拆 executor / critic 兩個 TaskClass:executor 真改 code 用高 capability,critic 讀 diff 判 PASS/FAIL 用便宜 model;`syncJob` 衝突解走 executor cfg
 - Auth 設計:loopback IP 永遠 bypass,只非 loopback 連線強制 TOTP;本機 dev 完全不受影響
 
-**Phase 6 候選**(尚未動工)
-- **iOS PWA push 實測** — iOS 16.4+ 已支援 Web Push 但需先「加入主畫面」,目前只在 Android 驗過
-- **FCM push gateway 共用方案** — 規劃見 [`fcm-push-gateway-2026-05-17.md`](docs/refs/fcm-push-gateway-2026-05-17.md);動工時機:enduser 抱怨 Firebase setup 麻煩 / 做 hosted VP service 時
-- **`vbpl server start/stop/status/restart/logs`** — 規劃見 [`vbpl-server-cmd-2026-05-17.md`](docs/refs/vbpl-server-cmd-2026-05-17.md);enduser 不必懂 `bun run server` + repo cwd,vbpl 包這層
+**待動工清單**:見 [`docs/TODO.md`](docs/TODO.md)(對應 phase 8 pipeline `019e36fbea63-phase8`)。
 
 ## Repo 結構(物理路徑 single source of truth)
 
@@ -197,12 +194,12 @@ vibe-pipeline/
 | [`merge-isolation-2026-05-11.md`](docs/refs/merge-isolation-2026-05-11.md) | self-dogfood AI merge 撞 vite/bun watch 的研究紀錄;結論不做(99% user 不踩),phase 5+ 多人 self-dogfood 才回頭做 |
 | [`claude-cli-spawn-perf-2026-05-11.md`](docs/refs/claude-cli-spawn-perf-2026-05-11.md) | claude CLI spawn 加速 — QA/split/runner 三處 flag 改動量測(QA/split 省 80-90% cost)+ 風險 + 衍生 |
 | [`sync-redesign-2026-05-13.md`](docs/refs/sync-redesign-2026-05-13.md) | Sync 重構(Plan C)— 從 mode=sync ticket 拆成 pipeline.syncJob;state machine + 4 endpoints + AI 衝突解 prompt 設計 + 「靠 git 判定不靠 AI stdout」雷紀錄 |
-| [`skill-injection-2026-05-14.md`](docs/refs/skill-injection-2026-05-14.md) | Phase 7「引用重點 SKILL」設計討論(規劃中)— pointer vs inline 取捨、三來源、不拆 per-AI、plugin 不自動列舉、未定項清單 + plugin cache 雷 |
-| [`worktree-env-2026-05-15.md`](docs/refs/worktree-env-2026-05-15.md) | worktree gitignored 檔複製(採 `.worktreeinclude` 慣例)+ 漏設提醒 + merge 前 secret 洩漏偵測設計(規劃中)|
+| [`skill-injection-2026-05-14.md`](docs/refs/skill-injection-2026-05-14.md) | 「引用重點 SKILL」設計討論 — pointer vs inline 取捨、三來源、不拆 per-AI、plugin 不自動列舉、未定項清單 + plugin cache 雷 |
+| [`worktree-env-2026-05-15.md`](docs/refs/worktree-env-2026-05-15.md) | worktree gitignored 檔複製(採 `.worktreeinclude` 慣例)+ 漏設提醒 + merge 前 secret 洩漏偵測設計 |
 | [`pause-simplify-2026-05-17.md`](docs/refs/pause-simplify-2026-05-17.md) | 拔 graceful pause,UI/API/CLI 只留「停止」(immediate SIGKILL)— 7 張 ticket 拆分 spec(待跑) |
 | [`pause-simplify-run-postmortem-2026-05-17.md`](docs/refs/pause-simplify-run-postmortem-2026-05-17.md) | pause-simplify 跑前 + 第一次 run 踩雷紀錄(8 個 bug,5 新發現,提 follow-up pipeline 拆分建議) |
-| [`fcm-push-gateway-2026-05-17.md`](docs/refs/fcm-push-gateway-2026-05-17.md) | FCM push 共用方案(maintainer host gateway,enduser 不開 Firebase)— 規劃中,未動工 |
-| [`vbpl-server-cmd-2026-05-17.md`](docs/refs/vbpl-server-cmd-2026-05-17.md) | `vbpl server start/stop/status/restart/logs` CLI 包裝 — 規劃中,未動工 |
+| [`fcm-push-gateway-2026-05-17.md`](docs/refs/fcm-push-gateway-2026-05-17.md) | FCM push 共用方案(maintainer host gateway,enduser 不開 Firebase) |
+| [`vbpl-server-cmd-2026-05-17.md`](docs/refs/vbpl-server-cmd-2026-05-17.md) | `vbpl server start/stop/status/restart/logs` CLI 包裝 |
 
 **Archive(已落地或一次性閱讀)**:`docs/refs/archive/` 下 — phase 1/2 計畫已落地;`docs/refs/competitor-refs.md` 是 vibe-kanban / symphony / composio-ao 競品對照合集(設計初期一次性參考)。
 
