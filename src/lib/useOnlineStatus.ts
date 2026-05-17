@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 // online/offline 雙層偵測:
 // 1) navigator.onLine + online/offline event(系統層,連 wifi 報 online,可能 false positive)
-// 2) backend ping /api/health 每 15s(只在 visible 時 polling 省電) — 真實偵測 backend 通否
+// 2) backend ping /api/health 每 5s(只在 visible 時 polling 省電) — 真實偵測 backend 通否
 // 任一報 offline 就 return false(更保守,避免假 online 騙 user)。
 export function useOnlineStatus(): boolean {
   const [navOnline, setNavOnline] = useState<boolean>(
@@ -42,7 +42,7 @@ export function useOnlineStatus(): boolean {
     };
 
     ping();
-    timerId = setInterval(ping, 15_000);
+    timerId = setInterval(ping, 5_000);
 
     // visibility 切回也 ping 一次
     const onVisible = () => { if (!document.hidden) ping(); };
