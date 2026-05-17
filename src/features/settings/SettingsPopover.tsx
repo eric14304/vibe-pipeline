@@ -193,60 +193,34 @@ function PushNotificationsSection({
     }
   }
 
-  let statusIcon = "○";
-  let statusText = "尚未啟用";
-  let statusColor: string = "var(--fg-faint)";
-  if (supported === false) {
-    statusIcon = "✕";
-    statusText = "瀏覽器不支援推播";
-    statusColor = "var(--fg-faint)";
-  } else if (permission === "denied") {
-    statusIcon = "✕";
-    statusText = "權限已封鎖";
-    statusColor = "var(--failed)";
-  } else if (permission === "granted" && token) {
-    statusIcon = "●";
-    statusText = "已啟用";
-    statusColor = "var(--done)";
-  } else if (permission === "granted") {
-    statusIcon = "○";
-    statusText = "已授權,尚未註冊";
-    statusColor = "var(--fg-mute)";
-  }
+  const enabled = permission === "granted" && !!token;
+  const disabled = supported === false || permission === "denied" || loading || supported === null;
+  const hint = supported === false
+    ? "此瀏覽器不支援 Web Push。"
+    : permission === "denied"
+      ? "已被瀏覽器封鎖,請至網址列設定重新允許後再回此頁啟用。"
+      : loading
+        ? "處理中…"
+        : null;
 
   return (
     <div>
-      <div className="push-status-row">
-        <span className="push-status-icon" style={{ color: statusColor }}>{statusIcon}</span>
-        <span className="push-status-text">{statusText}</span>
-      </div>
-      {supported === false ? (
-        <div className="push-hint">此瀏覽器不支援 Web Push,改用桌面通知或行動 App。</div>
-      ) : permission === "denied" ? (
-        <div className="push-hint">已封鎖,請到瀏覽器網址列設定中重新允許後再回到此頁啟用。</div>
-      ) : token ? (
-        <div className="push-action-row">
-          <button
-            type="button"
-            className="btn"
-            disabled={loading}
-            onClick={() => void disable()}
-          >
-            {loading ? "處理中…" : "停用通知"}
-          </button>
-        </div>
-      ) : (
-        <div className="push-action-row">
-          <button
-            type="button"
-            className="btn"
-            disabled={loading || supported === null}
-            onClick={() => void enable()}
-          >
-            {loading ? "處理中…" : "啟用通知"}
-          </button>
-        </div>
-      )}
+      <label
+        className={"toggle-pill mono" + (enabled ? " is-on" : "")}
+        style={{ width: "100%", justifyContent: "space-between", opacity: disabled ? 0.55 : 1, cursor: disabled ? "not-allowed" : "pointer" }}
+      >
+        <input
+          type="checkbox"
+          checked={enabled}
+          disabled={disabled}
+          onChange={(e) => {
+            if (e.target.checked) void enable();
+            else void disable();
+          }}
+        />
+        <span>{enabled ? "推播通知 已啟用" : "啟用推播通知"}</span>
+      </label>
+      {hint && <div className="push-hint" style={{ marginTop: 6 }}>{hint}</div>}
       <div className="settings-popover-task-grid" aria-label="推播事件">
         {PUSH_EVENT_LABELS.map((item) => {
           const checked = userCfg?.pushEvents[item.key] ?? true;
