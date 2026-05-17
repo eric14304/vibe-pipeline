@@ -16,6 +16,7 @@
 
 **Phase 6 候選**(尚未動工)
 - **iOS PWA push 實測** — iOS 16.4+ 已支援 Web Push 但需先「加入主畫面」,目前只在 Android 驗過
+- **FCM push gateway 共用方案** — 規劃見 [`fcm-push-gateway-2026-05-17.md`](docs/refs/fcm-push-gateway-2026-05-17.md);動工時機:enduser 抱怨 Firebase setup 麻煩 / 做 hosted VP service 時
 
 ## Repo 結構(物理路徑 single source of truth)
 
@@ -199,6 +200,7 @@ vibe-pipeline/
 | [`worktree-env-2026-05-15.md`](docs/refs/worktree-env-2026-05-15.md) | worktree gitignored 檔複製(採 `.worktreeinclude` 慣例)+ 漏設提醒 + merge 前 secret 洩漏偵測設計(規劃中)|
 | [`pause-simplify-2026-05-17.md`](docs/refs/pause-simplify-2026-05-17.md) | 拔 graceful pause,UI/API/CLI 只留「停止」(immediate SIGKILL)— 7 張 ticket 拆分 spec(待跑) |
 | [`pause-simplify-run-postmortem-2026-05-17.md`](docs/refs/pause-simplify-run-postmortem-2026-05-17.md) | pause-simplify 跑前 + 第一次 run 踩雷紀錄(8 個 bug,5 新發現,提 follow-up pipeline 拆分建議) |
+| [`fcm-push-gateway-2026-05-17.md`](docs/refs/fcm-push-gateway-2026-05-17.md) | FCM push 共用方案(maintainer host gateway,enduser 不開 Firebase)— 規劃中,未動工 |
 
 **Archive(已落地或一次性閱讀)**:`docs/refs/archive/` 下 — phase 1/2 計畫已落地;`docs/refs/competitor-refs.md` 是 vibe-kanban / symphony / composio-ao 競品對照合集(設計初期一次性參考)。
 
