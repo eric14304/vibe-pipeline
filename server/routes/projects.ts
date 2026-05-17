@@ -19,6 +19,50 @@ import type { ApiErrorCode, Project } from "../../shared/types";
 // validProjectPath 是 isExistingDirectory 在 routes 層的 alias,維持原本呼叫點不動。
 const validProjectPath = isExistingDirectory;
 
+// 包 mutation handler:開頭寫 pending 一筆,Response 看 ok 寫 ok / 看 error envelope 寫 error。
+// caller 不必手動 finalize。throw 的話 catch 並重 throw 給上層 500。
+async function withUserAudit(
+  projectPath: string,
+  meta: { action: string; pipelineId?: string; ticketId?: string },
+  fn: () => Promise<Response>
+): Promise<Response> {
+  const handle = auditLog.beginUserAction({
+    projectPath,
+    action: meta.action,
+    pipelineId: meta.pipelineId,
+    ticketId: meta.ticketId,
+  });
+  let res: Response;
+  try {
+    res = await fn();
+  } catch (e) {
+    handle.error(String(e), "thrown");
+    throw e;
+  }
+  // 嘗試 inspect response envelope 判斷 ok/err。clone 才不會耗掉 body。
+  try {
+    const cloned = res.clone();
+    const parsed = (await cloned.json()) as
+      | { ok: true }
+      | { ok: false; error?: { code?: string; message?: string } };
+    if (parsed && parsed.ok === true) {
+      handle.ok();
+    } else if (parsed && parsed.ok === false) {
+      const code = parsed.error?.code;
+      const msg = parsed.error?.message ?? "(no message)";
+      handle.error(msg, code);
+    } else {
+      // 非預期 envelope(理論不會發生)— 看 HTTP status 推斷
+      if (res.ok) handle.ok();
+      else handle.error(`http ${res.status}`, "non_envelope");
+    }
+  } catch {
+    if (res.ok) handle.ok();
+    else handle.error(`http ${res.status}`, "envelope_parse_failed");
+  }
+  return res;
+}
+
 export async function listRecent(): Promise<Response> {
   const items = await projectStore.listRecent();
   return ok(items);
@@ -332,53 +376,55 @@ export async function reveal(hash: string): Promise<Response> {
 export async function runPipeline(hash: string, pipelineId: string): Promise<Response> {
   const project = await projectStore.findByHash(hash);
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);
-  if (!validProjectPath(project.path)) return err("invalid_path", `Path missing: ${project.path}`);
-  if (!project.hasGit) return err("invalid_path", "Project 沒 .git/,先 git init 再跑 pipeline");
-  // User 顯式按繼續 = 明確要重試:把所有 failed_transient ticket reset 成 paused,
-  // 否則 runner 主迴圈規則「遇 failed_transient 立刻暫停」會讓 pipeline 秒退。
-  // 設計初衷是「不自動重試燒 token」,但 user 主動點繼續就是 explicit consent。
-  try {
-    await pipelineDir.mutatePipeline(project.path, pipelineId, (p) => {
-      for (const t of p.tickets ?? []) {
-        if (t.status === "failed_transient") {
-          t.status = "paused";
+  return withUserAudit(project.path, { action: "pipeline.run", pipelineId }, async () => {
+    if (!validProjectPath(project.path)) return err("invalid_path", `Path missing: ${project.path}`);
+    if (!project.hasGit) return err("invalid_path", "Project 沒 .git/,先 git init 再跑 pipeline");
+    // User 顯式按繼續 = 明確要重試:把所有 failed_transient ticket reset 成 paused,
+    // 否則 runner 主迴圈規則「遇 failed_transient 立刻暫停」會讓 pipeline 秒退。
+    // 設計初衷是「不自動重試燒 token」,但 user 主動點繼續就是 explicit consent。
+    try {
+      await pipelineDir.mutatePipeline(project.path, pipelineId, (p) => {
+        for (const t of p.tickets ?? []) {
+          if (t.status === "failed_transient") {
+            t.status = "paused";
+          }
         }
-      }
-      return p;
-    }, {
-      source: "api-run-pipeline",
-      sourceDetail: "reset failed_transient → paused on user run",
-    });
-  } catch (e) {
-    console.warn(`[runPipeline] reset failed_transient skipped: ${String(e)}`);
-  }
-  const r = await orchestrator.start({
-    projectPath: project.path,
-    projectHash: hash,
-    pipelineId,
-  });
-  if (!r.ok) {
-    // budget_exceeded → 402 Payment Required + body 帶 spent/limit 給前端顯示
-    if (r.reason === "budget_exceeded") {
-      return Response.json(
-        {
-          ok: false,
-          error: {
-            code: "budget_exceeded" satisfies ApiErrorCode,
-            message: r.error,
-            spent: r.spent,
-            limit: r.limit,
-          },
-        },
-        { status: 402 }
-      );
+        return p;
+      }, {
+        source: "api-run-pipeline",
+        sourceDetail: "reset failed_transient → paused on user run",
+      });
+    } catch (e) {
+      console.warn(`[runPipeline] reset failed_transient skipped: ${String(e)}`);
     }
-    // 邏輯阻擋(state guard / 已在跑等)用 409 conflict;真正爆炸用 500
-    const isConflict = /已在|完成|排隊|merge/.test(r.error);
-    return err("invalid_path", r.error, isConflict ? 409 : 500);
-  }
-  // queued: true 時,前端可立即顯示「排隊中(順位 N)」不等下一輪 poll
-  return ok({ ok: true, queued: r.queued ?? false, position: r.position ?? 0 });
+    const r = await orchestrator.start({
+      projectPath: project.path,
+      projectHash: hash,
+      pipelineId,
+    });
+    if (!r.ok) {
+      // budget_exceeded → 402 Payment Required + body 帶 spent/limit 給前端顯示
+      if (r.reason === "budget_exceeded") {
+        return Response.json(
+          {
+            ok: false,
+            error: {
+              code: "budget_exceeded" satisfies ApiErrorCode,
+              message: r.error,
+              spent: r.spent,
+              limit: r.limit,
+            },
+          },
+          { status: 402 }
+        );
+      }
+      // 邏輯阻擋(state guard / 已在跑等)用 409 conflict;真正爆炸用 500
+      const isConflict = /已在|完成|排隊|merge/.test(r.error);
+      return err("invalid_path", r.error, isConflict ? 409 : 500);
+    }
+    // queued: true 時,前端可立即顯示「排隊中(順位 N)」不等下一輪 poll
+    return ok({ ok: true, queued: r.queued ?? false, position: r.position ?? 0 });
+  });
 }
 
 // GET /api/projects/:hash/pipelines/:id/diff-stat
@@ -421,29 +467,30 @@ export async function pausePipeline(
 ): Promise<Response> {
   const project = await projectStore.findByHash(hash);
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);
+  return withUserAudit(project.path, { action: "pipeline.pause", pipelineId }, async () => {
+    // queued 狀態走 cancelQueued(直接從 queue 拔 + 標 paused);running 走立即停止。
+    if (orchestrator.isQueued(hash, pipelineId)) {
+      const r = await orchestrator.cancelQueued({
+        projectPath: project.path,
+        projectHash: hash,
+        pipelineId,
+      });
+      if (!r.ok) return err("invalid_path", r.error, 409);
+      return ok({ ok: true, cancelled: true });
+    }
 
-  // queued 狀態走 cancelQueued(直接從 queue 拔 + 標 paused);running 走立即停止。
-  if (orchestrator.isQueued(hash, pipelineId)) {
-    const r = await orchestrator.cancelQueued({
+    const r = await orchestrator.stopImmediate({
       projectPath: project.path,
       projectHash: hash,
       pipelineId,
     });
-    if (!r.ok) return err("invalid_path", r.error, 409);
-    return ok({ ok: true, cancelled: true });
-  }
-
-  const r = await orchestrator.stopImmediate({
-    projectPath: project.path,
-    projectHash: hash,
-    pipelineId,
+    if (!r.ok) {
+      const code: ApiErrorCode = r.code === "not_found" ? "not_found" : "invalid_path";
+      const status = code === "not_found" ? 404 : 409;
+      return err(code, r.error, status);
+    }
+    return ok({ ok: true });
   });
-  if (!r.ok) {
-    const code: ApiErrorCode = r.code === "not_found" ? "not_found" : "invalid_path";
-    const status = code === "not_found" ? 404 : 409;
-    return err(code, r.error, status);
-  }
-  return ok({ ok: true });
 }
 
 // AI merge(ticket-based):append 一張 mode=merge synthetic ticket 進 pipeline,
@@ -456,6 +503,7 @@ export async function pausePipeline(
 export async function mergePipeline(hash: string, pipelineId: string): Promise<Response> {
   const project = await projectStore.findByHash(hash);
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);
+  return withUserAudit(project.path, { action: "pipeline.merge", pipelineId }, async () => {
 
   // 第 1 段:純 git merge
   const mech = await autoMergeNoAI({
@@ -512,6 +560,7 @@ export async function mergePipeline(hash: string, pipelineId: string): Promise<R
     case "working_tree_dirty":return err("invalid_path", mech.error, 409);
     case "git_error":         return err("invalid_path", mech.error, 500);
   }
+  });
 }
 
 // GET sync 狀態:回 worktree 落後 base 幾個 commit
@@ -539,30 +588,32 @@ export async function syncStatus(hash: string, pipelineId: string): Promise<Resp
 export async function syncPipeline(hash: string, pipelineId: string): Promise<Response> {
   const project = await projectStore.findByHash(hash);
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);
-  if (!project.hasGit) return err("invalid_path", "Project 沒 .git/", 400);
-  if (orchestrator.isRunning(hash, pipelineId)) {
-    return err("invalid_path", "Pipeline 在跑,先 pause 才能 sync", 409);
-  }
-  const pipeline = (await pipelineDir.readPipeline(project.path, pipelineId)) as {
-    state?: string;
-    branch?: string;
-    baseBranch?: string;
-    [k: string]: unknown;
-  } | null;
-  if (!pipeline) return err("not_found", `Pipeline not found: ${pipelineId}`, 404);
-  if (pipeline.state === "queued") return err("invalid_path", "Pipeline 在排隊,等開跑後 pause 才能 sync", 409);
+  return withUserAudit(project.path, { action: "pipeline.sync", pipelineId }, async () => {
+    if (!project.hasGit) return err("invalid_path", "Project 沒 .git/", 400);
+    if (orchestrator.isRunning(hash, pipelineId)) {
+      return err("invalid_path", "Pipeline 在跑,先 pause 才能 sync", 409);
+    }
+    const pipeline = (await pipelineDir.readPipeline(project.path, pipelineId)) as {
+      state?: string;
+      branch?: string;
+      baseBranch?: string;
+      [k: string]: unknown;
+    } | null;
+    if (!pipeline) return err("not_found", `Pipeline not found: ${pipelineId}`, 404);
+    if (pipeline.state === "queued") return err("invalid_path", "Pipeline 在排隊,等開跑後 pause 才能 sync", 409);
 
-  const res = await syncJob.startSync({
-    projectPath: project.path,
-    projectHash: hash,
-    pipelineId,
-  });
-  if (!res.ok) return err("invalid_path", res.error, 409);
-  return ok({
-    ok: true,
-    state: res.state,
-    behind: res.behind,
-    conflictFiles: res.conflictFiles,
+    const res = await syncJob.startSync({
+      projectPath: project.path,
+      projectHash: hash,
+      pipelineId,
+    });
+    if (!res.ok) return err("invalid_path", res.error, 409);
+    return ok({
+      ok: true,
+      state: res.state,
+      behind: res.behind,
+      conflictFiles: res.conflictFiles,
+    });
   });
 }
 
@@ -570,26 +621,30 @@ export async function syncPipeline(hash: string, pipelineId: string): Promise<Re
 export async function syncConfirmAi(hash: string, pipelineId: string): Promise<Response> {
   const project = await projectStore.findByHash(hash);
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);
-  const res = await syncJob.confirmAi({
-    projectPath: project.path,
-    projectHash: hash,
-    pipelineId,
+  return withUserAudit(project.path, { action: "pipeline.sync.confirmAi", pipelineId }, async () => {
+    const res = await syncJob.confirmAi({
+      projectPath: project.path,
+      projectHash: hash,
+      pipelineId,
+    });
+    if (!res.ok) return err("invalid_path", res.error, 409);
+    return ok({ ok: true });
   });
-  if (!res.ok) return err("invalid_path", res.error, 409);
-  return ok({ ok: true });
 }
 
 // POST /sync/cancel:取消 sync(conflict_await 階段 = 不解了 / ai_running 階段 = 殺 AI)
 export async function syncCancel(hash: string, pipelineId: string): Promise<Response> {
   const project = await projectStore.findByHash(hash);
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);
-  const res = await syncJob.cancelSync({
-    projectPath: project.path,
-    projectHash: hash,
-    pipelineId,
+  return withUserAudit(project.path, { action: "pipeline.sync.cancel", pipelineId }, async () => {
+    const res = await syncJob.cancelSync({
+      projectPath: project.path,
+      projectHash: hash,
+      pipelineId,
+    });
+    if (!res.ok) return err("invalid_path", res.error, 409);
+    return ok({ ok: true });
   });
-  if (!res.ok) return err("invalid_path", res.error, 409);
-  return ok({ ok: true });
 }
 
 // POST /sync/dismiss:user 看完 done / failed 狀態後 dismiss(把 syncJob 從 pipeline.json 拿掉)
@@ -733,6 +788,30 @@ export async function listPipelineAudit(
   const limitRaw = url.searchParams.get("limit");
   const limit = limitRaw && /^\d+$/.test(limitRaw) ? Math.min(500, parseInt(limitRaw, 10)) : 50;
   const entries = auditLog.listAudit(project.path, pipelineId, limit);
+  return ok(entries);
+}
+
+// GET /api/projects/:hash/audit?type=user_action&action=&pipelineId=&ticketId=&limit=
+// 跨 pipeline / 跨 type query。目前只支援 type=user_action(state_change 走 pipeline-level endpoint)。
+export async function listProjectAudit(hash: string, req: Request): Promise<Response> {
+  const project = await projectStore.findByHash(hash);
+  if (!project) return err("not_found", `Project not found: ${hash}`, 404);
+  const url = new URL(req.url);
+  const type = url.searchParams.get("type") ?? "user_action";
+  if (type !== "user_action") {
+    return err("invalid_path", `unsupported audit type: ${type}`, 400);
+  }
+  const action = url.searchParams.get("action") ?? undefined;
+  const pipelineId = url.searchParams.get("pipelineId") ?? undefined;
+  const ticketId = url.searchParams.get("ticketId") ?? undefined;
+  const limitRaw = url.searchParams.get("limit");
+  const limit = limitRaw && /^\d+$/.test(limitRaw) ? Math.min(500, parseInt(limitRaw, 10)) : 50;
+  const entries = auditLog.listUserActions(project.path, {
+    action,
+    pipelineId,
+    ticketId,
+    limit,
+  });
   return ok(entries);
 }
 

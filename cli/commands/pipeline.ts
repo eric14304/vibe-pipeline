@@ -4,6 +4,7 @@ import * as pipelineDir from "../../server/lib/pipelineDir";
 import * as orchestrator from "../../server/lib/runner/orchestrator";
 import * as runLog from "../../server/lib/runner/runLog";
 import * as syncJob from "../../server/lib/runner/syncJob";
+import * as auditLog from "../../server/lib/auditLog";
 import { resolveProject, requireInit } from "../lib/project";
 import { post } from "../lib/api";
 import type { ParsedArgs } from "../lib/args";
@@ -482,13 +483,28 @@ async function pipelineSync(args: ParsedArgs): Promise<void> {
     return;
   }
 
-  // Default action:啟動 sync
-  const res = await syncJob.startSync({
+  // Default action:啟動 sync(CLI 直接呼 lib,不經 backend route → 自己 audit)
+  const handle = auditLog.beginUserAction({
     projectPath: proj.path,
-    projectHash: proj.hash,
+    action: "pipeline.sync",
     pipelineId: id,
   });
-  if (!res.ok) fail("STATE_GUARD", res.error);
+  let res: Awaited<ReturnType<typeof syncJob.startSync>>;
+  try {
+    res = await syncJob.startSync({
+      projectPath: proj.path,
+      projectHash: proj.hash,
+      pipelineId: id,
+    });
+  } catch (e) {
+    handle.error(String(e), "thrown");
+    throw e;
+  }
+  if (!res.ok) {
+    handle.error(res.error, "state_guard");
+    fail("STATE_GUARD", res.error);
+  }
+  handle.ok();
 
   if (isJsonMode()) {
     okJson({ state: res.state, behind: res.behind, conflictFiles: res.conflictFiles });

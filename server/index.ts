@@ -150,6 +150,7 @@ async function handle(req: Request): Promise<Response> {
     if (rest === "/config" && method === "GET") return projects.getConfig(hash);
     if (rest === "/config" && method === "PUT") return projects.updateConfig(hash, req);
     if (rest === "/runtime" && method === "GET") return projects.getRuntime(hash);
+    if (rest === "/audit" && method === "GET") return projects.listProjectAudit(hash, req);
     if (rest === "/pipelines" && method === "GET") return projects.listPipelines(hash);
     if (rest === "/pipelines" && method === "POST") return projects.createPipeline(hash, req);
     const pipelineMatch = rest.match(/^\/pipelines\/([a-z0-9_-]+)$/);
