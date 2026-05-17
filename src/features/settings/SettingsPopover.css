@@ -395,3 +395,147 @@
     background: var(--bg-elevated);
   }
 }
+
+/* ─── Settings redesign v2 utilities(ticket S1)─────────────────
+   給 S2-S4 重排各 tab row 用,目前 SettingsPopover.tsx 還沒套。
+   設計風格對齊 docs/refs/images/settings-redesign/*.png:
+   - 每 row 三欄:左 label(icon+title+subtitle)/ 中 control / 右 hint 灰小字
+   - 卡片風:1px line border + radius + padding
+   - amber tip card:淡 amber bg + 💡 + 文字
+   - RWD <600px:row stacked(flex column)
+   Scoped spacing/radius 變數在這層宣告,不污染 tokens.css(若日後升 global 再搬)。 */
+
+.settings-popover {
+  --settings-space-1: 4px;
+  --settings-space-2: 8px;
+  --settings-space-3: 12px;
+  --settings-space-4: 16px;
+  --settings-space-5: 20px;
+}
+
+.settings-section {
+  margin-bottom: var(--settings-space-4);
+}
+.settings-section:last-child {
+  margin-bottom: 0;
+}
+
+.settings-section > .settings-section-title {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--fg);
+  margin-bottom: var(--settings-space-2);
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: var(--settings-space-3);
+  padding: var(--settings-space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  margin-bottom: var(--settings-space-2);
+}
+.settings-row:last-child {
+  margin-bottom: 0;
+}
+
+.settings-row-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.settings-row-label-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg);
+}
+
+.settings-row-label-head .settings-row-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg-mute);
+  flex-shrink: 0;
+}
+
+.settings-row-label-sub {
+  font-size: 11.5px;
+  color: var(--fg-mute);
+  line-height: 1.4;
+}
+
+.settings-row-control {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--settings-space-2);
+}
+
+.settings-row-control--multi {
+  display: flex;
+  align-items: center;
+  gap: var(--settings-space-2);
+  flex-wrap: nowrap;
+}
+
+.settings-row-hint {
+  flex: 0 0 auto;
+  max-width: 220px;
+  color: var(--fg-mute);
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.settings-tip-card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--settings-space-2);
+  padding: var(--settings-space-3);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, #d4a76a 14%, var(--panel));
+  border: 1px solid color-mix(in srgb, #d4a76a 30%, var(--line));
+  color: var(--fg);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.settings-tip-card::before {
+  content: "💡";
+  flex-shrink: 0;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.settings-tip-card--no-icon::before {
+  content: none;
+}
+
+@media (max-width: 600px) {
+  .settings-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--settings-space-2);
+  }
+
+  .settings-row-control,
+  .settings-row-control--multi {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .settings-row-hint {
+    max-width: 100%;
+    width: 100%;
+  }
+}
