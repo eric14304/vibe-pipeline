@@ -49,6 +49,38 @@ project(user 的某個 git repo)
 - **step mode**:跑一次就收(no critic loop)
 - **autoMerge**:全 ticket done → 自動 git merge 回 base(衝突才 AI)
 
+## 怎麼拆 ticket(精神比 mechanics 重要)
+
+**Ticket = vertical slice**(獨立可交付的小單元),**不是 lifecycle stage**(規劃 / 寫 / 測)。AI 在小範圍內表現好,但前提是「小範圍 = 完整可單獨交付」,不是「lifecycle 切一段」。
+
+### 反面教材
+
+```
+t1: 規劃 X
+t2: 實作 X
+t3: 測 X
+```
+
+→ t2 critic 只看自己 acceptance,AI 視野等於 ticket goal,跨 ticket 一致性丟失。最後 t3 才發現 t2 跟 t1 規劃對不上。
+
+### 正確切法
+
+```
+t1: feature A 完整(含 spec + 實作 + 自驗)
+t2: feature B 完整(獨立可 merge,不破 A)
+t3: feature C 完整
+```
+
+每 ticket 自帶 iter critic loop,executor 內部跑「規劃 → 實作 → 驗」全 lifecycle。**ticket 之間是水平劃分**,不是垂直流程。
+
+### 拆 ticket 對齊清單
+
+- goal 寫「一塊完整可交付」,不是「一個階段」
+- acceptance 加「跟 sibling ticket / 既有 code 一致」(critic 視野不只 goal 內)
+- 太大(>500 行 / 跨 3+ 模組)→ 拆兩個 vertical slice,**不**是 plan / impl 分
+- 太小(<30 行單檔)→ 併進相關 slice,不獨立 ticket
+- 用 QA drawer 跟 AI 聊規格時,AI 看到跨多件獨立工作會自動建議拆 — 採納前確認「拆出來每張都是 vertical slice 不是 lifecycle stage」
+
 ## 你能做什麼(透過 vbpl CLI)
 
 **讀(不需 backend)**:
