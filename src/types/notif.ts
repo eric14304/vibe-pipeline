@@ -29,4 +29,4 @@ export type NotifItem = {
 };
 
 export type InboxState = "expanded" | "collapsed" | "hidden";
-export type InboxFilter = "all" | "unread" | "blocking" | "frontend";
+export type InboxFilter = "all" | "unread" | "blocking";

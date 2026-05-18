@@ -205,27 +205,29 @@ function PushNotificationsSection({
 
   return (
     <div>
-      <label
-        className={"toggle-pill mono" + (enabled ? " is-on" : "")}
-        style={{ opacity: disabled ? 0.55 : 1, cursor: disabled ? "not-allowed" : "pointer" }}
-      >
-        <input
-          type="checkbox"
-          checked={enabled}
-          disabled={disabled}
-          onChange={(e) => {
-            if (e.target.checked) void enable();
-            else void disable();
-          }}
-        />
-        <span className="toggle-pill-track" aria-hidden>
-          <span className="toggle-pill-thumb" />
-        </span>
-        {enabled ? "推播通知 已啟用" : "啟用推播通知"}
-      </label>
-      {hint && <div className="push-hint" style={{ marginTop: 6 }}>{hint}</div>}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <label
+          className={"toggle-pill mono" + (enabled ? " is-on" : "")}
+          style={{ opacity: disabled ? 0.55 : 1, cursor: disabled ? "not-allowed" : "pointer" }}
+        >
+          <input
+            type="checkbox"
+            checked={enabled}
+            disabled={disabled}
+            onChange={(e) => {
+              if (e.target.checked) void enable();
+              else void disable();
+            }}
+          />
+          <span className="toggle-pill-track" aria-hidden>
+            <span className="toggle-pill-thumb" />
+          </span>
+          {enabled ? "推播通知" : "啟用推播通知"}
+        </label>
+        {hint && <span className="push-hint" style={{ margin: 0 }}>{hint}</span>}
+      </div>
       {enabled && (
-        <div className="settings-popover-task-grid" aria-label="推播事件" style={{ marginTop: "var(--space-3)" }}>
+        <div className="settings-popover-task-grid" aria-label="推播事件" style={{ marginTop: 14, marginLeft: 12, paddingLeft: 12, borderLeft: "2px solid var(--line)", width: "fit-content", alignItems: "stretch" }}>
           {PUSH_EVENT_LABELS.map((item) => {
             const checked = userCfg?.pushEvents[item.key] ?? true;
             return (
@@ -258,15 +260,6 @@ function PushNotificationsSection({
   );
 }
 
-// PWA 行為 hint — 只留真正需要 user 知道的(其他靠 UX 自然體會)
-function PwaInfoHint() {
-  return (
-    <div className="push-hint" style={{ marginTop: "var(--space-2)" }}>
-      離線可看快取,但啟動 / 暫停 pipeline 需連線。iOS 安裝走「分享 → 加入主畫面」。
-    </div>
-  );
-}
-
 function InstallAppSection({ onActionError }: { onActionError?: (message: string) => void }) {
   const { canInstall, installed, promptInstall } = useInstallPrompt();
   const [busy, setBusy] = useState(false);
@@ -286,7 +279,7 @@ function InstallAppSection({ onActionError }: { onActionError?: (message: string
   // button 只在「真能 prompt」(canInstall + 未 install)才顯,避免 disabled button 誤導 user 點不動以為壞。
   // 已 install / 不能 prompt 都改純文字提示。
   return (
-    <div style={{ marginTop: "var(--space-3)" }}>
+    <>
       <div className="settings-section-title">安裝為 App</div>
       {canInstall && !installed && (
         <div className="push-action-row">
@@ -295,14 +288,14 @@ function InstallAppSection({ onActionError }: { onActionError?: (message: string
           </button>
         </div>
       )}
-      <div className="push-hint">
+      <div className="push-hint" style={{ margin: 0 }}>
         {installed
-          ? "✓ 已加入桌面 / 主畫面,可直接從 App 圖示開啟。"
+          ? "已安裝,直接從 App 圖示開啟即可。"
           : canInstall
-            ? "加入桌面 / 主畫面後可全螢幕開啟,推播也更穩。"
-            : "瀏覽器沒提示可安裝(可能已安裝過 / iOS Safari / 不支援);若要安裝請用瀏覽器網址列右側「⊕ 安裝」icon,或 iOS Safari「分享 → 加入主畫面」。"}
+            ? "安裝後可全螢幕、推播更穩。"
+            : "沒安裝鈕?可能已裝、或瀏覽器不支援。Chrome / Edge 用網址列「⊕」;iOS Safari 走「分享 → 加入主畫面」。"}
       </div>
-    </div>
+    </>
   );
 }
 
@@ -741,7 +734,9 @@ export function SettingsPopover({
       </div>
 
       {/* ─── Project tab ─── */}
-      {activeTab === "project" && <>
+      {activeTab === "project" && (
+        <div className="settings-tab-content">
+          <div className="task-group task-group--primary">
       <div className="settings-field-row">
         <label className="settings-field-label">平行上限</label>
         <div className="settings-field-controls">
@@ -862,75 +857,80 @@ export function SettingsPopover({
         </label>
       </div>
       <div className="settings-subhint">每條 pipeline 也可單獨切換。</div>
-      </>}
+          </div>
+        </div>
+      )}
 
       {/* ─── AI 任務 tab ─── */}
-      {activeTab === "ai" && <>
-      <div className="settings-section-title">
-        全域 provider / model 設定
-      </div>
-      {userCfg ? (
-        <>
-        {/* Group 1:獨立 agent(各自挑 provider) */}
-        <div className="settings-popover-task-grid task-group task-group--primary">
-          {(["qa", "split", "runner"] as const).map((tc) => (
-            <TaskModelRow
-              key={tc}
-              label={TASK_CLASS_LABELS[tc]}
-              hint={TASK_CLASS_HINTS[tc]}
-              provider={userCfg.defaults[tc].provider}
-              model={userCfg.defaults[tc].model}
-              effort={userCfg.defaults[tc].effort}
-              showProvider
-              onChange={(patch) => updateTask(tc, patch)}
-            />
-          ))}
+      {activeTab === "ai" && (
+        <div className="settings-tab-content">
+          {userCfg ? (
+            <>
+              {/* Group 1:獨立 agent(各自挑 provider) */}
+              <div className="task-group task-group--primary">
+                <div className="settings-section-title">全域 provider / model 設定</div>
+                <div className="settings-popover-task-grid">
+                  {(["qa", "split", "runner"] as const).map((tc) => (
+                    <TaskModelRow
+                      key={tc}
+                      label={TASK_CLASS_LABELS[tc]}
+                      hint={TASK_CLASS_HINTS[tc]}
+                      provider={userCfg.defaults[tc].provider}
+                      model={userCfg.defaults[tc].model}
+                      effort={userCfg.defaults[tc].effort}
+                      showProvider
+                      onChange={(patch) => updateTask(tc, patch)}
+                    />
+                  ))}
+                </div>
+              </div>
+              {/* Group 2:跟主 agent(只挑 model / effort,provider 跟 runner) */}
+              <div className="task-group task-group--secondary">
+                <div className="task-group-hint">
+                  ↑ 為了加快速度和節省 Token,預設跟隨 Main Agent 設定
+                </div>
+                <div className="settings-popover-task-grid">
+                  {(["executor", "critic", "merge"] as const).map((tc) => (
+                    <TaskModelRow
+                      key={tc}
+                      label={TASK_CLASS_LABELS[tc]}
+                      hint={TASK_CLASS_HINTS[tc]}
+                      provider={userCfg.defaults[tc].provider}
+                      model={userCfg.defaults[tc].model}
+                      effort={userCfg.defaults[tc].effort}
+                      onChange={(patch) => updateTask(tc, patch)}
+                    />
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="settings-subhint">載入中…</div>
+          )}
+          {userCfgError && (
+            <div className="mono settings-error">{userCfgError}</div>
+          )}
+          {error && (
+            <div className="mono settings-error">{error}</div>
+          )}
         </div>
-        {/* Group 2:跟主 agent(只挑 model / effort,provider 跟 runner) */}
-        <div className="task-group task-group--secondary">
-          <div className="task-group-hint">
-            ↑ 為了加快速度和節省 Token,預設跟隨 Main Agent 設定
-          </div>
-          <div className="settings-popover-task-grid">
-            {(["executor", "critic", "merge"] as const).map((tc) => (
-              <TaskModelRow
-                key={tc}
-                label={TASK_CLASS_LABELS[tc]}
-                hint={TASK_CLASS_HINTS[tc]}
-                provider={userCfg.defaults[tc].provider}
-                model={userCfg.defaults[tc].model}
-                effort={userCfg.defaults[tc].effort}
-                onChange={(patch) => updateTask(tc, patch)}
-              />
-            ))}
-          </div>
-        </div>
-        </>
-      ) : (
-        <div className="settings-subhint">載入中…</div>
       )}
-      {userCfgError && (
-        <div className="mono settings-error">{userCfgError}</div>
-      )}
-
-      {error && (
-        <div className="mono settings-error">{error}</div>
-      )}
-      </>}
 
       {activeTab === "notifications" && (
-        <>
-          <InstallAppSection onActionError={onActionError} />
-          <PwaInfoHint />
-          <div style={{ height: 1, background: "var(--line)", margin: "var(--space-4) 0" }} />
-          <div className="settings-section-title">推播通知</div>
-          <PushNotificationsSection
-            userCfg={userCfg}
-            pushSaving={pushSaving}
-            onTogglePushEvent={updatePushEvent}
-            onActionError={onActionError}
-          />
-        </>
+        <div className="settings-tab-content">
+          <div className="task-group task-group--primary">
+            <InstallAppSection onActionError={onActionError} />
+          </div>
+          <div className="task-group task-group--primary">
+            <div className="settings-section-title">推播通知</div>
+            <PushNotificationsSection
+              userCfg={userCfg}
+              pushSaving={pushSaving}
+              onTogglePushEvent={updatePushEvent}
+              onActionError={onActionError}
+            />
+          </div>
+        </div>
       )}
 
       {activeTab === "security" && authStatus?.bound === true && (

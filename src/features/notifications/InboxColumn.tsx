@@ -221,14 +221,10 @@ function InboxPanel({
   const filtered = items.filter((it) => {
     if (filter === "unread") return !!it.unread;
     if (filter === "blocking") return it.sev === "block";
-    if (filter === "frontend") return typeof it.type === "string" && it.type.startsWith("frontend_action_");
     return true;
   });
 
   const blockCount = items.filter((i) => i.sev === "block").length;
-  const frontendCount = items.filter(
-    (i) => typeof i.type === "string" && i.type.startsWith("frontend_action_")
-  ).length;
 
   return (
     <div className="inbox-panel">
@@ -248,7 +244,6 @@ function InboxPanel({
             ["all", "全部", items.length],
             ["unread", "未讀", unreadCount],
             ["blocking", "阻斷", blockCount],
-            ["frontend", "前端動作", frontendCount],
           ] as const
         ).map(([key, label, count]) => (
           <button type="button"
@@ -275,9 +270,7 @@ function InboxPanel({
                   ? "都看過了"
                   : filter === "blocking"
                     ? "沒有阻斷類通知"
-                    : filter === "frontend"
-                      ? "沒有前端動作紀錄"
-                      : "目前沒有通知"}
+                    : "目前沒有通知"}
             </div>
           </div>
         ) : (

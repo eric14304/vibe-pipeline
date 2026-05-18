@@ -86,44 +86,16 @@ export function BoardScreen({
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const unreadCount = items.filter((i) => i.unread).length;
 
-  // 失敗 / 警告 / 成功 訊息走同一條路:toast(5s 自消)+ 同步 emit notif 進 Inbox 留 history。
-  // ticket A2:解決原 toast 過 5s 找不到的問題。Inbox 可用 frontend filter 單獨看這類紀錄。
-  // pipelineIdFallback 用當前 activeId(若 caller 沒帶),失敗動作通常綁在某條 pipeline 上
-  function notifyAndShow(
-    msg: string,
-    opts: {
-      kind: "failed" | "warn" | "info";
-      sub?: string;
-      pipelineId?: string;
-    }
-  ) {
+  // 失敗 / 警告 / 成功 toast — 只走 setActionError(5s 自消),不再 emit notif 進 Inbox。
+  // (原 A2 ticket 把 toast 同步 emit 進 Inbox,user 反映「這不該進 Inbox」,改回純 toast)
+  function notifyError(msg: string, _opts?: { sub?: string; pipelineId?: string }) {
     setActionError(msg);
-    if (!hash) return;
-    const type =
-      opts.kind === "failed"
-        ? "frontend_action_failed"
-        : opts.kind === "warn"
-        ? "frontend_action_warn"
-        : "frontend_action_info";
-    const sev = opts.kind === "failed" ? "block" : opts.kind === "warn" ? "info" : "muted";
-    api
-      .postNotif(hash, {
-        type,
-        title: msg,
-        sub: opts.sub,
-        pipelineId: opts.pipelineId ?? activeId ?? undefined,
-        sev,
-      })
-      .catch(() => {});
   }
-  function notifyError(msg: string, opts?: { sub?: string; pipelineId?: string }) {
-    notifyAndShow(msg, { kind: "failed", ...opts });
+  function notifyWarn(msg: string, _opts?: { sub?: string; pipelineId?: string }) {
+    setActionError(msg);
   }
-  function notifyWarn(msg: string, opts?: { sub?: string; pipelineId?: string }) {
-    notifyAndShow(msg, { kind: "warn", ...opts });
-  }
-  function notifyInfo(msg: string, opts?: { sub?: string; pipelineId?: string }) {
-    notifyAndShow(msg, { kind: "info", ...opts });
+  function notifyInfo(msg: string, _opts?: { sub?: string; pipelineId?: string }) {
+    setActionError(msg);
   }
 
   function markRead(id: string) {

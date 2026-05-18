@@ -28,7 +28,6 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-bottom: 14px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -242,12 +241,18 @@
   width: var(--task-w-provider);
 }
 
-/* ─── AI 任務 group container ──────────────────────────────────── */
+/* ─── Tab content wrapper(統一各 tab 垂直節奏)──────────────────── */
+
+.settings-tab-content {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Card container(原 .task-group,通用於 AI / PWA tab)────────── */
 
 .task-group {
   display: flex;
   flex-direction: column;
-  gap: 10px;
   padding: 10px;
   border-radius: 8px;
 }
@@ -258,7 +263,6 @@
 
 .task-group--secondary {
   background: var(--panel-2);
-  margin-bottom: 12px;
 }
 
 .task-group-hint {
