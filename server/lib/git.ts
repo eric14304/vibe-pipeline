@@ -62,6 +62,39 @@ export async function workingTreeStatus(projectPath: string): Promise<WorkingTre
   return { clean: false, modified, untracked, files };
 }
 
+// 強刪 local branch(git branch -D <name>)。
+// 用於 pipeline delete cascade:worktree dir 已砍 + prune 後,把 pipeline/* branch ref 也清掉。
+// throw-safe:回 { ok, error };branch 不存在當成 ok(冪等)。
+export async function deleteBranchForce(
+  projectPath: string,
+  branchName: string
+): Promise<{ ok: boolean; error?: string }> {
+  if (!hasGit(projectPath)) return { ok: false, error: "not a git repo" };
+  if (!branchName || branchName.length === 0) {
+    return { ok: false, error: "empty branch name" };
+  }
+  // 先確認 branch 存在 — 不存在 = 已沒事可做,當成功(冪等,allow re-run)
+  const check = Bun.spawn(
+    ["git", "-C", projectPath, "rev-parse", "--verify", "--quiet", `refs/heads/${branchName}`],
+    { stdout: "pipe", stderr: "pipe" }
+  );
+  await check.exited;
+  if (check.exitCode !== 0) return { ok: true };
+  const proc = Bun.spawn(["git", "-C", projectPath, "branch", "-D", branchName], {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const [, errText] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ]);
+  await proc.exited;
+  if (proc.exitCode !== 0) {
+    return { ok: false, error: errText.trim() || `git branch -D exit ${proc.exitCode}` };
+  }
+  return { ok: true };
+}
+
 // list local branches (for CreateCard base branch picker)
 // 過濾掉 pipeline/* (vibe-pipeline 自家建的 worktree branch)避免 base 撞自己
 export async function listBranches(projectPath: string): Promise<string[]> {
