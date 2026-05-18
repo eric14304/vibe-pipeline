@@ -74,19 +74,21 @@ export async function sendToEnduser(
   const failed: SendFailure[] = [];
   let sent = 0;
 
-  const dataPayload: Record<string, string> = { ...(payload.data || {}) };
+  const dataPayload: Record<string, string> = {};
+  for (const [k, v] of Object.entries(payload.data || {})) {
+    if (v === undefined || v === null) continue;
+    dataPayload[k] = typeof v === "string" ? v : JSON.stringify(v);
+  }
   if (payload.ticketId) dataPayload.ticketId = payload.ticketId;
+  dataPayload.title = payload.title;
+  dataPayload.body = payload.body;
 
   for (const doc of devSnap.docs) {
     const dev = doc.data() as DeviceDoc;
     try {
       await messaging.send({
         token: dev.deviceToken,
-        notification: { title: payload.title, body: payload.body },
         data: dataPayload,
-        webpush: {
-          notification: { title: payload.title, body: payload.body },
-        },
       });
       sent++;
       doc.ref.update({ lastSentAt: Date.now() }).catch(() => {});
