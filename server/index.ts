@@ -22,6 +22,11 @@ const TAILSCALE_ORIGIN_RE = /^https?:\/\/100\.\d+\.\d+\.\d+(:\d+)?$/;
 const CORS_METHODS = "GET, POST, PUT, DELETE, OPTIONS";
 const CORS_HEADERS = "Content-Type, Authorization";
 
+function logAccess(method: string, pathname: string, status: number, startedAt: number): void {
+  if (!pathname.startsWith("/api/")) return;
+  console.log(`[access] ${method} ${pathname} ${status} ${Date.now() - startedAt}ms`);
+}
+
 function isAllowedOrigin(origin: string | null): origin is string {
   if (!origin) return false;
   if (ALLOWED_ORIGINS.has(origin)) return true;
@@ -289,13 +294,18 @@ const server = Bun.serve({
   // 拉到 5min cover 大部分 case,真超過代表 claude 卡死,讓 bun 砍掉合理
   idleTimeout: 255, // bun 上限 255s (≈4.25min)
   async fetch(req, srv) {
+    const startedAt = Date.now();
+    const url = new URL(req.url);
     const origin = req.headers.get("Origin");
+    let response: Response;
     if (req.method === "OPTIONS") {
-      return withCors(
+      response = withCors(
         new Response(null, { status: 204 }),
         origin,
         req.headers.get("Access-Control-Request-Headers")
       );
+      logAccess(req.method, url.pathname, response.status, startedAt);
+      return response;
     }
     let ip = srv.requestIP(req)?.address ?? null;
     // E2E escape hatch:mock 模式下可用 X-Forwarded-For 覆寫 IP,測非 loopback / 進入 auth flow。
@@ -306,17 +316,20 @@ const server = Bun.serve({
     }
     (req as unknown as { __ip?: string }).__ip = ip ?? "unknown";
     try {
-      const url = new URL(req.url);
       // /api/__test/* 在 mock 模式 mount,本身就是 e2e 控制面;不應走 authGuard(否則 spec 設 XFF 後自己進不來)
       const skipGuard = testMode.isTestMode() && url.pathname.startsWith("/api/__test/");
       if (url.pathname.startsWith("/api/") && !skipGuard) {
         const guard = await authGuard(req, ip);
         const blocked = guardResponse(guard, req);
-        if (blocked) return withCors(blocked, origin);
+        if (blocked) {
+          response = withCors(blocked, origin);
+          logAccess(req.method, url.pathname, response.status, startedAt);
+          return response;
+        }
       }
-      return withCors(await handle(req), origin);
+      response = withCors(await handle(req), origin);
     } catch (e) {
-      return withCors(
+      response = withCors(
         Response.json(
           { ok: false, error: { code: "internal_error", message: String(e) } },
           { status: 500 }
@@ -324,6 +337,8 @@ const server = Bun.serve({
         origin
       );
     }
+    logAccess(req.method, url.pathname, response.status, startedAt);
+    return response;
   },
 });
 

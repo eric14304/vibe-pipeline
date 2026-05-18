@@ -53,3 +53,13 @@
 - Settings full-redesign + pixel-polish 全 revert(`8bb47fb` / `09af96d` / `24dcf5c`);backup branch `backup/settings-pixel-polish-pre-revert` 保留。reason:redesign 後元素全放大 ~1.5x,實用時「各種元素都好大」+「兩 tab 樣式不一致」。經驗:**mockup-driven AI polish 容易過度 scale + 失去既有 design language**,critic 不會抓
 - Frontend toast → Inbox emit 拔:BoardScreen 只走 `setActionError`(5s toast),不再 `postNotif`。reason:user 反問「前端動作不該進 Inbox」
 - 文件 / SKILL 結構重整:跨檔「雷 #N」brittle 引用改 §descriptive anchor(13 處);AGENTS.md 砍到 9 行純 pointer(SSOT 回 CLAUDE.md dir 表);`.claude/rules/` 新增 path-specific 規則檔(pwa-sw / remote-access / cli-codex);`docs/refs/` active 14 → 5 個 + archive 6 → 17;CHANGELOG 精煉收斂 + 結構整理(已 final / 計畫 ref 段上移到日期 entries 前)
+
+---
+
+## 2026-05-19
+
+- `vbpl server` 系列落地:enduser / AI 以 `vbpl server start|status|logs|restart|stop` 管 backend,不再要求記 `bun run server` 或留 terminal 掛著
+- CLI mutating commands auto-start backend:`pipeline run|stop|merge|sync` 透過 local start lock 防 race,同時兩個 CLI 只會 spawn 一個 backend
+- Windows detach 驗證補齊:`Bun.spawn(..., detached:true, stdio:file, windowsHide:true)` 關 terminal 不帶死 backend;避免 Node #36808 / `fork` 類 IPC detach 雷
+- Backend access log 加上 `[access] METHOD /api/... STATUS Nms`,讓 `vbpl server logs -f` 可直接驗證 live request tail
+- README / enduser SKILL / install.md 改成 `vbpl server start` 主軸;`bun run server|dev|start` 收斂為 maintainer source-workflow 備註
