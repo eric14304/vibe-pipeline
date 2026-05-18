@@ -16,14 +16,19 @@ cli/
 │   ├── project.ts      list / show / add / remove
 │   ├── pipeline.ts     list / create / show / delete / run / stop / status / log
 │   ├── ticket.ts       list / show / add / update / remove
-│   └── config.ts       list / get / set(user-level config.json)
+│   ├── config.ts       list / get / set(user-level config.json)
+│   └── server.ts       start / stop / status / restart / logs(背景管 backend daemon)
 └── lib/
     ├── args.ts         極簡 flag / positional 解析,不依賴 commander 等套件
     ├── output.ts       ok / fail / print / table 統一輸出(human + --json 兩模式切)
-    └── project.ts      resolveProject(--project hash / --project-path / state.json lastProject 三層 fallback)
+    ├── project.ts      resolveProject(--project hash / --project-path / state.json lastProject 三層 fallback)
+    ├── api.ts          HTTP POST wrapper(requireBackend + post + User-Agent: vbpl-cli)
+    ├── ensureBackend.ts try-connect-first + lock 自動 spawn backend(避免兩 CLI race)
+    ├── serverBase.ts   apiBase()(VBPL_API_BASE env 或 default 127.0.0.1:3001)
+    └── serverPath.ts   auto-detect VP repo:cwd git root → VBPL_HOME → ~/.vibe-pipeline/server.json
 ```
 
-`package.json` 對應 `bun run vbpl` → `bun run cli/vbpl.ts`。
+`package.json` 對應 `bun run vbpl` → `bun run cli/vbpl.ts`。打包 binary 後 `vbpl` 直接在 `~/.vibe-pipeline/bin/`(install.md 指定統一位置,對齊 pyenv / cargo / nvm 慣例)。
 
 ## 設計信條
 
@@ -36,12 +41,14 @@ cli/
 
 **Mutate 純 fs 操作**(project add / remove / pipeline create / delete / ticket add/update/remove / config set):也直存 fs(沒 spawn child process,純寫 json)。
 
-**Spawn / kill 子程操作**(`vbpl pipeline run / stop / merge / sync --ai / sync --cancel`):**必須走 HTTP POST 給 backend**。透過 `cli/lib/api.ts:post()` 包好的 `requireBackend()` health check + fetch。
+**Spawn / kill 子程操作**(`vbpl pipeline run / stop / merge / sync --ai / sync --cancel`):**必須走 HTTP POST 給 backend**。透過 `cli/lib/api.ts:post()` 包好的 `requireBackend()` → `ensureBackend()` → fetch。
 
 為什麼:CLI 自己 spawn child 會在 CLI process 退出時失去 child 控制權(orchestrator running map 蒸發,watchdog / pause / stop 全失效,實測 Windows 上 child 也常被當孤兒 GC)。改成 backend 養 child:CLI 死了 backend 還活著,child 仍可被監控、kill、cleanup。
 
 - 環境變數 `VBPL_API_BASE` 覆寫 default `http://127.0.0.1:3001`
-- backend 沒起 → `fail("NO_BACKEND", "先跑 bun run server")` 而非靜默 spawn 孤兒
+- backend 沒起 → `ensureBackend` **自動 try-connect-first + lock + spawn**(2s timeout),user 看不到 NO_BACKEND error。失敗才回 friendly error 提示 `vbpl server logs`
+- 多 CLI 並發 race-safe(`~/.vibe-pipeline/server.start.lock` flock,只一個贏家 spawn,其他等 health 通)
+- POST fetch 自帶 `User-Agent: vbpl-cli`,backend audit 寫入 `via: "cli"` 區分 vs browser(debug mystery run 用)
 
 代價:CLI 跟 backend lib 強耦合,改 `server/lib/*` 的 export 介面要記得 CLI 也用;新增 mutate verb 要決定走 fs 還是 HTTP(原則:有沒有 spawn 或 kill child process)。**改 server/lib 前 grep `from "../../server/lib"` 確認 CLI 是否吃到**。
 
@@ -85,16 +92,19 @@ cli/
 | noun | verbs(粗體 = 走 HTTP,其餘 fs) |
 |---|---|
 | `project` | list / show / add `<path>` / remove `<hash>` |
-| `pipeline` | list / create / show / delete / **run / stop / merge / sync --ai / sync --cancel** / sync (default) / sync --dismiss / status / log |
+| `pipeline` | list / create / show / **delete** / **run** / **stop** / **merge** / **sync** / **sync --ai** / **sync --cancel** / sync --dismiss / status / log |
 | `ticket` | list / show `<id>` / add / update / remove,**全部要 `--pipeline <id>`** |
 | `config` | list / get `<key>` / set `<key> <value>`(user-level `~/.vibe-pipeline/config.json`) |
+| `server` | **start** / **stop** / **status** / **restart** / **logs [-f]**(全 fs + spawn,管 backend daemon 自己,不走 HTTP) |
 
-走 HTTP 的 5 個 verb 需要 backend up,沒起會回 `NO_BACKEND` error。其餘 fs 路徑沒 backend 也能用。
+走 HTTP 的 verb 需要 backend up — `ensureBackend` 自動 spawn(若有 `server.json` 記得到 repo),不必先手動 `vbpl server start`。極端情況才會回 `NO_BACKEND`。
 
 `pipeline log` 走 `runLog.listRuns` + `getRun`(同 RunHistory drawer 後端,fs)。
 `pipeline run` 走 `POST /api/.../run` → backend 內 `orchestrator.start(...)` spawn child → backend 養 child 不會孤兒。
 `pipeline merge` 走 `POST /api/.../merge` → backend 二段式(autoMergeNoAI → conflict 才 AI),response `mode: "mechanical" | "ai"` 分流訊息(mechanical 直印 commit hash;ai 印 ticketId + 提示 watch log)。
 `pipeline create` 沒帶 `--auto-merge` flag 時 fallback 讀 project config `defaults.auto_merge`(對齊 web UI)。
+`pipeline delete` cascade 清 worktree + branch + pipeline.json(running / queued state 拒絕,要先 stop),`--force` 跳 confirm。
+`server start` auto-detect VP repo(cwd → VBPL_HOME → ~/.vibe-pipeline/server.json),背景 spawn `bun run server`,detach 後 terminal 不阻塞。**enduser 永遠不必手動 cd 進 VP repo**。`server logs -f` tail server.log。
 
 ## 不踩的雷
 
@@ -143,5 +153,5 @@ bun run cli:build:linux   # Linux x64      → dist-cli/vbpl-linux
 
 - TUI / interactive mode(`vbpl repl` 之類)— 看 user 反應再加
 - shell completion(bash / zsh / pwsh)— 同上,有需求再做
-- log streaming(`vbpl pipeline log <id> --follow`)— 現在 log 是 one-shot dump,要 tail -f 等效得加 fs.watch / inotify
+- `vbpl pipeline log <id> --follow` — pipeline run log tail(現在是 one-shot dump);`vbpl server logs -f` 已 ship 是 server.log 不同檔
 - CI release(`gh release` 自動 build + upload artifact),目前 user 自己 build 自己用
