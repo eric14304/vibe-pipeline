@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "bun run --hot index.ts",
     "start": "bun run index.ts",
+    "admin": "bun run admin.ts",
     "typecheck": "bunx tsc --noEmit"
   },
   "dependencies": {

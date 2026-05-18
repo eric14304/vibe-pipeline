@@ -169,9 +169,59 @@ docker run --rm -p 8080:8080 \
 
 Cloud Run 上不必掛 gcloud config volume,ADC 走 metadata server。
 
+## Admin CLI 使用
+
+`gateway/admin.ts` 是給 maintainer 用的小 Bun script(`vp-gw-admin`),封裝 3 條 `/admin/*` endpoint,免每次手打 curl + Bearer header。執行端要先 `export MASTER_TOKEN=<與 gateway 同值>`,可選 `export GATEWAY_URL=<base url>`(default `http://localhost:8080`,prod 改 Cloud Run service URL)。沒設 `MASTER_TOKEN` 直接 exit 1,沒設 `GATEWAY_URL` 預設 local。
+
+啟動方式(在 gateway/ 內):
+
+```bash
+bun run admin <subcommand> [args]
+# 或
+bun run admin.ts <subcommand> [args]
+```
+
+3 個 subcommand:
+
+### `issue --label=<name>`
+
+簽發新的 enduser token(POST `/admin/issue-token`),回 JSON `{tokenId, token}`。**`token` 是明文,gateway 只存 sha256,只回這一次,當場存起來。**
+
+```bash
+export MASTER_TOKEN=<master>
+bun run admin issue --label=eric-laptop
+# {
+#   "tokenId": "a1b2c3...",
+#   "token": "<32-char base64url 明文>"
+# }
+# [admin] plaintext token shown ONCE — store it now; gateway only keeps sha256
+```
+
+### `revoke <tokenId>`
+
+撤銷指定 enduser token(POST `/admin/revoke-token/:tokenId`)。被 revoke 的 token 之後打 `/push/*` 一律 401。
+
+```bash
+bun run admin revoke a1b2c3deadbeef
+# {"ok":true,"tokenId":"a1b2c3deadbeef"}
+```
+
+### `list`
+
+列出所有 enduser token(GET `/admin/tokens`),印 table:`tokenId / label / createdAt / lastUsedAt / revoked`。
+
+```bash
+bun run admin list
+# tokenId                   label                 createdAt             lastUsedAt            revoked
+# ---------------------------------------------------------------------------------------------------
+# a1b2c3...                 eric-laptop           2026-05-19 03:12:01   2026-05-19 04:08:22   no
+# (1 tokens)
+```
+
+任一 subcommand 加 `--help` 印該指令說明;不帶任何參數印整體 usage。
+
 ## 不在本 phase scope
 
-- Admin CLI(t3)
 - Cloud Run deploy(t4)
 - vibe-pipeline backend 接 gateway(t5)
 - 主 repo 文件更新(t6)
