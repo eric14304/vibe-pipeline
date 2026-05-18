@@ -73,7 +73,7 @@ Phase 8 候選清單。動工時搬進 pipeline ticket(`vbpl ticket add --pipeli
 - 風險:user 預期 paused 不會自己跑 → 違反設計信條「pipeline state 由 user 控制」+ 燒 token 莫名其妙
 
 ### 12. `recoverStale` 標 `failed_transient` 太武斷
-- 痛點:backend restart `recoverStale` 把 running ticket 直接標 `failed_transient`,但 orphaned codex children 可能仍活(雷 #7 / #8 變體 — codex 是 detached process tree,bun parent 死了它沒死)
+- 痛點:backend restart `recoverStale` 把 running ticket 直接標 `failed_transient`,但 orphaned codex children 可能仍活(server 重啟殺 spawn 雷 變體 — codex 是 detached process tree,bun parent 死了它沒死)
 - 實證:settings-pixel-polish 01:39:07 backend restart 標 failed_transient,01:48:28 ticketWatcher 偵測 disk reconcile 救回(see audit timeline)
 - 候選機制:`recoverStale` 先 PID alive check + `tail` log 看時間戳;真死才標 failed_transient
 - 規格待寫,跟 #6 backend self-heal 同線
