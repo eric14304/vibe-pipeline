@@ -193,6 +193,16 @@ export async function start(opts: {
           ticketId: current?.id || opts.pipelineId,
         });
       }
+      if (last.state !== "ready" && cur.state === "ready") {
+        pushAsync({
+          eventKey: "pipeline_ready",
+          title: "✅ Pipeline 跑完",
+          body: `${p?.name || opts.pipelineId} 全 ticket done,可 merge`,
+          projectHash: opts.projectHash,
+          pipelineId: opts.pipelineId,
+          ticketId: opts.pipelineId,
+        });
+      }
       last = cur;
     } catch (e) {
       console.error(`[ticketWatcher ${opts.pipelineId}] error:`, e);
