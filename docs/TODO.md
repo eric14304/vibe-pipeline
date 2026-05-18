@@ -60,11 +60,12 @@ Phase 8 候選清單。動工時搬進 pipeline ticket(`vbpl ticket add --pipeli
 - 候選方向:`docs/refs/provider-task-fit.md` 累積實測:類型 × provider × model × 結果(成功/失敗 + 原因)
 - 規格待寫,本質是經驗 log 不是 code change
 
-### 9. Web UI 不該自動 fire `pipeline.run`(audit 抓到)
-- 痛點:settings-pixel-polish audit log 記到兩次 `user_action pipeline.run`(00:21:58 + 01:23:41)而 user 確認沒按。HTTP 是 spawnDirect 進來的,代表 web UI 某條 path 自動觸發
-- 候選嫌疑:SWR retry / settings-popover 某個 polling / notification action / browser tab background fetch
-- 規格待寫:`refs/auto-run-bug.md`(先 instrument fetch caller stack,抓到再寫 fix)
-- 風險:user 預期 paused 不會自己跑 → 違反設計信條「pipeline state 由 user 控制」+ 燒 token 莫名其妙
+### 9. Web UI 不該自動 fire `pipeline.run`(monitor only)
+- 痛點:settings-pixel-polish audit log 記到兩次 `user_action pipeline.run`(00:21:58 + 01:23:41)而 user 確認沒按
+- **2026-05-19 調查結論**:src/ 全 grep + backend internal caller / SW POST cache / fetch retry middleware 全排查,**找不到 auto-fire code path**(唯一 caller 是 RunButton onClick)。最一致解釋:user 自己按了忘記,或 vbpl CLI 從別處呼(以前 audit 無法區分 cli vs browser)
+- **2026-05-19 已加 instrumentation**(`1526488`):audit user_action 加 `via` 欄(cli / browser / other),vbpl CLI 自帶 `User-Agent: vbpl-cli`,backend `detectVia(req)` 讀 UA 寫 audit
+- 現狀:monitor only。下次再撞「user 沒按但 audit 抓到」直接看 audit `via` 欄秒判 source
+- **真撞到**(via=browser 而 user 確定沒按)再開正式 ticket 深挖
 
 ### 10. `recoverStale` 標 `failed_transient` 太武斷
 - 痛點:backend restart `recoverStale` 把 running ticket 直接標 `failed_transient`,但 orphaned codex children 可能仍活(server 重啟殺 spawn 雷 變體 — codex 是 detached process tree,bun parent 死了它沒死)
