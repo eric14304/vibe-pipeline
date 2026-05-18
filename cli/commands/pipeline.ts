@@ -6,6 +6,7 @@ import * as runLog from "../../server/lib/runner/runLog";
 import * as syncJob from "../../server/lib/runner/syncJob";
 import * as auditLog from "../../server/lib/auditLog";
 import { resolveProject, requireInit } from "../lib/project";
+import { ensureBackend } from "../lib/ensureBackend";
 import { post } from "../lib/api";
 import type { ParsedArgs } from "../lib/args";
 import { fail, isJsonMode, okJson, print, printLines, table } from "../lib/output";
@@ -177,6 +178,7 @@ async function pipelineRun(args: ParsedArgs): Promise<void> {
   await requireInit(proj.path);
   const id = args.positional[0];
   if (!id) fail("INVALID_ARGS", "Usage: vbpl pipeline run <id>");
+  await ensureBackend();
 
   const result = await post<{ ok: true; queued?: boolean; position?: number | null }>(
     `/api/projects/${proj.hash}/pipelines/${id}/run`
@@ -199,6 +201,7 @@ async function pipelineStop(args: ParsedArgs): Promise<void> {
   await requireInit(proj.path);
   const id = args.positional[0];
   if (!id) fail("INVALID_ARGS", "Usage: vbpl pipeline stop <id>");
+  await ensureBackend();
 
   await post(`/api/projects/${proj.hash}/pipelines/${id}/stop`);
 
@@ -406,6 +409,7 @@ async function pipelineMerge(args: ParsedArgs): Promise<void> {
   await requireInit(proj.path);
   const id = args.positional[0];
   if (!id) fail("INVALID_ARGS", "Usage: vbpl pipeline merge <id>");
+  await ensureBackend();
 
   // 2026-05-13 後 backend 二段式:mechanical → mergeCommit;衝突 fallback ai → ticketId
   type MergeResp =
@@ -441,6 +445,7 @@ async function pipelineSync(args: ParsedArgs): Promise<void> {
   await requireInit(proj.path);
   const id = args.positional[0];
   if (!id) fail("INVALID_ARGS", "Usage: vbpl pipeline sync <id> [--ai|--cancel|--dismiss]");
+  await ensureBackend();
 
   const wantAi = args.flags["ai"] === true;
   const wantCancel = args.flags["cancel"] === true;

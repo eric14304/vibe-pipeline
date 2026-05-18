@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { bool } from "../lib/args";
 import type { ParsedArgs } from "../lib/args";
 import { fail, isJsonMode, okJson, print } from "../lib/output";
+import { localServerBase, serverPort } from "../lib/serverBase";
 import {
   detectServerRepoPath,
   readServerInfo,
@@ -13,9 +14,6 @@ import {
   serverStateDir,
 } from "../lib/serverPath";
 
-const SERVER_PORT = Number(process.env["VBPL_SERVER_PORT"] ?? 3001);
-const SERVER_BASE = `http://127.0.0.1:${SERVER_PORT}`;
-const HEALTH_URL = `${SERVER_BASE}/api/health`;
 const START_TIMEOUT_MS = 5_000;
 const HEALTH_TIMEOUT_MS = 5_000;
 const POLL_MS = 200;
@@ -51,6 +49,13 @@ type StopResult = {
   forced?: boolean;
 };
 
+type StartOptions = {
+  quiet?: boolean;
+  healthTimeoutMs?: number;
+  timeoutMessage?: string;
+  deadlineAtMs?: number;
+};
+
 export async function runServer(sub: string | undefined, args: ParsedArgs): Promise<void> {
   if (sub === "help" || args.flags["help"] === true) {
     print(SERVER_USAGE);
@@ -75,6 +80,23 @@ function samePath(a: string, b: string): boolean {
   const left = resolve(a);
   const right = resolve(b);
   return process.platform === "win32" ? left.toLowerCase() === right.toLowerCase() : left === right;
+}
+
+function serverBase(): string {
+  return localServerBase();
+}
+
+function healthUrl(): string {
+  return `${serverBase()}/api/health`;
+}
+
+function deadlineRemaining(deadlineAtMs: number | undefined, fallbackMs: number): number {
+  if (deadlineAtMs == null) return fallbackMs;
+  return Math.max(0, Math.min(fallbackMs, deadlineAtMs - Date.now()));
+}
+
+function failStartTimeout(options: StartOptions, logPath?: string): never {
+  fail("START_TIMEOUT", options.timeoutMessage ?? `backend 5s 內沒有通過 health check。log:${logPath ?? serverLogPath()}`);
 }
 
 async function readPidFile(): Promise<number | null> {
@@ -108,10 +130,11 @@ async function pidFileUptimeMinutes(): Promise<number> {
 }
 
 async function healthInfo(timeoutMs = 500): Promise<HealthInfo> {
+  if (timeoutMs <= 0) return { ok: false, pid: null, repoPath: null };
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(HEALTH_URL, { method: "GET", signal: controller.signal });
+    const res = await fetch(healthUrl(), { method: "GET", signal: controller.signal });
     if (res.status !== 200) return { ok: false, pid: null, repoPath: null };
     const body = await res.json().catch(() => null) as {
       data?: { pid?: unknown; repo_path?: unknown; repoPath?: unknown };
@@ -131,13 +154,13 @@ async function healthOk(timeoutMs = 500): Promise<boolean> {
   return (await healthInfo(timeoutMs)).ok;
 }
 
-async function waitForHealthUp(): Promise<boolean> {
-  const deadline = Date.now() + START_TIMEOUT_MS;
+async function waitForHealthUp(timeoutMs = START_TIMEOUT_MS): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (await healthOk()) return true;
-    await sleep(POLL_MS);
+    if (await healthOk(Math.min(500, Math.max(1, deadline - Date.now())))) return true;
+    await sleep(Math.min(POLL_MS, Math.max(0, deadline - Date.now())));
   }
-  return healthOk();
+  return false;
 }
 
 async function waitForHealthDown(): Promise<boolean> {
@@ -162,7 +185,7 @@ async function isManagedPid(pid: number, repoPath: string): Promise<boolean> {
   const info = await readServerInfo();
   if (!info) return false;
   if (!samePath(info.repo_path, repoPath)) return false;
-  if (info.port != null && info.port !== SERVER_PORT) return false;
+  if (info.port != null && info.port !== serverPort()) return false;
   if (info.pid != null && info.pid !== pid) return false;
   return true;
 }
@@ -204,9 +227,9 @@ async function killManagedServer(pid: number, options: { forced?: boolean } = {}
   return { stopped: true, pid, forced: options.forced === true };
 }
 
-async function serverStart(options: { quiet?: boolean } = {}): Promise<StartResult> {
+export async function serverStart(options: StartOptions = {}): Promise<StartResult> {
   const repoPath = await detectServerRepoPath();
-  const initialHealth = await healthInfo();
+  const initialHealth = await healthInfo(deadlineRemaining(options.deadlineAtMs, 500));
   if (initialHealth.ok) {
     const pidFile = await readPidFile();
     if (
@@ -218,15 +241,15 @@ async function serverStart(options: { quiet?: boolean } = {}): Promise<StartResu
     ) {
       fail(
         "PORT_IN_USE",
-        `${SERVER_BASE} 已有非 vbpl server start 管理的 backend。請先停止該 backend,或確認 server.pid/repo_path。`,
+        `${serverBase()} 已有非 vbpl server start 管理的 backend。請先停止該 backend,或確認 server.pid/repo_path。`,
       );
     }
     await rememberServerRepoPath(repoPath, {
       pid: initialHealth.pid,
-      port: SERVER_PORT,
+      port: serverPort(),
       log_path: serverLogPath(),
     });
-    const result = { started: false, alreadyRunning: true, pid: initialHealth.pid, repoPath, url: SERVER_BASE };
+    const result = { started: false, alreadyRunning: true, pid: initialHealth.pid, repoPath, url: serverBase() };
     if (!options.quiet) {
       if (isJsonMode()) {
         okJson(result);
@@ -240,6 +263,9 @@ async function serverStart(options: { quiet?: boolean } = {}): Promise<StartResu
   await mkdir(serverStateDir(), { recursive: true });
   const logPath = serverLogPath();
   const pidPath = serverPidPath();
+  if (options.deadlineAtMs != null && deadlineRemaining(options.deadlineAtMs, 1) <= 0) {
+    failStartTimeout(options, logPath);
+  }
 
   let stdoutFd: number | null = null;
   let stderrFd: number | null = null;
@@ -249,7 +275,7 @@ async function serverStart(options: { quiet?: boolean } = {}): Promise<StartResu
     stderrFd = openSync(logPath, "a");
     child = Bun.spawn(["bun", "run", "server/index.ts"], {
       cwd: repoPath,
-      env: { ...process.env, PORT: String(SERVER_PORT) },
+      env: { ...process.env, PORT: String(serverPort()) },
       stdio: ["ignore", stdoutFd, stderrFd],
       detached: true,
       windowsHide: true,
@@ -266,22 +292,23 @@ async function serverStart(options: { quiet?: boolean } = {}): Promise<StartResu
   await writeFile(pidPath, String(child.pid) + "\n", "utf8");
   await rememberServerRepoPath(repoPath, {
     pid: child.pid,
-    port: SERVER_PORT,
+    port: serverPort(),
     log_path: logPath,
     started_at: Date.now(),
   });
 
-  if (!(await waitForHealthUp())) {
+  const healthTimeoutMs = deadlineRemaining(options.deadlineAtMs, options.healthTimeoutMs ?? START_TIMEOUT_MS);
+  if (healthTimeoutMs <= 0 || !(await waitForHealthUp(healthTimeoutMs))) {
     try {
       process.kill(child.pid);
     } catch {
       // best effort cleanup after a failed start
     }
     await rm(pidPath, { force: true });
-    fail("START_TIMEOUT", `backend 5s 內沒有通過 health check。log:${logPath}`);
+    failStartTimeout(options, logPath);
   }
 
-  const startedHealth = await healthInfo();
+  const startedHealth = await healthInfo(deadlineRemaining(options.deadlineAtMs, 500));
   if (
     !startedHealth.ok ||
     startedHealth.pid !== child.pid ||
@@ -294,10 +321,10 @@ async function serverStart(options: { quiet?: boolean } = {}): Promise<StartResu
       // best effort cleanup after a failed start
     }
     await rm(pidPath, { force: true });
-    fail("PORT_IN_USE", `${SERVER_BASE} health 回應不屬於剛啟動的 vbpl backend。log:${logPath}`);
+    fail("PORT_IN_USE", `${serverBase()} health 回應不屬於剛啟動的 vbpl backend。log:${logPath}`);
   }
 
-  const result = { started: true, pid: child.pid, repoPath, logPath, url: SERVER_BASE };
+  const result = { started: true, pid: child.pid, repoPath, logPath, url: serverBase() };
   if (!options.quiet) {
     if (isJsonMode()) {
       okJson(result);
