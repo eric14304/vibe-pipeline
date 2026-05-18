@@ -12,6 +12,22 @@ bun run cli:build:linux     # Linux x64   → dist-cli/vbpl-linux
 
 binary ~121 MB(bundle 整個 Bun runtime)。
 
+## Start backend(enduser / AI flow)
+
+安裝到 PATH 後,日常跑 pipeline 不需要進 vibe-pipeline repo 起 `bun run server`。用 `vbpl server` 管 backend:
+
+```bash
+vbpl server start
+vbpl server status
+vbpl server logs -f          # 需要 debug 時
+vbpl server restart
+vbpl server stop
+```
+
+`vbpl server start` 會從當前目錄、`VBPL_HOME` 或既有 `~/.vibe-pipeline/server.json` 自動找到 vibe-pipeline repo,用背景 process 啟動 backend(3001)。`vbpl pipeline run|stop|merge|sync` 也會 auto-detect + auto-start local backend;失敗時看 `vbpl server logs`。
+
+Maintainer 改 vibe-pipeline source code 才用 `bun run server` / `bun run dev` / `bun run start`。
+
 ## Install to PATH(per OS)
 
 ### macOS / Linux

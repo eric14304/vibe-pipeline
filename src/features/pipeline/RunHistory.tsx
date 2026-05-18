@@ -112,6 +112,9 @@ function RunCard({
           : ""
       }`
     : "—";
+  // codex 沒成本 / 回合 / Tokens 資料(全 null 或語意空),隱藏這三欄避免「—」滿版
+  const isCodex = run.provider === "codex";
+  const ticketDiff = computeTicketDiff(run.ticketsBefore, run.ticketsAfter);
   return (
     <div className="tdrw-run-card">
       <button type="button"
@@ -144,18 +147,41 @@ function RunCard({
           <span className="tdrw-run-meta-label">時間</span>
           <strong>{dur}</strong>
         </span>
-        <span className="tdrw-run-meta-item">
-          <span className="tdrw-run-meta-label">成本</span>
-          <strong>{cost}</strong>
-        </span>
-        <span className="tdrw-run-meta-item">
-          <span className="tdrw-run-meta-label">回合</span>
-          <strong>{turns}</strong>
-        </span>
-        <span className="tdrw-run-meta-item">
-          <span className="tdrw-run-meta-label">Tokens</span>
-          <strong>{tokens}</strong>
-        </span>
+        {!isCodex && (
+          <>
+            <span className="tdrw-run-meta-item">
+              <span className="tdrw-run-meta-label">成本</span>
+              <strong>{cost}</strong>
+            </span>
+            <span className="tdrw-run-meta-item">
+              <span className="tdrw-run-meta-label">回合</span>
+              <strong>{turns}</strong>
+            </span>
+            <span className="tdrw-run-meta-item">
+              <span className="tdrw-run-meta-label">Tokens</span>
+              <strong>{tokens}</strong>
+            </span>
+          </>
+        )}
+        {run.failureReason && (
+          <span className="tdrw-run-meta-item" title={run.failureReason}>
+            <span className="tdrw-run-meta-label">失敗原因</span>
+            <strong>{run.failureReason}</strong>
+          </span>
+        )}
+        {ticketDiff.length > 0 && (
+          <span className="tdrw-run-meta-item">
+            <span className="tdrw-run-meta-label">Ticket 進度</span>
+            <strong>
+              {ticketDiff.map((d, i) => (
+                <span key={d.id}>
+                  {i > 0 ? " / " : ""}
+                  {d.id}: {d.from}→{d.to}
+                </span>
+              ))}
+            </strong>
+          </span>
+        )}
       </div>
 
       {open && (
@@ -189,6 +215,21 @@ function RunCard({
       )}
     </div>
   );
+}
+
+// 比對 spawn 前 / exit 後 ticket 狀態,只列有差的;沒 snapshot 回空陣列
+function computeTicketDiff(
+  before: RunSummary["ticketsBefore"],
+  after: RunSummary["ticketsAfter"],
+): Array<{ id: string; from: string; to: string }> {
+  if (!before || !after) return [];
+  const beforeMap = new Map(before.map((t) => [t.id, t.status]));
+  const out: Array<{ id: string; from: string; to: string }> = [];
+  for (const t of after) {
+    const from = beforeMap.get(t.id) ?? "(新)";
+    if (from !== t.status) out.push({ id: t.id, from, to: t.status });
+  }
+  return out;
 }
 
 function fmtNum(n: number): string {

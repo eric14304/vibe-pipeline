@@ -1,41 +1,41 @@
-# vbpl server start/stop/status/restart/logs(2026-05-17,規劃中,未動工)
+# vbpl server start/stop/status/restart/logs(2026-05-19 落地)
 
 ## 為什麼
 
-enduser 啟 backend 要記 `bun run server`,還要在 vibe-pipeline repo cwd 跑。SKILL.md 內提的也是 bun run 路線。CLI 該包這層,讓 enduser 不必懂 bun / repo path:
+enduser / AI 不應該記 `bun run server`,也不該被要求在 vibe-pipeline repo cwd 留一個 terminal 掛著。CLI 包住 backend lifecycle:
 
 ```bash
 vbpl server start            # 起 backend(背景)
-vbpl server status           # 看活著沒
-vbpl server stop             # kill
+vbpl server status           # 看 health / PID / uptime
+vbpl server stop             # kill managed backend
 vbpl server restart
 vbpl server logs [-f]
 ```
 
-## 設計
+`vbpl pipeline run|stop|merge|sync` 也會 auto-detect + auto-start local backend,讓 enduser 流程不必先手動起 server。
+
+## 已落地設計
 
 ### 子命令
 
 | verb | 行為 |
 |---|---|
-| `start` | spawn backend 背景,寫 `~/.vibe-pipeline/server.pid` + `~/.vibe-pipeline/server.log` |
-| `stop` | 讀 pid file kill;清 pid |
-| `status` | health check `/api/health` + 報 PID + uptime |
-| `restart` | stop + start |
-| `logs` | tail server.log;`-f` follow mode |
+| `start` | 背景 spawn backend,寫 `~/.vibe-pipeline/server.pid` + `server.log` + `server.json` |
+| `stop` | 只 kill `vbpl server start` 管理、且 health pid/repo_path 對得上的 backend |
+| `status` | health check `/api/health`,報 `up/down/unresponsive` + PID + uptime |
+| `restart` | stop + start;PID 會換新,health 重新通 |
+| `logs` | dump `server.log`;`-f` follow mode |
 
-### 關鍵實作
+### Repo path auto-detect
 
-| 點 | 解法 |
-|---|---|
-| 知道 vibe-pipeline repo 在哪 | install 時記 `~/.vibe-pipeline/install.json` 含 `repo_path`;或 env `VBPL_HOME`;或 auto-detect from `vbpl` binary symlink |
-| 跨平台 background spawn | `Bun.spawn([..], { cwd, stdio: file, detached:true })`;Windows `windowsHide:true` |
-| port 已占 | 起前 fetch `/api/health` 回 200 → already running,不重啟 |
-| PID file 殘留(process 死了 pid 還在) | `process.kill(pid, 0)` 探活,死的清 pid 重 spawn |
-| Windows / POSIX detach 差異 | Bun.spawn detached 內部處理,extra:Windows `start /B`,POSIX `setsid`(若 Bun 不夠) |
-| log rotation | start 時 append-only 寫 server.log;不做 rotation(maintainer 自己清,或 phase 6+) |
+`install.json` prompt 流程 **OBSOLETE**。最後採用零互動 auto-detect:
 
-### `~/.vibe-pipeline/install.json` 結構
+1. `VBPL_HOME` 明確指定 vibe-pipeline repo(給 binary 從任何 cwd 執行)
+2. 從目前 cwd 往上找 `.git` + `package.json.name === "vibe-pipeline"`
+3. 讀已記錄的 `~/.vibe-pipeline/server.json.repo_path`
+4. 都找不到才回 `NO_SERVER_REPO`,請 user 設 `VBPL_HOME` 或 cd 進 VP repo
+
+原本規劃的 `~/.vibe-pipeline/install.json`:
 
 ```json
 {
@@ -45,30 +45,42 @@ vbpl server logs [-f]
 }
 ```
 
-由 install script 寫(或第一次 `vbpl server start` 時 prompt user 一次填)。
+已不採用;不需要 install script / first-run prompt。
+
+### 關鍵實作
+
+| 點 | 解法 |
+|---|---|
+| 跨平台 background spawn | `Bun.spawn(["bun","run","server/index.ts"], { cwd, stdio:file, detached:true, windowsHide:true })` |
+| Windows detach | spawn + detached + file stdio;不用 `fork` / IPC,避開 Node #36808 類 Windows terminal 關閉帶死 child 問題 |
+| port 已占 | 起前 fetch `/api/health`;若 pid/repo_path 對不上,回 `PORT_IN_USE` 不接管 |
+| PID file 殘留 | `status` / `stop` 清 stale pid;health pid/repo_path mismatch 不亂 kill |
+| race auto-start | `server.start.lock` (`open wx`) 包住 auto-start;同時兩個 CLI 只會一個拿鎖 spawn,另一個等 health |
+| access log | backend 印 `[access] METHOD /api/... STATUS Nms`,給 `server logs -f` live 驗 |
+| log | append-only `server.log`;`logs -f` 用 fs watch + incremental read |
 
 ## 改動範圍
 
 | 檔 | 改動 |
 |---|---|
-| `cli/commands/server.ts` 新 | ~120 行(5 verb + pid / log file 管理) |
-| `cli/vbpl.ts` | dispatch 加 `server` noun,~5 行 |
-| `cli/lib/installInfo.ts` 新 | read `~/.vibe-pipeline/install.json` + env / symlink fallback,~30 行 |
-| `cli/commands/project.ts` 等 | 若有 hardcode backend URL 改走 helper 拿 |
-| install.md | 加「`vbpl server start` 起 backend」說明 |
-| README.md / SKILL.md | 「啟動 backend / Web UI」段改成 `vbpl server start`(對齊) |
+| `cli/commands/server.ts` | 5 verb + pid / log / health / restart / follow 管理 |
+| `cli/vbpl.ts` | dispatch 加 `server` noun |
+| `cli/lib/serverPath.ts` | repo path auto-detect + server pid/log/json path |
+| `cli/lib/ensureBackend.ts` | mutating command auto-start + race lock |
+| `cli/lib/serverBase.ts` | local API base / port helper |
+| `README.md` / `docs/vibe-pipeline/SKILL.md` / `docs/vibe-pipeline/install.md` | enduser 文件改 `vbpl server start` 主軸 |
 
-## Acceptance(動工時)
+## Acceptance(2026-05-19 Windows host)
 
-- `vbpl server start` 起 backend 背景,terminal 不阻塞
-- `vbpl server status` 對 alive / dead 兩種 case 都明確
-- `vbpl server stop` 真 kill(`/api/health` 不再回)
-- `vbpl server logs -f` 即時 tail
-- Windows + macOS + Linux 各驗一次
-- SKILL.md 對應段改成 `vbpl server start`
+- `vbpl server start` 5s 內 health 通
+- `vbpl server status` 回 up
+- `vbpl server logs -f` 可即時看到 backend access log
+- `vbpl server restart` PID 換新,health 重新通
+- 關 terminal 後 backend 不死(detach 有效)
+- `vbpl server stop` 後 health 不回
+- 同時跑 `vbpl pipeline run XX` + `vbpl pipeline list` 只 spawn 一個 backend
 
-## 不在現 scope
+## 不在 scope
 
-- 短期沿用 `bun run server`(README + SKILL 已寫)
-- 動工時機:enduser binary distribution 流程成熟後 / install.json 機制就緒一起做
-- 動工前要先想:install.json 怎麼寫(install script 還是第一次 prompt)、Windows detach edge case
+- macOS / Linux 真機驗證(phase 6+ 或 user host 補)
+- watchdog(YAGNI,不做)

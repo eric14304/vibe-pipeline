@@ -26,13 +26,26 @@ User 把 repo URL 給你的話,標準流程:
 
 需要 [Bun](https://bun.sh)(≥ 1.1)+ Git。
 
+### Enduser / AI 操作(推薦)
+
+先確定 `vbpl` 已安裝(PATH 內可跑 `vbpl --version`;安裝見 [`docs/vibe-pipeline/install.md`](docs/vibe-pipeline/install.md))。
+
+```bash
+vbpl server start
+vbpl server status
+```
+
+`vbpl server start` 會自動找到 vibe-pipeline repo(從 cwd / `VBPL_HOME` / 已記錄的 server.json),背景啟動 backend,終端機關掉 backend 仍會活著。`vbpl pipeline run|stop|merge|sync` 也會自動確保本機 backend 已啟動。
+
+### Maintainer 改 source code
+
 ```bash
 bun install
 bun run start         # build + 同時起 backend 3001 + preview 4173
 # 開 http://127.0.0.1:4173/board
 ```
 
-`start` 一條指令搞定 production build + 後端 + 前端 preview(PWA SW 註冊正常)。改 VP source code 才用 `bun run dev`(走 5173 vite HMR,SW 不註冊,maintainer 用)。
+`start` 一條指令搞定 production build + 後端 + 前端 preview(PWA SW 註冊正常)。日常改 VP source code 用 `bun run dev`(走 5173 vite HMR,SW 不註冊)。
 
 **Sub-agent 用 `sub:*` script + 100 port**(`sub:dev` / `sub:server` / `sub:preview`)避開 user backend。詳見 [package.json](package.json)。
 
@@ -130,6 +143,11 @@ bun run cli:build:linux     # Linux x64   → dist-cli/vbpl-linux
 ### 常用指令
 
 ```bash
+vbpl server start                                             # 背景啟動 backend
+vbpl server status
+vbpl server logs -f
+vbpl server restart
+vbpl server stop
 vbpl project list
 vbpl project init --here                                        # fresh 資料夾一鍵 init
 vbpl pipeline list --project <hash>
@@ -224,10 +242,15 @@ Phase 1-5 全套已落地(CRUD + QA + Runner + Worktree + Merge/Sync + Auto + Ta
 
 | 指令 | 用途 |
 |---|---|
-| `bun run start` | **enduser 用** — build + 同時 backend 3001 + preview 4173 |
-| `bun run dev` | maintainer 改 source 用:vite 5173 HMR + backend 3001(SW 不註冊) |
-| `bun run server` | 只 backend(3001) |
-| `bun run preview` | 只 frontend preview(4173,需先 `bun run build`) |
+| `vbpl server start` | **enduser / AI 推薦** — 背景啟動 backend(3001),終端機關掉不會殺 backend |
+| `vbpl server status` | 檢查 backend health / PID / uptime |
+| `vbpl server logs [-f]` | 看 backend log;`-f` 即時 tail |
+| `vbpl server restart` | 重啟 backend(PID 會換新) |
+| `vbpl server stop` | 停掉 `vbpl server start` 管理的 backend |
+| `bun run start` | maintainer 驗 production bundle:build + backend 3001 + preview 4173 |
+| `bun run dev` | maintainer 改 source:vite 5173 HMR + backend 3001(SW 不註冊) |
+| `bun run server` | maintainer 只起 backend(3001;前景 process) |
+| `bun run preview` | maintainer 只起 frontend preview(4173,需先 `bun run build`) |
 | `bun run sub:dev` | sub-agent 用:vite 5273 + backend 3101(避開 user 的 3001/5173) |
 | `bun run sub:server` | sub-agent 只 backend(3101) |
 | `bun run sub:preview` | sub-agent preview(4273 + proxy → 3101) |

@@ -16,23 +16,29 @@ User 在這台機器**可能裝了** **vibe-pipeline**(多 AI agent 的 ticket /
 
 ## 啟動 backend / 開 Web UI
 
-vbpl 主要 read 操作不需 backend(直接讀 fs),但 **run / pause / merge / sync** 跟 web UI 都需 backend up。
+vbpl 主要 read 操作不需 backend(直接讀 fs),但 **run / stop / merge / sync** 跟 web UI 都需 backend up。
 
-在 **vibe-pipeline repo 內** 開 terminal:
+首選用 `vbpl server start`。它會從當前目錄、`VBPL_HOME` 或先前記錄的 `server.json` 找到 vibe-pipeline repo,背景啟動 backend,terminal 關掉也不會殺 backend。
+
+```bash
+vbpl server start
+vbpl server status
+vbpl server logs -f        # 需要看 backend log 才開
+```
+
+`vbpl pipeline run|stop|merge|sync` 會自動確保 local backend 起來;若 backend 起不來,回 `START_TIMEOUT`,讓 user 跑 `vbpl server logs` 看原因。讀取型指令(`project list` / `pipeline status` / `ticket show`)不需 backend。
+
+確認 backend 活:`curl http://127.0.0.1:3001/api/health` 回 `{"ok":true,...}`;或直接看 `vbpl server status` 回 `up`。
+
+維護 vibe-pipeline source code 或要開 production Web UI 預覽時,才在 vibe-pipeline repo 內跑:
 
 ```bash
 bun install                # 第一次或 dep 更新後跑
-bun run start              # build + 同時起 backend 3001 + preview 4173
-# 開瀏覽器到 http://127.0.0.1:4173/board
+bun run start              # build + backend 3001 + preview 4173
+# 開 http://127.0.0.1:4173/board
 ```
 
-`start` = `bun run build` 完接 `concurrently` 同 terminal 跑 server + preview,一條指令拿 production bundle + PWA SW + 後端。
-
-確認 backend 活:`curl http://127.0.0.1:3001/api/health` 回 `{"ok":true,...}`。
-
-死了 / 沒起就 `vbpl pipeline run` 會回 `NO_BACKEND` error,告訴 user 跑 `bun run start`。
-
-> `bun run dev` 是 **maintainer 改 VP 自己 source code** 才用(走 5173 vite HMR,SW 不註冊,不適合 enduser 正常用)。enduser 永遠走 `bun run start`。
+> `bun run server` / `bun run dev` 是 **maintainer 改 VP 自己 source code** 才用;enduser AI 流程以 `vbpl server start` 為主。
 
 ## 心智模型
 
@@ -105,7 +111,7 @@ vbpl ticket remove --pipeline <id> --ticket <n>
 vbpl config set <key> <value>                          # e.g. runner.model claude-opus-4-7
 ```
 
-**啟動 / 停 / 合併(需 backend up — `bun run server`)**:
+**啟動 / 停 / 合併(會 auto-detect + auto-start local backend;也可先手動 `vbpl server start`)**:
 
 ```bash
 vbpl pipeline run <pipelineId>                         # 啟動 runner
@@ -173,7 +179,7 @@ vbpl pipeline sync <id> --cancel                       # 取消同步
    - 用 `vbpl ticket add` 或建議 user 開 web UI 走 QA 對話讓 AI 收斂規格(複雜需求建議走 QA,簡單一張可用 CLI)
 
 2. **「跑這條 pipeline」**
-   - **首選**:走 backend — `vbpl pipeline run <id>`(backend 沒起會回 `NO_BACKEND` error,告訴 user 跑 `bun run server`)
+   - **首選**:走 backend — `vbpl pipeline run <id>`(會自動啟 local backend;失敗時請 user 跑 `vbpl server logs`)
    - **替代(省 Agent SDK 額度)**:走 REPL 主 agent 模式 — 見上方「進階」段,適合 dogfood / CC 配 VP / 不過夜
    - 啟動後**不等完成**,告訴 user「已啟動,看 `vbpl pipeline status <id>` 或 web UI」
    - 不要 polling status 一直問;user 真要進度自己會問
@@ -199,13 +205,13 @@ vbpl pipeline sync <id> --cancel                       # 取消同步
 - **不要改 user 沒拜託的 config**(`vbpl config set`) — 動 model / effort 影響 cost
 - **不要碰 `~/.vibe-pipeline/state.json` / pipeline.json 手** — 走 vbpl 指令,後端有 atomic write / race guard
 - **看到 `merge_blocked` notif** — 通常 user 工作區髒 / git_error,reporter 告知不主動解
-- **`pipeline run` 不要塞給 backend 沒起的 user** — 先 health check,給明確提示「需 backend up」
+- **backend 起不來不要硬 retry** — `START_TIMEOUT` 時先看 `vbpl server logs`,回報真正錯誤
 
 ## 出錯訊息對照
 
 | Error code | 意思 | 怎麼回 user |
 |---|---|---|
-| `NO_BACKEND` | backend server 沒起 | 「先跑 `bun run server`」 |
+| `START_TIMEOUT` | local backend 自動啟動逾時 | 「跑 `vbpl server logs` 看 backend 為什麼起不來」 |
 | `NO_PROJECT` | resolveProject 找不到 | 「--project <hash> 指定 / 或先 `vbpl project add <path>`」 |
 | `NOT_INITIALIZED` | project 沒 `.vibe-pipeline/` | 「跑 vbpl project add,首次進去 web UI 點自動初始化」 |
 | `STATE_GUARD` | operation 不允許在當前 state | 看 state(running 要先「停止」/ merged 不准 run) |

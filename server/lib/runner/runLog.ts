@@ -12,8 +12,10 @@ import { readdirSync, existsSync, unlinkSync, statSync } from "node:fs";
 import { join } from "node:path";
 import * as pipelineDir from "../pipelineDir";
 
-import type { RunSummary, RunDetail, Provider } from "../../../shared/types";
+import type { RunSummary, RunDetail, Provider, RunTicketSnapshot } from "../../../shared/types";
 export type { RunSummary, RunDetail };
+
+const FAILURE_REASON_MAX = 200;
 
 const FILENAME_RE = /^(.+)-(\d+)\.log$/;
 
@@ -103,10 +105,30 @@ function parseFullLog(filename: string, logPath: string, text: string): RunDetai
   const headerMatch = text.match(/^\[runner [^\]]+\] exited code=(-?\d+)/m);
   const exitCode = headerMatch ? Number(headerMatch[1]) : null;
 
-  const stdoutMatch = text.match(/^--- stdout ---\n([\s\S]*?)(?=\n--- stderr ---|$)/m);
-  const stderrMatch = text.match(/^--- stderr ---\n([\s\S]*)$/m);
+  // log 結構:[header]\n--- stdout ---\n<stdout>\n--- stderr ---\n<stderr>\n--- meta ---\n<json>
+  // meta block 在最尾(orchestrator exit handler 寫),before snapshot 可能在 stdout 前
+  // 但為簡化,before/after 都統一塞 meta block
+  const stdoutMatch = text.match(/^--- stdout ---\n([\s\S]*?)(?=\n--- stderr ---|\n--- meta ---|$)/m);
+  const stderrMatch = text.match(/^--- stderr ---\n([\s\S]*?)(?=\n--- meta ---|$)/m);
+  const metaMatch = text.match(/^--- meta ---\n([\s\S]*)$/m);
   const stdout = (stdoutMatch?.[1] ?? "").trim();
   const stderr = (stderrMatch?.[1] ?? "").trim();
+  const metaText = (metaMatch?.[1] ?? "").trim();
+
+  let ticketsBefore: RunTicketSnapshot[] | null = null;
+  let ticketsAfter: RunTicketSnapshot[] | null = null;
+  if (metaText) {
+    try {
+      const j = JSON.parse(metaText) as {
+        ticketsBefore?: unknown;
+        ticketsAfter?: unknown;
+      };
+      ticketsBefore = normalizeSnapshot(j.ticketsBefore);
+      ticketsAfter = normalizeSnapshot(j.ticketsAfter);
+    } catch {
+      // skip
+    }
+  }
 
   let costUsd: number | null = null;
   let durationMs: number | null = null;
@@ -178,6 +200,8 @@ function parseFullLog(filename: string, logPath: string, text: string): RunDetai
     }
   }
 
+  const failureReason = extractFailureReason({ provider, stdout, stderr, exitCode });
+
   return {
     filename,
     logPath,
@@ -192,9 +216,106 @@ function parseFullLog(filename: string, logPath: string, text: string): RunDetai
     hasStderr: stderr.length > 0,
     provider,
     model,
+    failureReason,
+    ticketsBefore,
+    ticketsAfter,
     stdout,
     stderr,
   };
+}
+
+function normalizeSnapshot(v: unknown): RunTicketSnapshot[] | null {
+  if (!Array.isArray(v)) return null;
+  const out: RunTicketSnapshot[] = [];
+  for (const item of v) {
+    if (!item || typeof item !== "object") continue;
+    const o = item as { id?: unknown; status?: unknown };
+    if (typeof o.id === "string" && typeof o.status === "string") {
+      out.push({ id: o.id, status: o.status });
+    }
+  }
+  return out;
+}
+
+function truncate(s: string): string {
+  const t = s.trim().replace(/\s+/g, " ");
+  return t.length > FAILURE_REASON_MAX ? t.slice(0, FAILURE_REASON_MAX - 1) + "…" : t;
+}
+
+// 抽失敗原因:取最後一條最具體的 error 訊息。
+// codex:掃 turn.failed / thread.failed event 的 error.message 或 error 字串。
+// claude:JSON result 內若 is_error / subtype error 抓 result;另掃 stdout/stderr 內 Error: / panic / API Error 等
+// exitCode === 0 且沒 turn.failed → 視為成功,回 null
+function extractFailureReason(opts: {
+  provider: Provider | null;
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+}): string | null {
+  const { provider, stdout, stderr, exitCode } = opts;
+  const candidates: string[] = [];
+
+  if (provider === "codex" && stdout) {
+    for (const line of stdout.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("{")) continue;
+      try {
+        const ev = JSON.parse(trimmed) as {
+          type?: string;
+          error?: { message?: string } | string;
+          message?: string;
+        };
+        const isFailEvent =
+          ev.type === "turn.failed" ||
+          ev.type === "thread.failed" ||
+          ev.type === "error";
+        if (!isFailEvent) continue;
+        let msg: string | null = null;
+        if (ev.error && typeof ev.error === "object" && typeof ev.error.message === "string") {
+          msg = ev.error.message;
+        } else if (typeof ev.error === "string") {
+          msg = ev.error;
+        } else if (typeof ev.message === "string") {
+          msg = ev.message;
+        }
+        if (msg) candidates.push(msg);
+      } catch {
+        // skip
+      }
+    }
+  } else if (provider === "claude" && stdout) {
+    try {
+      const j = JSON.parse(stdout) as {
+        is_error?: boolean;
+        subtype?: string;
+        result?: string;
+      };
+      if ((j.is_error === true || (j.subtype && /error/i.test(j.subtype))) && typeof j.result === "string") {
+        candidates.push(j.result);
+      }
+    } catch {
+      // not full JSON — fall through to text scan
+    }
+  }
+
+  // 通用 text scan(stdout + stderr):抓 Error:/panic/API Error/abort/killed
+  const text = `${stdout}\n${stderr}`;
+  const errRe = /^(?:.*\b(?:Error|API Error|panic|Aborted|Killed|Fatal):.*)$/gm;
+  for (const m of text.matchAll(errRe)) {
+    candidates.push(m[0]);
+  }
+
+  if (candidates.length === 0) {
+    // 沒抓到具體 error 但 exitCode 非 0 → 給通用 fallback
+    if (exitCode !== null && exitCode !== 0) {
+      const tail = stderr.trim().split(/\r?\n/).filter((l) => l.trim()).pop();
+      if (tail) return truncate(tail);
+      return `exit code ${exitCode}`;
+    }
+    return null;
+  }
+  // 取最後一條(通常最具體)
+  return truncate(candidates[candidates.length - 1]);
 }
 
 type CodexParsed = {

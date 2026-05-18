@@ -15,6 +15,20 @@ import { ensureDepsAfterMerge } from "../depInstall";
 
 const LOG_CODE_WIDTH = 10;
 
+// P5: 抓 ticket id/status 寫進 log meta block,RunHistory diff 用
+function snapshotTickets(
+  tickets: ReadonlyArray<{ id?: string; status?: string } | undefined> | undefined
+): Array<{ id: string; status: string }> {
+  if (!tickets) return [];
+  const out: Array<{ id: string; status: string }> = [];
+  for (const t of tickets) {
+    if (t && typeof t.id === "string" && typeof t.status === "string") {
+      out.push({ id: t.id, status: t.status });
+    }
+  }
+  return out;
+}
+
 type RunningProcess = {
   pipelineId: string;
   proc: Bun.Subprocess | null; // mock 模式為 null
@@ -529,6 +543,9 @@ async function spawnDirect(opts: {
   const logFile = join(logsDir, `${pipelineId}-${Date.now()}.log`);
   await Bun.write(logFile, runnerLogHeader(pipelineId, "active") + "--- stdout ---\n");
 
+  // P5: snapshot 當下 tickets 狀態作為 ticketsBefore(spawn 前的基線),exit handler 算 diff 用
+  const ticketsBefore = snapshotTickets(pipeline.tickets);
+
   // 不 await — let it run async,handler 監看 exit
   (async () => {
     let stdoutText = "";
@@ -555,6 +572,14 @@ async function spawnDirect(opts: {
       const code = proc.exitCode;
       logStream.write("\n--- stderr ---\n");
       logStream.write(stderrText);
+      // P5: 寫 ticket snapshot meta(before spawn snapshot + after exit re-read)
+      const finalForMeta = (await pipelineDir.readPipeline(projectPath, pipelineId).catch(() => null)) as {
+        tickets?: Array<{ id?: string; status?: string }>;
+      } | null;
+      const ticketsAfter = snapshotTickets(finalForMeta?.tickets ?? []);
+      const meta = JSON.stringify({ ticketsBefore, ticketsAfter });
+      logStream.write("\n--- meta ---\n");
+      logStream.write(meta);
       await endStream(logStream);
       logStream = null;
       await patchRunnerLogExitCode(logFile, pipelineId, code ?? codeFromExited);
@@ -700,7 +725,17 @@ async function spawnDirect(opts: {
         } catch {}
       }
       try {
-        await Bun.write(logFile, `${runnerLogHeader(pipelineId, "active")}--- stdout ---\n${stdoutText}\n--- stderr ---\n${stderrText}\n[runner ${pipelineId}] error: ${String(e)}`);
+        const finalForMeta = (await pipelineDir.readPipeline(projectPath, pipelineId).catch(() => null)) as {
+          tickets?: Array<{ id?: string; status?: string }>;
+        } | null;
+        const meta = JSON.stringify({
+          ticketsBefore,
+          ticketsAfter: snapshotTickets(finalForMeta?.tickets ?? []),
+        });
+        await Bun.write(
+          logFile,
+          `${runnerLogHeader(pipelineId, "active")}--- stdout ---\n${stdoutText}\n--- stderr ---\n${stderrText}\n[runner ${pipelineId}] error: ${String(e)}\n--- meta ---\n${meta}`,
+        );
       } catch {}
     } finally {
       running.delete(k);
