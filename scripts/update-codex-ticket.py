@@ -13,7 +13,7 @@ new_acc = (
     "codex spawn args 對稱 claude 的 perf flags(skip user/project settings、skip MCP、"
     "skip skills/plugins、session 控制),CodexAdapter 內用 codex 對應的 flag 達到同樣 "
     "isolation 等級;若 codex 無等價 flag → 標 capability false + 在 prompt 註明 trade-off"
-    "(refs/claude-cli-spawn-perf-2026-05-11.md 同等對待)"
+    "(refs/archive/claude-cli-spawn-perf-2026-05-11.md 同等對待)"
 )
 if new_acc not in t["acceptance"]:
     t["acceptance"].append(new_acc)
@@ -22,7 +22,7 @@ extra = """
 
 ## 對稱 claude 的 perf flag(必做)
 
-參考 [refs/claude-cli-spawn-perf-2026-05-11.md](.claude/skills/vibe-pipeline/refs/claude-cli-spawn-perf-2026-05-11.md):claude 三處 spawn 加四組 flag 拿到 QA / split 80-90% cost 省 + 14-22% cold start 省。codex adapter 要對稱對應 flag(若 codex CLI 有等價的)。
+參考 [refs/archive/claude-cli-spawn-perf-2026-05-11.md](.claude/skills/vibe-pipeline/refs/archive/claude-cli-spawn-perf-2026-05-11.md):claude 三處 spawn 加四組 flag 拿到 QA / split 80-90% cost 省 + 14-22% cold start 省。codex adapter 要對稱對應 flag(若 codex CLI 有等價的)。
 
 ### claude 那邊有的 flag(對稱目標)
 

@@ -21,7 +21,7 @@
 //    + approval policy 控制;QA / split 用 read-only sandbox,runner 用 workspace-write。
 //    supportsToolWhitelist=false。
 //
-// Perf flag 對應(對齊 refs/claude-cli-spawn-perf-2026-05-11.md):
+// Perf flag 對應(對齊 refs/archive/claude-cli-spawn-perf-2026-05-11.md):
 //   claude --setting-sources ""        → codex --ignore-user-config + --ignore-rules
 //   claude --strict-mcp-config + 空 MCP → codex -c mcp_servers={}(override TOML)
 //   claude --disable-slash-commands    → 無對應(codex exec 本就 non-interactive)

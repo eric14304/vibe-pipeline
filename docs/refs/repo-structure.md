@@ -73,7 +73,7 @@ vibe-pipeline/
 │       ├── dialog.ts          OS native folder picker (osascript/powershell/zenity) + revealFolder
 │       ├── userConfig.ts      ~/.vibe-pipeline/config.json
 │       ├── git.ts             hasGit / gitInit
-│       ├── depInstall.ts      merge 後動 deps → 自動 bun install(雷 #20)
+│       ├── depInstall.ts      merge 後動 deps → 自動 bun install(見 CLAUDE.md §self-dogfood 加 npm dep)
 │       ├── pipelineMerge.ts   mechanical(git --no-ff)+ AI fallback merge
 │       ├── git/worktree.ts    ensure / remove / prune (per pipeline)
 │       ├── cli/               CliAdapter + claudeAdapter + codexAdapter + factory
@@ -90,7 +90,7 @@ vibe-pipeline/
 ├── design/                    Claude Design handoff bundle(歷史紀錄,real code 已不引用)
 │
 ├── docs/
-│   ├── CHANGELOG.md           Phase 表 / 歷次大改動 / 已 final 不做
+│   ├── CHANGELOG.md           歷次大改動
 │   ├── TODO.md                待動工清單(對應 phase 8 pipeline)
 │   ├── refs/                  設計文件 / 競品對照 / 歷史 spec(maintainer 用)
 │   │   ├── README.md          refs 目錄索引(active / archive)
@@ -100,11 +100,15 @@ vibe-pipeline/
 │       ├── install.md
 │       └── repl-runner.md
 │
-├── .claude/skills/            repo 內 maintainer SKILL
-│   ├── vibe-pipeline-frontend/SKILL.md
-│   ├── vibe-pipeline-backend/SKILL.md
-│   ├── vibe-pipeline-cli/SKILL.md
-│   └── vibe-pipeline-e2e/SKILL.md
+├── .claude/
+│   ├── skills/                repo 內 maintainer SKILL
+│   │   ├── vibe-pipeline-frontend/SKILL.md
+│   │   ├── vibe-pipeline-backend/SKILL.md
+│   │   ├── vibe-pipeline-cli/SKILL.md
+│   │   └── vibe-pipeline-e2e/SKILL.md
+│   └── rules/                 path-specific 雷區(frontmatter `paths:` 標明適用範圍)
+│       ├── pwa-sw.md          SW / Workbox / vite-plugin-pwa
+│       └── remote-access.md   Tailscale / TOTP / FCM / network binding
 │
 └── node_modules/              (gitignored)
 ```

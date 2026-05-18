@@ -61,7 +61,7 @@ export async function runTurn({
   //
   // **但保留 setting-sources 預設**(2026-05-16 改動):QA 對純 VP 用戶(沒 CC 在旁)是主要建 ticket 入口,
   // 沒專案脈絡時 spec 品質差。少用、要準 → 願意付 ~19k token/spawn 換 CLAUDE.md + skill 索引讓 AI 有專案知識。
-  // 早期 perf 量測(refs/claude-cli-spawn-perf-2026-05-11.md)的 -89% cost 對應的代價是 spec 品質,該回頭走回來。
+  // 早期 perf 量測(refs/archive/claude-cli-spawn-perf-2026-05-11.md)的 -89% cost 對應的代價是 spec 品質,該回頭走回來。
   //
   // 注意:**不能加 --no-session-persistence** — QA 多輪靠 --resume 接續,
   // 第二輪起需要前一輪 session 落地到 disk,no-persist 會讓 follow-up turn 直接 500。

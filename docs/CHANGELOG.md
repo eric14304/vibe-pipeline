@@ -2,99 +2,54 @@
 
 歷史紀錄 + 設計決策來源。CLAUDE.md 是「現狀規則」,本檔是「為何變成現狀 / 過去考慮過什麼」。
 
-新版本變動規則:每次有架構級改動或設計決策落地時加日期分段;CLAUDE.md 只更動 canonical reference 段。
+寫入規則:每次架構級改動或設計決策落地往**後 append** 日期分段(舊在上、新在下);CLAUDE.md 只更動 canonical reference 段。每個 bullet 一個概念,非顯而易見的 why 加一句。
 
 ---
 
-## Phase 1-5 落地表
+## 2026-05-13(Phase 5 後續打磨)
 
-每 phase 一條 merge commit,詳細落地紀錄查 `git log --grep "Merge pipeline/"`;Phase 5 後續打磨在 `b4a6a13` 之後 ~30+ patch + 2026-05-13 大改動。
-
-| Phase | 一句話 |
-|---|---|
-| 1 | Project / Pipeline CRUD + JSON 持久化 + git init |
-| 2 | QA drawer + claude CLI 收斂 + Draft store |
-| 3 | Pipeline runner(主 agent + Task sub-agent)/ git worktree / iter rounds / multi-pipeline 平行 / merge to base |
-| 4 | E2E (Playwright mock + real) / AI merge ticket-based / UI polish(ConfirmDialog / DiffModal / 中文化) |
-| 5 | 全自動化(拆 / sync / merge / prune)+ per-task model config + CLI perf flags + RWD + Tailscale + TOTP auth + FCM + cross-provider sub-agent |
-
-六條 pipeline 已 merge 進 main:phase3 / phase4 / refactor / perf-claude-cli / codex-cli / phase5,chore pipeline 補完 e2e mock。Self-dogfood 自我重構穩定運作,**手機可透過 Tailscale HTTPS + TOTP auth + FCM Web Push 遠端控制 + 收 ticket 通知**。
-
----
-
-## 2026-05-13 大改動(Phase 5 後續打磨期)
-
-- **Sync 重構(Plan C)**:`Pipeline.syncJob` 寄生欄位取代舊 `mode=sync` ticket;git-first → 衝突才 AI;新 4 endpoints `/sync` `/sync/ai` `/sync/cancel` `/sync/dismiss`。細節 → [`refs/sync-redesign-2026-05-13.md`](refs/sync-redesign-2026-05-13.md)
-- **`subAgent` 拆 `executor` + `critic`**:兩個獨立 TaskClass,critic 可挑便宜 model(sonnet+medium)省 token 5-10x;userConfig 自動 migrate(舊 subAgent → executor,critic 走 default)
-- **Client-side folder browser**:新 `GET /api/projects/browse?path=` endpoint,瀏覽器內導覽 host 上目錄;Tailscale 遠端開 project 走這個(native picker 跑在 host user 看不到 dialog)
-- **`vbpl` CLI 落地**:`cli/` 內,reuse `server/lib/*` 直接讀寫 fs(no HTTP)。4 nouns(project/pipeline/ticket/config)+ `--json` mode。`bun run vbpl <noun> <verb>`。約定見 [`vibe-pipeline-cli` SKILL](.claude/skills/vibe-pipeline-cli/SKILL.md)
-- **Auto-merge 二段式**:`autoMerge=true` 觸發時 backend 先 `git merge --no-ff`(機械式,~90% clean case 毫秒級 done);**撞衝突 → 自動 fallback 到 spawn AI 全套** + emit notif + FCM push「🤖 AI 接手解衝突」(autoMerge 核心情境就是 user 不在現場,所以推播必要)。dirty / git_error 等非 AI 能解的失敗才 emit `merge_blocked` 等 user。心智:autoMerge 是「全自動」承諾;速度收益留在 clean 場景
-- **Manual merge 也走 git-first 二段式**:跟 auto-merge 對稱化。`mergePipeline` route 改成先試 `autoMergeNoAI`,衝突才 fallback `triggerMerge`。response 加 `mode: "mechanical" | "ai"` discriminator;CLI / Web UI handler 依 mode 分流顯示。按鈕 label「AI 合併」→「合併」(AI 變 fallback)。`alreadyMerged` 路徑也補寫 pipeline state=merged + 清殘存 failed merge ticket
-- **CLI mutate 操作走 backend HTTP**(`cli/lib/api.ts`):`vbpl pipeline run / stop / merge / sync --ai / sync --cancel` 走 POST,避免 CLI 自己 spawn child 後 CLI 退出 → child 孤兒 / orchestrator running map 蒸發。其他 verb(list / show / create / delete / config 等)維持 fs 直存,read 不受 backend 起沒起影響
-- **`Pipeline.createdAt` 欄位**:取代 id 內嵌 hex timestamp 當排序依據(AI / fixture 手 craft 的假 id 會排亂)。`listPipelines` 讀檔時若無此欄位自動 backfill 用 id-ts;新 pipeline 寫真 `Date.now()`。CLI `pipeline create` 同步讀 project config `defaults.auto_merge` 預設值(原本漏)
-- **`pipelineDir.init` 改 idempotent**:`.vibe-pipeline/` partial init 殘骸自動補齊不報錯;`.gitignore` 自動補 `pipelines/`(原本漏)
-- **UX 收斂**:Pipeline 執行紀錄從 TicketDrawer 拆到 pipeline-level OverflowMenu;Inbox strip 整塊觸碰 + 滾輪 preview popover;QA reopen + viewOverride 雙向;CTA 視覺強度三檔(`btn` / `btn-accent` / `btn-primary`),+ ticket 跟 RunButton 主色互斥避免兩顆都搶眼;`bun run start` 一指令包 preview + server(production-like)
-- **主 SKILL 重定位**(2026-05-13 後段):從「設計信條 + 競品對照 + 產品形態混雜的 maintainer doc」改成「給 enduser AI 看的 vbpl 操作手冊」。refs 從 `.claude/skills/vibe-pipeline/refs/` 搬到 `docs/refs/`,SKILL 變 distributable;設計信條搬進 CLAUDE.md;競品對照合一為 `docs/refs/competitor-refs.md`
+- Sync 重構(Plan C):`Pipeline.syncJob` 寄生欄位取代舊 `mode=sync` ticket;git-first → 衝突才 AI
+- `subAgent` 拆 `executor` + `critic`:critic 可挑便宜 model 省 token 5-10x;userConfig 自動 migrate
+- Client-side folder browser:Tailscale 遠端開 project 走 `GET /api/projects/browse`,native picker 失效改瀏覽器內導覽
+- `vbpl` CLI 落地:`cli/` 內 reuse `server/lib/*` 直存 fs(no HTTP),4 nouns + `--json` mode
+- Auto-merge 二段式:先 `git merge --no-ff`(~90% clean case 毫秒級);撞衝突自動 fallback AI + FCM push
+- Manual merge 對稱 git-first:`mergePipeline` 改先試 mechanical;response 加 `mode: "mechanical" | "ai"` discriminator
+- CLI mutate 走 backend HTTP:`run / stop / merge / sync` 走 POST,避免 CLI 退出後 child 孤兒
+- `Pipeline.createdAt`:取代 id 內嵌 hex timestamp 當排序依據(AI 手 craft 假 id 會排亂)
+- `pipelineDir.init` 改 idempotent:partial 殘骸自動補齊;`.gitignore` 自動補 `pipelines/`
+- UX 收斂:Pipeline 執行紀錄拆 OverflowMenu;CTA 三檔強度(`btn` / `btn-accent` / `btn-primary`)互斥
+- 主 SKILL 重定位:從 maintainer doc 改成 enduser AI 操作手冊;refs 搬 `docs/refs/`,SKILL 變 distributable
 
 ---
 
-## 2026-05-14 大改動
+## 2026-05-14
 
-- **`cost_limit_usd` enforcement 從 project 累積改 per-pipeline 累積**:設定位置仍在 `<project>/.vibe-pipeline/config.json`,但每條 pipeline 各自用自己的 tickets/runs cost 判斷上限,不再跨 pipeline 加總互相擋 /run
-- **Provider 鏈一致化(主跟 sub 同 provider)正式落地**:設計原則「主 agent 是 X,sub-agent 跟著用 X」徹底實現,executor / critic / merge 不再各自選 provider,全部 snap 成 runner.provider
-- **codex 主 runner 改 in-process spawn_agent pattern**:取代舊 Bash `codex exec` subprocess fallback,主 agent 用 `spawn_agent` → `wait_agent` → `close_agent` 三步 atomic in-process 序列派 sub-agent;需 codex CLI 的 multi_agent feature flag,`codexAdapter.spawnRunner` 自動加 `-c features.multi_agent=true`。codex-codex 達到 claude-claude 同級 in-process 速度
-- **UI 砍 executor/critic/merge 的 provider 欄**(SettingsPopover):只 runner row 仍可選 provider,其餘 task class 自動跟隨 runner
-- **`coerceConfig` silent snap migration**:讀 user config 時自動把 executor / critic / merge 的 `provider` snap 成 `runner.provider`;PUT 進來若 mismatch 也擋掉(server 端強制一致)
-- **codex 主 runner e2e 驗證通過**:vp-autotest `codex-runner-smoke` pipeline 跑 step ticket,log 內多次 `spawn_agent` 出現,確認用 in-process API(非 Bash fallback);ticket commit + pipeline 收 ready 都正常。順帶修一個雷:`codexAdapter.commonExecArgs` 內 `--ignore-user-config` flag 會把 `~/.codex/config.toml` 內 `provider = codex_local_access`(ChatGPT auth)設定 ignore 掉,fallback default OpenAI API 模式,用 `auth.json` 內 internal/beta key 撞 401 Unauthorized。移除該 flag,保留 `--ignore-rules` + `-c mcp_servers={}` 維持隔離
-- **背景 push 真實 pipeline 事件觸發 e2e 驗證通過**:vp-autotest `push-verify` 跑一張 step ticket,手機鎖屏收到「✅ Ticket 完成 / 建一個 push verify file」FCM push。確認 ticketWatcher 的 fs.watch → diff status → fanoutPush 全鏈路 work;之前只測過 `/api/push/test` 直接 fanout(底層 OK 但沒驗 watcher 觸發路徑)
-- **Push event per-type toggle**:user config 加 `pushEvents`(4 個 key:ticket_done / ticket_failed / pipeline_paused / auto_merge_conflict,預設全 true),SettingsPopover 通知 tab 加 toggle;backend fanoutPush 前查 config gate,關掉的 event 不推
-- **`vbpl pipeline log --follow`**:像 tail -f,印出最新 run log 現有 content 後 fs.watch 增量串流,Ctrl+C 收尾;log 檔未生時 poll 等候。debug pipeline 卡 / 觀察 runner 進度用
-- **runner prompt 重構 + 修**:(1)iter step 1 寫 partial round `{n, startedAt}` 進 rounds(修 UI elapsed 00:00 假象,step 4 改 update in-place);(2)dispatchProtocol 抽共通段(利用 cascade 同 provider,不再 3 角色各印一份),~20KB → ~17.6KB;(3)砍 transient retry dead code(CLI 內部已自動 retry,主 agent 永遠看不到 transient error,prompt retry 段從未觸發)
-- **Phase 6 候選大幅收斂**:Provider 鏈一致化 / codex 主 runner / 背景 push 三項驗證落地;Budget dashboard / shell completion / CI release / Transient retry 驗證 / Self-dogfood guard 五項評估後砍除(個人 vibe 工具不需 / 邏輯矛盾 / free mitigation 已夠);剩 iOS PWA push 實測(等 iPhone 設備)
-- **雜項修**:cascade 整套對稱 runner(provider+model+effort,不再降 effort 到 default);SettingsPopover updateTask 拿 PUT response 覆寫 local state(修 cascade 後 UI 顯示漂掉);Rail commits null entry 防禦;QA sendTurn optimistic user turn 被 polledDraft race 蓋掉的修(turns.length 嚴格比較);mobile QA spec-actions 維持單列;SettingsPopover inline style 31→2 / FocusColumn 40→10 / TopBar 21→1 搬 CSS
+- `cost_limit_usd` enforcement 改 per-pipeline 累積:不再跨 pipeline 加總互擋
+- Provider 鏈一致化:主 agent 是 X → sub-agent 跟著 X;executor / critic / merge 全 snap 成 `runner.provider`
+- codex 主 runner 改 in-process `spawn_agent` pattern:需 `[features] multi_agent = true`;達到 claude-claude 同級 in-process 速度
+- `coerceConfig` silent snap migration:讀 config 自動 snap provider 一致;PUT mismatch 擋掉
+- Background push 真實 pipeline 事件觸發 e2e 驗證(vp-autotest `push-verify`)
+- Push event per-type toggle:`pushEvents` 4 key(ticket_done / ticket_failed / pipeline_paused / auto_merge_conflict)
+- `vbpl pipeline log --follow`:tail -f 模式,debug pipeline 卡 / 看 runner 進度
+- runner prompt 重構:iter step 1 寫 partial round 修 elapsed 00:00 假象;dispatchProtocol 抽共通段 ~20KB→~17.6KB;砍 transient retry dead code
+- Phase 6 候選大幅收斂:5 項評估後砍(個人 vibe 工具不需 / 邏輯矛盾 / free mitigation 已夠);剩 iOS PWA push 實測
 
 ---
 
-## 2026-05-18 大改動
+## 2026-05-17
 
-- **`ensureDepsAfterMerge` backend 自動跑 `bun install`**(雷 #20 mitigate)。merge 後 diff `mergeCommit^1..mergeCommit` 的 `package.json` deps keys + `bun.lock`,有變就同步跑 `bun install`(失敗 emit `pipeline_merge_cleanup_failed` notif 不阻斷 merge 成功)。mechanical 跟 AI merge 兩條 path 都呼。背景:self-dogfood pipeline 加新 dep merge 回 main 後撞「Cannot find package」,本來要人工 `bun install`。實作 `server/lib/depInstall.ts` + `pipelineMerge.ts` + `orchestrator.ts` post-merge block 共 ~115 行
-- **`bun run start` enduser script + sub:* sub-agent script 拆**。`dev` 名稱保留給 maintainer 改 source 用(vite 5173 HMR + SW 不註冊);enduser 改走 `bun run start = build + concurrently(server 3001 | preview 4173)`,production bundle + PWA SW 註冊都拿到。`sub:dev` / `sub:server` / `sub:preview` 走 +100 port(5273 / 3101 / 4273)給 sub-agent 自起 stack 避免撞 user main backend。SKILL / README 同步;`cross-env` dep 加進
-- **CLAUDE.md 瘦身 285→89 行**。物理 tree 抽 `docs/refs/repo-structure.md`(SSOT);refs 表抽 `docs/refs/README.md`;開發環境 / 手機遠端段刪(指 README);手機遠端 5 條雷搬進「不踩的雷」#24-28(README 沒提的不丟)
-- **`docs/TODO.md` 落地 + Phase 8 pipeline `019e36fbea63-phase8` 開**。14 項候選收一處(6 已有 ref / 8 session 新痛點):FCM gateway / vbpl server cmd / iOS push 實測 / SKILL injection / secret 洩漏偵測 / pause-simplify follow-up bugs / backend self-heal / pipeline delete cascade / mockup-driven polish 機制 / worktree staleness / provider-task-fit / web UI 自動 fire pipeline.run / recoverStale 太武斷 / ticketWatcher disk reconcile 該設計化
-- **Settings full-redesign + pixel-polish 全 revert**。`pipeline/settings-full-redesign` merge `2225986` 跟 `pipeline/settings-pixel-polish` merge `f1b1c19` 都撤(`8bb47fb` / `09af96d` / `24dcf5c`)。Backup branch `backup/settings-pixel-polish-pre-revert` 保留(tip `1fdc7bd`)。reason:redesign 後元素全放大 ~1.5x(input 62px / icon 24px / row padding 24px / 字級 1.0625-1.375rem),pixel-polish 雖對齊 mockup 但實際用起來「各種元素都好大」+「兩 tab 樣式不一致」,user 反映 reverted。後續以 baseline 上小幅微調為主(PWA tab 重排 + `.settings-tab-content` wrapper 統一三 tab 結構)。經驗:**mockup-driven AI polish 容易過度 scale + 失去既有 design language**,critic 不會抓
-- **Frontend toast → Inbox emit 拔(原 A2 ticket revert in spirit)**。BoardScreen `notifyError/Warn/Info` 只走 `setActionError`(5s toast),不再 `postNotif`。InboxColumn 「前端動作」filter / count / empty msg 移除;`InboxFilter` type 去 `"frontend"`。reason:user 看到 Inbox 多了「前端動作」filter 反問「這不該進 Inbox」。Backend `/api/.../notif` endpoint + 既有歷史 notif 保留(無害,不再寫入)
-
-## 2026-05-17 大改動
-
-- **PWA Workbox 整合**(pipeline `pwa-workbox`)。vite-plugin-pwa `injectManifest` 模式加進 build pipeline,跟既有 `firebase-messaging-sw.js` 合併為單一 SW;**precache** 所有 build 產物(JS/CSS/HTML/SVG/PNG,9 entries / ~640 KiB);**runtime cache** 三條 — `/api/*` GET StaleWhileRevalidate(cache name `api-cache`,非 GET 排除)/ Google Fonts CacheFirst + SWR / NavigationRoute fallback `/index.html`;FCM push handler / `notificationclick` / install+activate `skipWaiting`+`clients.claim` 維持原邏輯。PWA manifest(`public/manifest.json`)補 description / lang `zh-Hant` / dir / orientation / categories / shortcuts;`manifest.webmanifest`(plugin 產)並存但 `index.html` 只 link 手寫的 `manifest.json`。SW 註冊入口仍是 `src/lib/fcm.ts`(`injectRegister: false` 不搶);加 `src/hooks/useInstallPrompt.ts`(`beforeinstallprompt` / `appinstalled` / standalone matchMedia)+ `SettingsPopover` 通知 tab 末尾 `InstallAppSection`(iOS Safari 走分享 → 加入主畫面 fallback)。dev mode 不註冊 SW,要 `bun run build && bun run preview`(4173)才看得到 PWA 行為;Lighthouse PWA 目標 ≥ 90。CLAUDE.md 雷區補 #19(dev vs production)/ #20(改 SW 兩段都要驗)/ #21(`/api/*` 只 cache GET)。e2e 22 條 pre-existing fail 跟 PWA 無關(P4 確認)
-- **PWA `registerType` autoUpdate → prompt**(pipeline `pwa-update-prompt`)。原本 vite-plugin-pwa 預設 `autoUpdate`,SW 一變新版 workbox-window 收 `controlling` event 直接 `window.location.reload()`,user 打字 / 看 modal / 跑 QA 都被打斷。改 `registerType: 'prompt'` + `src/lib/swUpdate.ts`(workbox-window 包裝 `waiting` / `controlling` / `activated` event + `messageSkipWaiting` + `useSwUpdate()` hook)+ `src/features/system/SwUpdateBanner.tsx`(`有新版可更新` + 「更新」`btn-primary` + 本地 dismiss `×`),user 主動點才 reload。CLAUDE.md 雷區 #22 補 autoUpdate 體感問題與設計信條(執行中操作信號才該立即冪等,「自動 reload」非對等);frontend SKILL PWA 段補 prompt mode 行為 + SwUpdateBanner 位置 + 開發者改 SW 後 build → preview → reload → banner → 點更新 驗證流程
-- **Pause 簡化:graceful 路徑全拔**。原設計「按暫停 → state=stopping → runner 跑完當前 ticket → ack 標 paused」拔掉,改成 stop = SIGKILL child → state=paused immediate。動機:user 按下停止就是想立刻停(燒錢 / 跑歪 / 改主意),等一張 ticket 跑完反直覺;graceful ack 還讓 prompt / state machine / UI 三層各養 stopping 分支,維護不對稱。落地分四 ticket:t1 backend(orchestrator stop + 拔 prompt 內 stopping 處理)/ t2 frontend(雙按鈕「暫停 / 終止」合一為「停止」)/ t3 CLI(`vbpl pipeline stop` 描述改 immediate)/ t4 e2e(stop sequence 改驗 running → paused 無中介)/ t5 docs 同步本檔。`recoverStale` 保留收 legacy `stopping` 殘留(舊 pipeline.json 升級無痛)。詳細紀錄 [CLAUDE.md 雷區 #18](../CLAUDE.md);歷史 graceful 設計保留在 [`refs/integration-plan-v3-runner-2026-05-10.md`](refs/integration-plan-v3-runner-2026-05-10.md)
+- PWA Workbox 整合(`pwa-workbox`):vite-plugin-pwa injectManifest 跟 firebase-messaging-sw.js 合併為單一 SW;precache(9 entries / ~640 KiB)+ runtime cache(`/api/*` SWR / Google Fonts / Navigation fallback)。dev mode 不註冊 SW,要 `bun run build && bun run preview` 才驗
+- PWA `registerType: autoUpdate → prompt`(`pwa-update-prompt`):原 autoUpdate 體感像突然 refresh;改 prompt + `<SwUpdateBanner>` 等 user 主動點才 reload
+- Pause 路徑簡化:`stopping` 中介 state 全拔,stop = SIGKILL → paused immediate。動機:按停止就想立刻停,等 ticket 跑完反直覺;graceful 三層分支維護不對稱。設計信條「執行中操作信號 = 立即 + 冪等」
 
 ---
 
-## 已 final 決定(不再討論,搬到這段表示不會做)
+## 2026-05-18
 
-- **Theme 偏好 → localStorage**(URL `?theme=` 仍 override)
-- **Worktree 位置 → global** `~/.vibe-pipeline/worktrees/<projHash>/<pipelineId>/`
-- **vp-autotest project**(`d:/sugarfungit/vp-autotest`,hash `cf94d1b2`)— Claude 跑 runner 測試專用,user 主 project 不污染
-- **Pixel-diff 不救**(2026-05-10 phase 3-5 砍):prototype variant routes(/init, /drawer, /qa, /notifications)+ NotifBanner / NotificationsScreen / DrawerStage / QAScreen / InitScreen 全刪,tests/ 整個刪,playwright/pixelmatch/pngjs 從 devDeps 移除,`bun run diff` script 移除。design/ 留作歷史紀錄不再對齊
-- **log/notif GC** 走 per-pipeline 10 / 全 project 500 上限,trigger 在 /run spawn 前
-- **Self-dogfood AI merge worktree isolation 目前不做(等需求訊號)** — 觸發條件三項交集:(a) target repo 是 VP 本身、(b) backend `server:watch` / `dev:all` watch mode、(c) AI 改到 `server/**/*.ts`;少任一條不踩。99% end-user(對別 project 用 VP)不會踩 — `bun run server` no-watch default + 雷區 #7/#8 文件化規避是 free mitigation。實作 worktree isolation ~150 行只半解 merge 階段(平常 ticket exec 改 backend code 仍踩);完整解要 process group detach 動 Bun.spawn internals。研究紀錄見 [`refs/merge-isolation-2026-05-11.md`](refs/merge-isolation-2026-05-11.md)。**等需求訊號**(VP fork 變多 + user 抱怨累積)再回頭做
-- **Runner spawn `--setting-sources` 不砍** — 保留給 Task sub-agent 讀 user/project CLAUDE.md。砍掉省 ~13% cache 但 sub-agent 失去 context 繼承,得失不對稱
-
-> 2026-05-13 update:原本「Runner 主 agent 永遠是 claude」被搬回 Phase 6 候選。理由:查 codex CLI 確認本體有 `spawn_agent` / `wait_agent` / `close_agent` 原語(需 `[features] multi_agent = true`),跟 claude Task tool 對等。若接起來,codex 主 + codex sub 可達到 claude-claude 同級 in-process 速度,「子跟隨主」原則才有性能依據。當前 runnerPrompt 全 claude-isms + Bash spawn codex sub 那條 fallback 設計也跟著要重寫。
-
----
-
-## 計畫 ref(歷史 spec / 設計文件)
-
-- [phase 1 plan(已落地)](refs/archive/integration-plan-v1-2026-05-09.md)
-- [phase 2 QA plan(已落地)](refs/archive/integration-plan-v2-qa-2026-05-09.md)
-- [phase 3 runner plan(進行中)](refs/integration-plan-v3-runner-2026-05-10.md)
-- [git design](refs/git-design-2026-05-09.md)
-- [完整功能 spec](refs/spec-2026-05-09.md)
-- [state matrix](refs/state-matrix-2026-05-10.md)
-- [claude CLI spawn perf](refs/claude-cli-spawn-perf-2026-05-11.md)
-- [sync 重構](refs/sync-redesign-2026-05-13.md)
-- [merge worktree isolation 研究(不做)](refs/merge-isolation-2026-05-11.md)
-- [競品對照](refs/competitor-refs.md)
+- `ensureDepsAfterMerge`:merge 後 diff `package.json` deps + `bun.lock`,變動就 `bun install`(失敗 emit notif 不阻斷)。背景:self-dogfood pipeline 加新 dep merge 回 main 後撞「Cannot find package」
+- `bun run start` enduser script vs `dev` maintainer script 拆;`sub:*` script +100 port(5273 / 3101 / 4273)給 sub-agent 自起 stack
+- CLAUDE.md 瘦身 285→89 行:物理 tree 抽 `repo-structure.md`(SSOT);refs 表抽 `refs/README.md`;手機遠端段刪指 README
+- `docs/TODO.md` 落地 + Phase 8 pipeline `019e36fbea63-phase8` 開:14 項候選收一處
+- Settings full-redesign + pixel-polish 全 revert(`8bb47fb` / `09af96d` / `24dcf5c`);backup branch `backup/settings-pixel-polish-pre-revert` 保留。reason:redesign 後元素全放大 ~1.5x,實用時「各種元素都好大」+「兩 tab 樣式不一致」。經驗:**mockup-driven AI polish 容易過度 scale + 失去既有 design language**,critic 不會抓
+- Frontend toast → Inbox emit 拔:BoardScreen 只走 `setActionError`(5s toast),不再 `postNotif`。reason:user 反問「前端動作不該進 Inbox」
+- 文件 / SKILL 結構重整:跨檔「雷 #N」brittle 引用改 §descriptive anchor(13 處);AGENTS.md 砍到 9 行純 pointer(SSOT 回 CLAUDE.md dir 表);`.claude/rules/` 新增 path-specific 規則檔(pwa-sw / remote-access / cli-codex);`docs/refs/` active 14 → 5 個 + archive 6 → 17;CHANGELOG 精煉收斂 + 結構整理(已 final / 計畫 ref 段上移到日期 entries 前)

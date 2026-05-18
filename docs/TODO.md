@@ -19,10 +19,6 @@ Phase 8 候選清單。動工時搬進 pipeline ticket(`vbpl ticket add --pipeli
 - iOS 16.4+ 已支援 Web Push 但需先「加入主畫面」,目前只在 Android 驗過
 - 沒獨立 ref(<1 條 ticket),動工時直接拆
 
-### 4. SKILL 引用重點
-- Ref:[`refs/skill-injection-2026-05-14.md`](refs/skill-injection-2026-05-14.md)
-- 規格中,未定項清單未收(pointer vs inline / 三來源 / 不拆 per-AI / plugin cache 雷)
-
 ### 5. Merge 前 secret 洩漏偵測
 - Ref:[`refs/worktree-env-2026-05-15.md`](refs/worktree-env-2026-05-15.md)
 - `.worktreeinclude` 慣例已落,merge 前 secret 偵測還規劃中

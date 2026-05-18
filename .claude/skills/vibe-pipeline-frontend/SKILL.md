@@ -148,7 +148,7 @@ phase 3-5 後 prototype variant + pixel-diff 已砍。新畫面流程:
 
 ## Pitfall
 
-root [`CLAUDE.md`](../../../CLAUDE.md) 雷區 #1-16 是全 repo 公用,本段只列 src/ 特有:
+root [`CLAUDE.md`](../../../CLAUDE.md) §不踩的雷 是全 repo 公用,本段只列 src/ 特有:
 
 1. **新 feature 避開 prototype 命名空間殘留** — `src/styles/qa.css` 是 prototype 留的 `.qa-*` class(含 `.qa-body { display: grid }`)。Phase 2 加 QADrawer 用 `.qa-body` 被 grid 拉伸 bubble 高度暴增。修法:新 feature 走獨立 prefix(QADrawer 用 `qadr-*`),不要 reuse prototype class
 
@@ -242,7 +242,7 @@ backend 一律回 `{ ok: true, data }` 或 `{ ok: false, error: { code, message 
 
 - **來源**:`public/firebase-messaging-sw.js`(repo 內,手寫)
 - **build 後**:`dist/firebase-messaging-sw.js`(plugin 把 `self.__WB_MANIFEST` inline,SW 路徑跟檔名都不變)
-- **dev mode 不發 SW**(雷區 #19)— `bun run dev` 5173 上 SW 不註冊,改邏輯後一律 `bun run build && bun run preview`(4173)驗
+- **dev mode 不發 SW**(見 [`.claude/rules/pwa-sw.md`](../../../.claude/rules/pwa-sw.md))— `bun run dev` 5173 上 SW 不註冊,改邏輯後一律 `bun run build && bun run preview`(4173)驗
 
 ### vite.config.ts plugin 設定要點
 
@@ -260,7 +260,7 @@ VitePWA({
 
 ### registerType: prompt(user 主動觸發更新)
 
-`registerType: 'prompt'`(非 `autoUpdate`):SW 新版背景 install + 進入 `waiting`,**不會 force reload**,等 user 點 banner 才 `messageSkipWaiting` → controlling event → `window.location.reload()`。對應雷區 #22。
+`registerType: 'prompt'`(非 `autoUpdate`):SW 新版背景 install + 進入 `waiting`,**不會 force reload**,等 user 點 banner 才 `messageSkipWaiting` → controlling event → `window.location.reload()`。為何不走 autoUpdate 見 [`.claude/rules/pwa-sw.md`](../../../.claude/rules/pwa-sw.md) §autoUpdate force reload。
 
 實作三檔:
 
@@ -270,7 +270,7 @@ VitePWA({
 
 ### 開發者改 SW 後測試流程
 
-雷區 #19 已寫 SW 只 production 註冊。配合 prompt mode 完整驗證流程:
+[`.claude/rules/pwa-sw.md`](../../../.claude/rules/pwa-sw.md) 已寫 SW 只 production 註冊。配合 prompt mode 完整驗證流程:
 
 1. `bun run build && bun run preview` → 開 `http://localhost:4173/`
 2. 第一次進 PWA(可加進主畫面 / 用瀏覽器分頁均可)— SW install + activate,Application → Service Workers 看 `activated and is running`
@@ -288,12 +288,12 @@ VitePWA({
 1. **Workbox precache** — `precacheAndRoute(self.__WB_MANIFEST || [])`
 2. **Workbox runtime cache**(4 條 `registerRoute`)
    - NavigationRoute → fallback `/index.html`
-   - `/api/*` GET → StaleWhileRevalidate(`cacheName: 'api-cache'`,filter 含 `request.method === 'GET'`,雷區 #21)
+   - `/api/*` GET → StaleWhileRevalidate(`cacheName: 'api-cache'`,filter 含 `request.method === 'GET'`,理由見 [`.claude/rules/pwa-sw.md`](../../../.claude/rules/pwa-sw.md) §Workbox 只 cache GET)
    - `fonts.googleapis.com` → SWR
    - `fonts.gstatic.com` → CacheFirst
 3. **FCM 段** — `importScripts(firebase-app + firebase-messaging)` + `messaging.onBackgroundMessage` + push event listener + `notificationclick` + `install`/`activate` 的 `skipWaiting()`/`clients.claim()`
 
-改任何一段都跑 `bun run build` 看 precache entries 數變化 + 開 `dist/firebase-messaging-sw.js` 確認另兩段還在(雷區 #20)。
+改任何一段都跑 `bun run build` 看 precache entries 數變化 + 開 `dist/firebase-messaging-sw.js` 確認另兩段還在(理由見 [`.claude/rules/pwa-sw.md`](../../../.claude/rules/pwa-sw.md) §改 SW 要兩段都驗)。
 
 ### Install prompt UX
 

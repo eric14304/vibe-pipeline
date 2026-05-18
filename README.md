@@ -159,7 +159,7 @@ vbpl pipeline merge <id>                                        # 合併回 base
 4. 首次非 loopback 連線 → TOTP 設定(掃 QR 加進 Authenticator,之後每個 session 輸入 6 碼登入)
 5. Settings →「Push Notifications」開啟推播,ticket 事件會到手機
 
-手機遠端踩雷(Windows ACL / HTTPS / 0.0.0.0 / ALLOWED_ORIGINS / 離線 push 補送)見 [`CLAUDE.md`](CLAUDE.md) §不踩的雷 #24-28。
+手機遠端踩雷(Windows ACL / HTTPS / 0.0.0.0 / ALLOWED_ORIGINS / 離線 push 補送)見 [`.claude/rules/remote-access.md`](.claude/rules/remote-access.md)。
 
 ---
 
@@ -172,7 +172,7 @@ build pipeline 透過 [vite-plugin-pwa](https://vite-pwa-org.netlify.app/) `inje
   - `/api/*` GET → StaleWhileRevalidate(cache name `api-cache`,排除非 GET;reload 立刻顯舊資料 + 背景 refresh)
   - Google Fonts `fonts.googleapis.com` / `fonts.gstatic.com` → CacheFirst / SWR
 - **Navigation fallback**:離線 / SPA route 一律 fallback `/index.html`,可進畫面顯舊 cache(不再純白頁)
-- **FCM push handler**:原 `messaging.onBackgroundMessage` + `notificationclick` 邏輯維持,跟 Workbox 共存於同 SW;雷區 #10 仍適用(Android 必須 SW 自己 `showNotification`)
+- **FCM push handler**:原 `messaging.onBackgroundMessage` + `notificationclick` 邏輯維持,跟 Workbox 共存於同 SW;Android push 行為(SW 必須自己 `showNotification`)見 [`.claude/rules/pwa-sw.md`](.claude/rules/pwa-sw.md)
 - **dev mode 不註冊 SW** — `bun run dev`(5173)用 vite-plugin-pwa 預設行為,不會起 SW;要驗 PWA / precache / install prompt 必須 `bun run build && bun run preview`(4173)
 - **SW 註冊入口**仍是 `src/lib/fcm.ts`(user 在「設定 → 通知」啟用 push 時才 register),plugin `injectRegister: false` 不搶
 - **安裝 App**按鈕在「**設定 → 通知**」tab 末尾:Chromium 系(Edge / Chrome / Android Chrome)抓 `beforeinstallprompt` event 觸發系統安裝;iOS Safari 走「分享 → 加入主畫面」(按鈕顯 fallback 提示)

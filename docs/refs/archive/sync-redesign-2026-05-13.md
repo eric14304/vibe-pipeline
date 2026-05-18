@@ -1,6 +1,6 @@
 # Sync 重構(Plan C)— 2026-05-13
 
-> **2026-05-17 note**:Pause graceful 路徑與 `stopping` state 已拔(見 CLAUDE.md 雷區 #18)。本文設計時的 sync state guards(`pipeline.state ∈ {merging, ai_running}` 等)**不涉及 `stopping`**,行為不變;`syncJob.recoverStaleSync` 收殘骸的條件也不需調整。
+> **2026-05-17 note**:Pause graceful 路徑與 `stopping` state 已拔(見 CLAUDE.md §Pause 路徑簡化)。本文設計時的 sync state guards(`pipeline.state ∈ {merging, ai_running}` 等)**不涉及 `stopping`**,行為不變;`syncJob.recoverStaleSync` 收殘骸的條件也不需調整。
 
 把 pipeline worktree 跟 base branch 對齊的功能(sync)從「append synthetic ticket 走 runner」拆成「pipeline-level state + git-first → 衝突才 AI」。
 
