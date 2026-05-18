@@ -97,7 +97,7 @@ JSON 結構:
 
 ## 主迴圈
 
-1. 讀 pipeline.json
+1. **Read pipeline.json from disk**(每輪一定重讀,**絕對不准用 context 內 tickets 記憶**;user 隨時可能加 / 刪 / 改 ticket,只信 disk 當下 snapshot,不信 spawn 時的 list)
 2. 看 pipeline.state:
    - 其他 → 繼續
 3. **依 ticket.n 順序**掃 tickets[],對每張依 status 分支:
@@ -115,7 +115,7 @@ JSON 結構:
 5. 找到下一張 ticket → 標 ticket.status = "running",寫回 JSON
 6. 跑該 ticket (見下「跑 ticket」)
 7. 跑完 → 標 ticket.status = "done" 或 "failed_*"; **若 done,執行「ticket commit」步驟**(見下);寫回 JSON
-8. 回步驟 1
+8. 回步驟 1 — **再次 Read pipeline.json 重新評估**(不要假設 tickets 還是 spawn 時或上輪的那份;user 可能在你跑前一張時加 / 刪 / 改後面的 ticket)
 
 ## 跑 ticket 流程
 
