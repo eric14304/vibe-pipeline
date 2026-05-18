@@ -288,7 +288,8 @@ VitePWA({
 1. **Workbox precache** — `precacheAndRoute(self.__WB_MANIFEST || [])`
 2. **Workbox runtime cache**(4 條 `registerRoute`)
    - NavigationRoute → fallback `/index.html`
-   - `/api/*` GET → StaleWhileRevalidate(`cacheName: 'api-cache'`,filter 含 `request.method === 'GET'`,理由見 [`.claude/rules/pwa-sw.md`](../../../.claude/rules/pwa-sw.md) §Workbox 只 cache GET)
+   - `/api/health` → NetworkOnly(在 /api/* 規則前,避免被 catch-all 蓋)
+   - `/api/*` GET → **NetworkOnly**(2026-05-19 refactor pipeline 改;原 SWR 對 polling endpoint 引入「先顯舊再閃新」flicker。activate handler 順手 `caches.delete("api-cache")` 清舊 cache。詳見 [`.claude/rules/pwa-sw.md`](../../../.claude/rules/pwa-sw.md) §Workbox runtime cache /api/* 已 NetworkOnly)
    - `fonts.googleapis.com` → SWR
    - `fonts.gstatic.com` → CacheFirst
 3. **FCM 段** — `importScripts(firebase-app + firebase-messaging)` + `messaging.onBackgroundMessage` + push event listener + `notificationclick` + `install`/`activate` 的 `skipWaiting()`/`clients.claim()`
@@ -298,7 +299,7 @@ VitePWA({
 ### Install prompt UX
 
 - `src/hooks/useInstallPrompt.ts` — 監聽 `beforeinstallprompt`(`preventDefault` + 存 event)、`appinstalled`、`matchMedia('(display-mode: standalone)')`,回傳 `{ canInstall, isInstalled, isBusy, promptInstall }`
-- `src/features/settings/SettingsPopover.tsx`「通知」tab 末尾 `<InstallAppSection>` 用上述 hook
+- `src/features/settings/SettingsPopover.tsx`「PWA」tab(原「通知」改名)頂端 `<InstallAppSection>` 用上述 hook
   - 已安裝 / 不支援 → disabled + 文字提示
   - iOS Safari fallback 顯「請用分享 → 加入主畫面」hint
 
