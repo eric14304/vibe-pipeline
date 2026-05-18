@@ -84,7 +84,16 @@ description: vibe-pipeline 後端 / 執行層的職責邊界、約定與 invaria
 - `alreadyMerged`(ahead=0)路徑也自動清:state=merged + 殘存 failed merge ticket 改 done + 清 lastAutoMergeError
 - **Sync 成功判定靠 git 三條件**(不靠 AI stdout):`!MERGE_HEAD && !conflictMarkers && behindBaseCount===0`。理由見 root CLAUDE.md §AI sync 成功判定靠 git
 - `syncJob.recoverStaleSync()`:server boot 收 `state ∈ {merging, ai_running}` 殘骸 → `merge --abort` + 標 failed
+- **`ensureDepsAfterMerge`**(`server/lib/depInstall.ts`):mechanical / AI merge path 結束都 diff `mergeCommit^1..mergeCommit` 的 `package.json` deps keys + `bun.lock`,變動就同步跑 `bun install`;失敗 emit `pipeline_merge_cleanup_failed` notif 不阻斷 merge 成功。背景:self-dogfood pipeline 加新 dep 後 main repo node_modules 不會自動同步(雷區 #12)
 - 完整設計 → [`docs/refs/archive/sync-redesign-2026-05-13.md`](../../../docs/refs/archive/sync-redesign-2026-05-13.md)
+
+### Pipeline delete cascade(`routes/projects.ts:deletePipeline`)
+
+`DELETE /api/projects/:hash/pipelines/:id` 一條清完:worktree dir(`worktree.removeQuiet` + git worktree prune)+ git branch `-D pipeline/<name>` + `pipelines/<id>.json` + emit `pipeline_deleted` notif。**running / queued state 拒絕**(回 `STATE_GUARD`「先 stop」),paused / ready / merged / failed 都可砍。中間任一步失敗回 partial result(report 哪步失敗 + 哪些清掉),user 看 message 手動補。
+
+### Audit log via(`server/lib/auditLog.ts`)
+
+`user_action` entry 加 `via?: "cli" | "browser" | "other"` 欄。`routes/projects.ts:detectVia(req)` 讀 `User-Agent` header → "vbpl-cli" 命中 cli;"Mozilla" 命中 browser;其他歸 other。debug「mystery run」(audit 抓到 user 沒按)時可秒判 source。`withUserAudit` 從 router 收 req 傳入,handler 加 `via: detectVia(req)` 到 meta。新加 mutation handler 想標 via 也是同模式。
 
 ### Auth(`server/lib/auth/`)
 
@@ -133,7 +142,7 @@ description: vibe-pipeline 後端 / 執行層的職責邊界、約定與 invaria
 
 ## 待動工(動到走 ScopeReport)
 
-清單在 [`docs/TODO.md`](../../../docs/TODO.md)(對應 phase 8 pipeline)。backend 相關:#1 FCM gateway / #2 vbpl server cmd / #5 secret 洩漏偵測 / #7 backend self-heal / #8 pipeline delete cascade / #10 worktree staleness。
+清單在 [`docs/TODO.md`](../../../docs/TODO.md)(對應 phase 8 pipeline)。backend 相關現存:#1 FCM gateway / #3 secret 洩漏偵測 / #5 backend self-heal / #7 worktree staleness / #10 recoverStale 太武斷 / #11 ticketWatcher reconcile 設計化。
 
 ## 觸發本 SKILL 的場景
 

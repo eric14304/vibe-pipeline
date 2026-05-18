@@ -63,3 +63,11 @@
 - Windows detach 驗證補齊:`Bun.spawn(..., detached:true, stdio:file, windowsHide:true)` 關 terminal 不帶死 backend;避免 Node #36808 / `fork` 類 IPC detach 雷
 - Backend access log 加上 `[access] METHOD /api/... STATUS Nms`,讓 `vbpl server logs -f` 可直接驗證 live request tail
 - README / enduser SKILL / install.md 改成 `vbpl server start` 主軸;`bun run server|dev|start` 收斂為 maintainer source-workflow 備註
+- `vbpl pipeline delete` cascade(phase8 t6):一條指令清 worktree dir + git branch + pipeline.json;running / queued state 拒絕(STATE_GUARD「先 stop」);`--force` 跳 confirm prompt
+- `RunHistory` 加失敗原因 + ticket 進度 diff + codex 條件隱藏空欄(phase8 t5):runner exit 寫 `failureReason` / `ticketsBefore` / `ticketsAfter`;codex run 不顯成本/回合/Tokens(本來就無資料,避免「—」雜訊)
+- Runner 主迴圈強制每輪重讀 pipeline.json(`b096cc8`):codex 主 agent 偷懶用 context cache 跳過 disk re-read,實測 user 跑中加 ticket 看不到 → 跑完自宣告完成。prompt 強硬語氣明標「絕對不准用 context tickets 記憶」
+- `refactor` pipeline merge(`6118f02`):**CSS dead code 清理**(`src/styles + features/**/*.css` scope 鎖死,t1);**SW `/api/*` GET 改 `NetworkOnly`**(去 polling flicker,t2);activate handler `caches.delete("api-cache")` 清舊 cache;dist 651→636 KiB
+- Audit log `user_action` 加 `via` 欄(`1526488`):cli / browser / other 三值;vbpl CLI fetch 自帶 `User-Agent: vbpl-cli`,backend `detectVia(req)` 讀 UA 寫 audit。debug 「mystery run」(audit 抓到但 user 沒按)時可秒判 source
+- `vbpl` binary 統一放 `~/.vibe-pipeline/bin/vbpl.exe`(對齊 pyenv / cargo / nvm「per-tool dir」慣例);舊 `~/bin` / `/usr/local/bin` install path 從文檔 / PATH 拔
+- `/acp`(add+commit+push)+ `/doc`(文件整理)slash commands 落地;`/acp` global,VP 慣例(中文 subject + Co-Authored-By 動態 model 名)
+- Pipeline `019e3c96c5df-refactor`、`019e36fbea63-phase8`(全 6 ticket)merge 進 main
