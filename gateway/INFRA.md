@@ -86,8 +86,20 @@ openssl rand -hex 24
 - `gcloud projects get-iam-policy vibe-pipeline --flatten="bindings[].members" --filter="bindings.members:vp-gateway-runner@..."` → 兩條 role 都在
 - `gcloud auth application-default print-access-token` → 拿得到 access token(ADC 可用)
 
-## 下一步(t2 起跑點)
+## Cloud Run deployment(t4 落地)
 
-1. `gateway/` 內建 Node service code(Express / Hono),import `firebase-admin`,跑 `/send` `/register` endpoint
-2. Dockerfile + `gcloud run deploy` 用 `--service-account=vp-gateway-runner@...`
-3. Secret Manager 存 `MASTER_TOKEN`,deploy 帶 `--set-secrets`
+- **Service**:`vp-gateway` @ asia-east1
+- **URL**:`https://vp-gateway-799841449136.asia-east1.run.app`
+- **Identity**:`vp-gateway-runner@vibe-pipeline.iam.gserviceaccount.com`
+- **Scaling**:max-instances=1 / min-instances=0(scale-to-zero)
+- **Resources**:512 MiB / 1 vCPU
+- **Auth**:`/health` 公開;`/push/*` enduser bearer;`/admin/*` `MASTER_TOKEN`(Secret Manager `master-token:latest` 注入)
+- **Env**:`FCM_PROJECT_ID=vibe-pipeline`
+
+完整 deploy / 更新 / rollback / troubleshooting 流程見 [`deploy.md`](deploy.md)。
+
+## 下一步(t5 起跑點)
+
+1. vibe-pipeline backend 改呼叫 gateway URL 發 push,移除本機 Firebase Admin code
+2. enduser 設定流程 docs(t6)
+3. dup-push fix(t7)
