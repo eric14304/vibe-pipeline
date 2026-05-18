@@ -24,12 +24,14 @@ export type PushEventKey =
   | "ticket_done"
   | "ticket_failed"
   | "pipeline_paused"
+  | "pipeline_ready"
   | "auto_merge_conflict";
 
 export const PUSH_EVENT_KEYS: PushEventKey[] = [
   "ticket_done",
   "ticket_failed",
   "pipeline_paused",
+  "pipeline_ready",
   "auto_merge_conflict",
 ];
 
@@ -90,6 +92,7 @@ export const DEFAULT_USER_CONFIG: UserConfig = {
     ticket_done: true,
     ticket_failed: true,
     pipeline_paused: true,
+    pipeline_ready: true,
     auto_merge_conflict: true,
   },
 };

@@ -172,12 +172,31 @@ vbpl pipeline merge <id>                                        # 合併回 base
 ## 遠端存取(Tailscale)
 
 1. 桌機 + 手機都裝 Tailscale,登入同 tailnet
-2. 桌機跑 `tailscale serve --https=443 http://localhost:5173`
+2. 桌機跑 `tailscale serve --https=443 http://localhost:4173`(走 preview port,SW 才註冊)
 3. 手機開 `https://<machine>.<tailnet>.ts.net`,安裝成 PWA
 4. 首次非 loopback 連線 → TOTP 設定(掃 QR 加進 Authenticator,之後每個 session 輸入 6 碼登入)
-5. Settings →「Push Notifications」開啟推播,ticket 事件會到手機
+5. Settings →「通知」開啟推播,ticket 事件會到手機(需先填 push gateway,見下)
 
 手機遠端踩雷(Windows ACL / HTTPS / 0.0.0.0 / ALLOWED_ORIGINS / 離線 push 補送)見 [`.claude/rules/remote-access.md`](.claude/rules/remote-access.md)。
+
+---
+
+## Push 通知 setup(走 maintainer gateway)
+
+**Enduser 不需要開 Firebase 帳號 / 建 project / 拿 service account key**。VP maintainer host 一個 push gateway(`https://vp-gateway-...run.app`),enduser VP backend 把 ticket / pipeline 事件 POST 到 gateway,gateway 用 maintainer 的 Firebase service account 推 FCM 到手機。
+
+設定:在 repo root `.env`(或 `~/.vibe-pipeline/.env`)填兩行:
+
+```bash
+PUSH_GATEWAY_URL=https://vp-gateway-799841449136.asia-east1.run.app
+PUSH_GATEWAY_TOKEN=<maintainer 發給你的 bearer token>
+```
+
+沒填的話 backend 啟動正常,只是 push 不會送出(Settings →「通知」開 toggle 仍可,但實際 ticket 事件不會推到手機)。token 是 per-enduser 發放,maintainer 端可 revoke。
+
+Maintainer 負責 Firebase project / service account key / Cloud Run 配置 / cost 監控($1/mo budget alert + Cloud Run max-instances=1 hard cap)/ abuse 管控(per-token rate limit + 日誌)。Gateway source 在 `gateway/` dir,設計見 [`docs/refs/archive/fcm-push-gateway-2026-05-17.md`](docs/refs/archive/fcm-push-gateway-2026-05-17.md)。
+
+> 沒拿到 token / 想自己 host 一份 gateway?gateway 是 stateless Bun service + Firestore token registry,~500 行,部署 Cloud Run asia-east1 就行(`gateway/` 內含 admin CLI `vp-gw-admin` 發 token / revoke / list)。要走「自己開 Firebase」的舊 path 已 deprecated,不再支援。
 
 ---
 

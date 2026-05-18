@@ -1,22 +1,3 @@
-import { readFileSync } from "node:fs";
-
-type FirebaseAppApi = {
-  apps?: unknown[];
-  initializeApp: (options: { credential: unknown }) => unknown;
-  credential: {
-    cert: (serviceAccount: Record<string, unknown>) => unknown;
-  };
-  messaging: () => {
-    sendEachForMulticast: (message: {
-      tokens: string[];
-      notification?: { title?: string; body?: string };
-      data?: Record<string, string>;
-    }) => Promise<{
-      responses: Array<{ success: boolean; error?: { code?: string } }>;
-    }>;
-  };
-};
-
 export type FcmPayload = {
   notification?: { title?: string; body?: string };
   data?: Record<string, string>;
@@ -24,67 +5,38 @@ export type FcmPayload = {
 
 export const fakeFcmCalls: Array<{ tokens: string[]; payload: object; ts: number }> = [];
 
-let ready = false;
-let initStarted = false;
-let initPromise: Promise<boolean> | null = null;
-let admin: FirebaseAppApi | null = null;
-
 function isMockMode(): boolean {
   return process.env.VP_TEST_MODE === "mock";
 }
 
-function loadServiceAccount(): Record<string, unknown> | null {
-  const json = process.env.FCM_SERVICE_ACCOUNT_JSON?.trim();
-  const path = process.env.FCM_SERVICE_ACCOUNT_PATH?.trim();
-  if (!json && !path) {
-    console.warn("[FCM] 未設定 service account,push 功能停用");
-    return null;
-  }
-  const text = json || readFileSync(path as string, "utf8");
-  const parsed = JSON.parse(text) as unknown;
-  if (!parsed || typeof parsed !== "object") {
-    throw new Error("FCM service account must be a JSON object");
-  }
-  return parsed as Record<string, unknown>;
+function gatewayUrl(): string | null {
+  const v = process.env.PUSH_GATEWAY_URL?.trim();
+  return v && v.length > 0 ? v.replace(/\/+$/, "") : null;
+}
+
+function gatewayToken(): string | null {
+  const v = process.env.PUSH_GATEWAY_TOKEN?.trim();
+  return v && v.length > 0 ? v : null;
 }
 
 export function initFCM(): Promise<boolean> {
-  if (isMockMode()) {
-    initStarted = true;
-    ready = true;
-    return Promise.resolve(true);
+  if (isMockMode()) return Promise.resolve(true);
+  const ready = !!(gatewayUrl() && gatewayToken());
+  if (!ready) {
+    console.warn("[FCM] PUSH_GATEWAY_URL / PUSH_GATEWAY_TOKEN 未設定,push 功能停用");
   }
-  if (initPromise) return initPromise;
-  initStarted = true;
-  initPromise = (async () => {
-    try {
-      const serviceAccount = loadServiceAccount();
-      if (!serviceAccount) return false;
-
-      // @ts-ignore firebase-admin is installed as an app dependency.
-      const adminModule = await import("firebase-admin");
-      admin = ((adminModule as { default?: unknown }).default ?? adminModule) as FirebaseAppApi;
-
-      if ((admin.apps ?? []).length === 0) {
-        admin.initializeApp({
-          credential: admin.credential.cert(serviceAccount),
-        });
-      }
-      ready = true;
-      return true;
-    } catch (e) {
-      ready = false;
-      console.error("[FCM] 初始化失敗,push 功能停用:", e);
-      return false;
-    }
-  })();
-  return initPromise;
+  return Promise.resolve(ready);
 }
 
 export function isFCMReady(): boolean {
   if (isMockMode()) return true;
-  return ready;
+  return !!(gatewayUrl() && gatewayToken());
 }
+
+type SendResponse = {
+  sent?: number;
+  failed?: Array<{ deviceToken?: string; deviceId?: string; code?: string; error?: string }>;
+};
 
 export async function fanoutPush(tokens: string[], payload: FcmPayload): Promise<string[]> {
   if (isMockMode()) {
@@ -100,27 +52,56 @@ export async function fanoutPush(tokens: string[], payload: FcmPayload): Promise
     return [];
   }
 
-  if (!initStarted) await initFCM();
-  if (!ready || !admin) return [];
-
-  const normalizedTokens = Array.from(new Set(tokens.map((t) => t.trim()).filter(Boolean)));
-  const deadTokens: string[] = [];
-  for (let i = 0; i < normalizedTokens.length; i += 500) {
-    const chunk = normalizedTokens.slice(i, i + 500);
-    if (chunk.length === 0) continue;
-    const res = await admin.messaging().sendEachForMulticast({
-      tokens: chunk,
-      notification: payload.notification,
-      data: payload.data,
-    });
-    res.responses.forEach((r, idx) => {
-      if (r.success) return;
-      if (r.error?.code === "messaging/registration-token-not-registered") {
-        deadTokens.push(chunk[idx]);
-      }
-    });
+  const url = gatewayUrl();
+  const tok = gatewayToken();
+  if (!url || !tok) {
+    console.warn("[FCM] gateway 未設定,跳過 fanout");
+    return [];
   }
-  return deadTokens;
+
+  // tokens arg 被 gateway 端 device registry 取代(gateway 是 SSOT);
+  // 這裡只是為了維持 signature 與 mock fakeFcmCalls 行為一致。
+  const title = payload.notification?.title ?? "";
+  const body = payload.notification?.body ?? "";
+  if (!title || !body) {
+    console.warn("[FCM] title / body 缺,gateway 會拒,跳過");
+    return [];
+  }
+  const data = payload.data ? { ...payload.data } : undefined;
+  const ticketId = data?.workUnitId ?? data?.ticketId;
+
+  try {
+    const res = await fetch(`${url}/push/send`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${tok}`,
+      },
+      body: JSON.stringify({ title, body, data, ticketId }),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      console.error(`[FCM] gateway /push/send ${res.status}: ${text}`);
+      return [];
+    }
+    const json = (await res.json().catch(() => null)) as SendResponse | null;
+    const failed = json?.failed ?? [];
+    const dead: string[] = [];
+    for (const f of failed) {
+      if (
+        f.code === "messaging/registration-token-not-registered" ||
+        f.code === "messaging/invalid-registration-token"
+      ) {
+        if (typeof f.deviceToken === "string" && f.deviceToken.length > 0) {
+          dead.push(f.deviceToken);
+        }
+      }
+    }
+    return dead;
+  } catch (e) {
+    console.error("[FCM] gateway /push/send 失敗:", e);
+    return [];
+  }
 }
 
 export function resetFakeFcmCalls(): void {

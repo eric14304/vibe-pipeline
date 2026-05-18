@@ -104,10 +104,15 @@ description: vibe-pipeline 後端 / 執行層的職責邊界、約定與 invaria
 
 ### Push(`server/lib/push/` + `server/lib/fcm/`)
 
-- `tokenStore`:`~/.vibe-pipeline/device_tokens.json`(register / list / removeDead)
-- `fcm/index.ts`:firebase-admin init + `fanoutPush(tokens, payload)` + 死 token 偵測自動 remove
-- `ticketWatcher.ts`:fs.watch pipeline.json + diff status → emit ticket_* notif + FCM fanout
+**2026-05-19 後架構**:VP backend 拔 `firebase-admin`,push 走 maintainer host 的 gateway(Cloud Run asia-east1 `https://vp-gateway-...run.app`)。service account key 集中在 gateway 端,enduser 只持有 `PUSH_GATEWAY_TOKEN`(bearer)。
+
+- `tokenStore`:register / unregister 直接轉發到 gateway `POST /push/register` / `DELETE /push/token`,本地不存 device tokens(舊 `~/.vibe-pipeline/device_tokens.json` 已不寫)
+- `fcm/index.ts`:`fanoutPush(payload)` = `fetch(PUSH_GATEWAY_URL + '/push/send', { Authorization: 'Bearer ' + PUSH_GATEWAY_TOKEN, body: payload })`;死 token 由 gateway 端 Firestore registry 偵測 + 清,不再 backend 本地處理
+- 環境變數沒填 → `fanoutPush` 直接 no-op return(backend 啟動正常);改 push code 不要假設 gateway 一定回 200,加 error log 但別 throw
+- `ticketWatcher.ts`:fs.watch pipeline.json + diff status → emit ticket_* notif + 呼叫 `fanoutPush`(行為不變,只是底下換 HTTP)
 - 前景 / 背景 push 行為差異雷見 [`.claude/rules/pwa-sw.md`](../../../.claude/rules/pwa-sw.md) §Android push 行為
+- gateway service code 在 repo 內 `gateway/`(Bun + Firestore,~500 行,multi-tenant per-token registry);admin CLI `vp-gw-admin` 發 token / revoke / list
+- 設計 spec → [`docs/refs/archive/fcm-push-gateway-2026-05-17.md`](../../../docs/refs/archive/fcm-push-gateway-2026-05-17.md);maintainer ops note:Cloud Run max-instances=1 + $1/mo budget alert hard cap abuse
 
 ### CLI adapter(`server/lib/cli/`)
 
@@ -142,7 +147,7 @@ description: vibe-pipeline 後端 / 執行層的職責邊界、約定與 invaria
 
 ## 待動工(動到走 ScopeReport)
 
-清單在 [`docs/TODO.md`](../../../docs/TODO.md)(對應 phase 8 pipeline)。backend 相關現存:#1 FCM gateway / #3 secret 洩漏偵測 / #5 backend self-heal / #7 worktree staleness / #10 recoverStale 太武斷 / #11 ticketWatcher reconcile 設計化。
+清單在 [`docs/TODO.md`](../../../docs/TODO.md)(對應 phase 8 pipeline)。backend 相關現存:#3 secret 洩漏偵測 / #5 backend self-heal / #7 worktree staleness / #10 recoverStale 太武斷 / #11 ticketWatcher reconcile 設計化(原 #1 FCM gateway 已落地)。
 
 ## 觸發本 SKILL 的場景
 

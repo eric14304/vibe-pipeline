@@ -53,6 +53,7 @@ const PUSH_EVENT_LABELS: Array<{ key: PushEventKey; label: string }> = [
   { key: "ticket_done", label: "Ticket 完成" },
   { key: "ticket_failed", label: "Ticket 失敗" },
   { key: "pipeline_paused", label: "Pipeline 暫停需回應" },
+  { key: "pipeline_ready", label: "Pipeline 跑完" },
   { key: "auto_merge_conflict", label: "AI 接手解衝突" },
 ];
 
