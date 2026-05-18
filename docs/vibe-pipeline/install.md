@@ -30,43 +30,48 @@ Maintainer 改 vibe-pipeline source code 才用 `bun run server` / `bun run dev`
 
 ## Install to PATH(per OS)
 
+VP 所有 artifact 統一收 `~/.vibe-pipeline/`(binary / config / runtime data / worktrees 都在這 dir)。binary 進 `~/.vibe-pipeline/bin/`,對齊 pyenv / cargo / nvm 慣例。
+
 ### macOS / Linux
 
-走 `/usr/local/bin/`(預設已在 PATH):
-
 ```bash
-sudo cp dist-cli/vbpl-mac /usr/local/bin/vbpl       # 或 vbpl-linux
-sudo chmod +x /usr/local/bin/vbpl
-vbpl --version                                       # 驗
-```
-
-不想 sudo 走 `~/bin`:
-
-```bash
-mkdir -p ~/bin && cp dist-cli/vbpl-mac ~/bin/vbpl
-chmod +x ~/bin/vbpl
-echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zshrc    # bash 用 .bashrc
+mkdir -p ~/.vibe-pipeline/bin
+cp dist-cli/vbpl-mac ~/.vibe-pipeline/bin/vbpl       # 或 vbpl-linux
+chmod +x ~/.vibe-pipeline/bin/vbpl
+echo 'export PATH="$HOME/.vibe-pipeline/bin:$PATH"' >> ~/.zshrc    # bash 用 .bashrc
 source ~/.zshrc
+vbpl --version                                        # 驗
 ```
 
 ### Windows PowerShell
 
 ```powershell
-New-Item -ItemType Directory -Force "$HOME\bin"
-Copy-Item dist-cli\vbpl.exe "$HOME\bin\vbpl.exe"
+New-Item -ItemType Directory -Force "$HOME\.vibe-pipeline\bin"
+Copy-Item dist-cli\vbpl.exe "$HOME\.vibe-pipeline\bin\vbpl.exe"
 $user = [Environment]::GetEnvironmentVariable("Path", "User")
-[Environment]::SetEnvironmentVariable("Path", "$HOME\bin;$user", "User")
+if ($user -notmatch [Regex]::Escape("$HOME\.vibe-pipeline\bin")) {
+  [Environment]::SetEnvironmentVariable("Path", "$HOME\.vibe-pipeline\bin;$user", "User")
+}
 # 開新 terminal 驗:vbpl --version
 ```
 
 ### Windows Git Bash
 
-PATH 繼承 Windows user PATH,設一次兩邊都吃:
+PATH 繼承 Windows user PATH(上面 PowerShell 設一次,Git Bash 也吃),不必另設。或:
 
 ```bash
-mkdir -p ~/bin && cp dist-cli/vbpl.exe ~/bin/
-echo 'export PATH="$HOME/bin:$PATH"' >> ~/.bashrc
+mkdir -p ~/.vibe-pipeline/bin && cp dist-cli/vbpl.exe ~/.vibe-pipeline/bin/
+echo 'export PATH="$HOME/.vibe-pipeline/bin:$PATH"' >> ~/.bashrc
 source ~/.bashrc
+```
+
+### 升級
+
+```bash
+cd <vibe-pipeline-repo>
+git pull
+bun run cli:build                                         # 出 dist-cli/vbpl.exe
+cp dist-cli/vbpl.exe ~/.vibe-pipeline/bin/vbpl.exe        # 蓋掉舊版,PATH 不必動
 ```
 
 ## Trouble
