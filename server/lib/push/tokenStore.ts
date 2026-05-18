@@ -1,6 +1,7 @@
-import { existsSync, mkdirSync, renameSync, unlinkSync } from "node:fs";
-import { join } from "node:path";
-import { vibeHome } from "../paths";
+// Gateway 上線後,device token registry 的 SSOT 在 gateway(Firestore),
+// 本地不再保留 device_tokens.json。register / unregister 改成轉發 gateway,
+// listTokens 回 sentinel(fanoutPush 不看個別 token,gateway 端 fanout 全部 device),
+// removeDeadTokens 是 no-op(gateway 收到 invalid-token 會自己刪)。
 
 export type DeviceTokenRecord = {
   id: string;
@@ -10,63 +11,35 @@ export type DeviceTokenRecord = {
   last_seen_at: string;
 };
 
-type StoreShape = {
-  tokens: DeviceTokenRecord[];
-};
-
-function dir(): string {
-  return join(vibeHome(), ".vibe-pipeline");
+function gatewayUrl(): string | null {
+  const v = process.env.PUSH_GATEWAY_URL?.trim();
+  return v && v.length > 0 ? v.replace(/\/+$/, "") : null;
 }
 
-function file(): string {
-  return join(dir(), "device_tokens.json");
+function gatewayToken(): string | null {
+  const v = process.env.PUSH_GATEWAY_TOKEN?.trim();
+  return v && v.length > 0 ? v : null;
 }
 
-function emptyStore(): StoreShape {
-  return { tokens: [] };
-}
-
-async function readStore(): Promise<StoreShape> {
-  const f = file();
-  if (!existsSync(f)) return emptyStore();
-  try {
-    const raw = JSON.parse(await Bun.file(f).text()) as unknown;
-    if (!raw || typeof raw !== "object") return emptyStore();
-    const tokens = (raw as { tokens?: unknown }).tokens;
-    if (!Array.isArray(tokens)) return emptyStore();
-    return {
-      tokens: tokens.filter(isDeviceTokenRecord),
-    };
-  } catch {
-    return emptyStore();
+async function postGateway(path: string, body: object): Promise<Response | null> {
+  const url = gatewayUrl();
+  const tok = gatewayToken();
+  if (!url || !tok) {
+    console.warn(`[push] gateway 未設定,跳過 ${path}`);
+    return null;
   }
-}
-
-function isDeviceTokenRecord(v: unknown): v is DeviceTokenRecord {
-  if (!v || typeof v !== "object") return false;
-  const o = v as Record<string, unknown>;
-  return (
-    typeof o.id === "string" &&
-    typeof o.token === "string" &&
-    typeof o.platform === "string" &&
-    typeof o.created_at === "string" &&
-    typeof o.last_seen_at === "string"
-  );
-}
-
-async function writeStore(store: StoreShape): Promise<void> {
-  if (!existsSync(dir())) mkdirSync(dir(), { recursive: true });
-  const text = JSON.stringify(store, null, 2) + "\n";
-  JSON.parse(text);
-  const tmp = `${file()}.tmp`;
-  await Bun.write(tmp, text);
   try {
-    renameSync(tmp, file());
+    return await fetch(`${url}${path}`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${tok}`,
+      },
+      body: JSON.stringify(body),
+    });
   } catch (e) {
-    try {
-      unlinkSync(tmp);
-    } catch {}
-    throw e;
+    console.error(`[push] gateway ${path} 失敗:`, e);
+    return null;
   }
 }
 
@@ -76,47 +49,54 @@ export async function registerToken(
 ): Promise<DeviceTokenRecord> {
   const normalizedToken = token.trim();
   const normalizedPlatform = platform.trim() || "unknown";
-  const store = await readStore();
   const now = new Date().toISOString();
-  const idx = store.tokens.findIndex((t) => t.token === normalizedToken);
-  if (idx >= 0) {
-    store.tokens[idx] = {
-      ...store.tokens[idx],
-      platform: normalizedPlatform,
-      last_seen_at: now,
-    };
-    await writeStore(store);
-    return store.tokens[idx];
+  const res = await postGateway("/push/register", {
+    deviceToken: normalizedToken,
+    label: normalizedPlatform,
+  });
+  if (res && !res.ok) {
+    const text = await res.text().catch(() => "");
+    console.error(`[push] /push/register ${res.status}: ${text}`);
   }
-  const record: DeviceTokenRecord = {
-    id: crypto.randomUUID(),
+  return {
+    id: normalizedToken,
     token: normalizedToken,
     platform: normalizedPlatform,
     created_at: now,
     last_seen_at: now,
   };
-  store.tokens.push(record);
-  await writeStore(store);
-  return record;
 }
 
 export async function unregisterToken(token: string): Promise<void> {
   const normalizedToken = token.trim();
-  const store = await readStore();
-  const next = store.tokens.filter((t) => t.token !== normalizedToken);
-  if (next.length === store.tokens.length) return;
-  await writeStore({ tokens: next });
+  const res = await postGateway("/push/unregister", { deviceToken: normalizedToken });
+  if (res && !res.ok) {
+    const text = await res.text().catch(() => "");
+    console.error(`[push] /push/unregister ${res.status}: ${text}`);
+  }
 }
 
+// Sentinel:gateway 是 device registry SSOT,VP backend 不再持有 device list。
+// 回 1 個假 record 讓 ticketWatcher / orchestrator 的 `records.length > 0` 判斷成立,
+// 真正的 fanout 在 gateway 端做。
 export async function listTokens(): Promise<DeviceTokenRecord[]> {
-  return (await readStore()).tokens;
+  const url = gatewayUrl();
+  const tok = gatewayToken();
+  if (!url || !tok) return [];
+  const now = new Date().toISOString();
+  return [
+    {
+      id: "gateway",
+      token: "gateway",
+      platform: "gateway",
+      created_at: now,
+      last_seen_at: now,
+    },
+  ];
 }
 
-export async function removeDeadTokens(deadTokens: string[]): Promise<void> {
-  const dead = new Set(deadTokens.map((t) => t.trim()).filter(Boolean));
-  if (dead.size === 0) return;
-  const store = await readStore();
-  const next = store.tokens.filter((t) => !dead.has(t.token));
-  if (next.length === store.tokens.length) return;
-  await writeStore({ tokens: next });
+// No-op:dead token 由 gateway 端 invalid-registration-token 自動刪除,
+// VP backend 不再維護 token list。保留 signature 讓 call site 不必改。
+export async function removeDeadTokens(_deadTokens: string[]): Promise<void> {
+  return;
 }
