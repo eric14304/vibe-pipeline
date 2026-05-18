@@ -63,7 +63,10 @@ async function handle(req: Request): Promise<Response> {
   const method = req.method;
 
   if (pathname === "/api/health" && method === "GET") {
-    return Response.json({ ok: true, data: { status: "up", testMode: testMode.isTestMode() } });
+    return Response.json({
+      ok: true,
+      data: { status: "up", testMode: testMode.isTestMode(), pid: process.pid, repo_path: process.cwd() },
+    });
   }
 
   if (pathname.startsWith("/api/auth/")) {
