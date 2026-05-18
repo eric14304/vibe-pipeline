@@ -20,7 +20,6 @@
 .topbar-sep { width: 1px; height: 18px; background: var(--line-2); }
 .topbar-active-meta { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .topbar-spacer { flex: 1; }
-.topbar-path { font-size: 11.5px; color: var(--fg-mute); white-space: nowrap; }
 
 /* ─── Project switcher ─── */
 .proj-switcher { position: relative; }
@@ -89,22 +88,6 @@
 .proj-menu-item-action { color: var(--fg-mute); font-size: 12px; }
 .proj-menu-item-action:hover { color: var(--fg); }
 
-.topbar-search {
-  flex: 1; max-width: 480px;
-  display: flex; align-items: center; gap: 8px;
-  height: 30px; padding: 0 12px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  color: var(--fg-mute);
-}
-.topbar-search:focus-within { border-color: var(--line-2); background: var(--panel-2); }
-.topbar-search input {
-  flex: 1; min-width: 0;
-  background: transparent; border: 0; outline: none;
-  color: var(--fg); font: inherit; font-size: 12.5px;
-}
-.topbar-search input::placeholder { color: var(--fg-faint); }
 .kbd {
   font-size: 10.5px; padding: 1px 5px;
   border: 1px solid var(--line-2); border-radius: 4px;
@@ -146,16 +129,6 @@
   background: var(--panel-2);
 }
 
-.budget-gauge {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 4px 10px;
-  font-size: 12px;
-  border-radius: 7px;
-  color: var(--fg);
-  background: var(--panel);
-  border: 1px solid var(--line);
-}
-.budget-gauge .budget-cap { color: var(--fg-faint); }
 .icon-btn { position: relative; }
 .icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
@@ -427,14 +400,6 @@
 .rail-add:hover { background: var(--hover); color: var(--fg); }
 
 .rail-spacer { flex: 1; min-height: 12px; }
-.rail-archive {
-  display: flex; align-items: center; gap: 8px;
-  padding: 8px 10px;
-  font-size: 12px; color: var(--fg-mute);
-  border-radius: 7px;
-  cursor: pointer;
-}
-.rail-archive:hover { background: var(--hover); color: var(--fg); }
 
 /* ─── Focus column ─── */
 .focus {
@@ -665,12 +630,6 @@ button.ticket-mode {
 }
 
 /* legacy:.iter-stage-pulse 留著怕別處還用到,不再被 IterStages 渲染 */
-.iter-stage-pulse {
-  position: absolute; top: -2px; right: -2px;
-  width: 6px; height: 6px; border-radius: 50%;
-  background: var(--iter);
-  border: 1.5px solid var(--bg-elevated);
-}
 
 /* 階段標記:past=✓ / current=▶或⏸或 verdict / future=? */
 .iter-stage-mark {
@@ -715,8 +674,7 @@ button.ticket-mode {
 }
 
 .verdicts { display: inline-flex; align-items: center; gap: 4px; }
-.verdicts-label { font-size: 10px; color: var(--fg-faint); margin-right: 4px; text-transform: uppercase; letter-spacing: 0.06em; }
-.verdict-pip { width: 8px; height: 8px; border-radius: 50%; }
+
 .verdict-pip.is-pass { background: var(--done); }
 .verdict-pip.is-warn { background: var(--paused); }
 .verdict-pip.is-fail { background: var(--failed); }
@@ -727,11 +685,6 @@ button.ticket-mode {
   font-size: 10.5px; color: var(--fg-mute);
 }
 .iter-meta strong { color: var(--fg); font-weight: 600; }
-.live-dot {
-  width: 6px; height: 6px; border-radius: 50%;
-  background: var(--running);
-  display: inline-block;
-}
 
 /* ── live log ── */
 .ticket-livelog {
@@ -813,7 +766,7 @@ html.light .create-card { background: var(--bg-elevated); }
   transition: border-color 120ms, background 120ms;
 }
 .create-input.is-error { border-color: var(--failed); background: var(--failed-soft); }
-.create-prefix { color: var(--fg-mute); opacity: 0.7; margin-right: 1px; font-weight: 500; }
+
 .create-input input {
   flex: 1; min-width: 0;
   background: transparent; border: 0; outline: none;

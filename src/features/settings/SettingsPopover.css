@@ -103,11 +103,6 @@
   margin-bottom: 10px;
 }
 
-.settings-subhint--top {
-  margin-left: 0;
-  margin-bottom: 0;
-}
-
 /* tab 內區塊標題(e.g. AI 任務 tab 的「全域 provider / model 設定」)*/
 .settings-section-title {
   font-size: 12px;
@@ -135,22 +130,6 @@
 }
 
 /* ─── Push notification status ─────────────────────────────────── */
-
-.push-status-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-  font-size: 12.5px;
-}
-
-.push-status-icon {
-  font-family: var(--font-mono);
-}
-
-.push-status-text {
-  color: var(--fg);
-}
 
 /* tight 版 field row 給 auto-merge toggle 那行用(下方 subhint 緊接) */
 .settings-field-row--tight {
@@ -391,11 +370,4 @@
     outline: none;
   }
 
-  .settings-popover-footer {
-    position: sticky;
-    bottom: calc(-12px - env(safe-area-inset-bottom));
-    margin: 0 -16px calc(-12px - env(safe-area-inset-bottom));
-    padding: 10px 16px calc(12px + env(safe-area-inset-bottom)) !important;
-    background: var(--bg-elevated);
-  }
 }

@@ -1,19 +1,4 @@
 /* Init screen styles */
-.init-root {
-  position: relative;
-  width: 100%; height: 100%;
-  background: var(--bg);
-  display: flex; align-items: center; justify-content: center;
-  overflow: hidden;
-}
-
-.init-brand {
-  position: absolute; top: 24px; left: 28px;
-  display: flex; align-items: center; gap: 9px;
-  color: var(--fg);
-  font-size: 14px; font-weight: 600; letter-spacing: -0.01em;
-}
-.init-brand-name { color: var(--fg); }
 
 .init-card {
   width: 580px; max-width: calc(100% - 48px);
@@ -71,30 +56,10 @@
   color: var(--fg-faint); margin-bottom: 8px;
 }
 
-.init-cmd-wrap { padding: 18px 28px 10px; }
-.init-cmd {
-  display: flex; align-items: center; gap: 10px;
-  background: #0a0c10;
-  border: 1px solid var(--line-2);
-  border-radius: 8px;
-  padding: 12px 14px;
-  font-size: 13px;
-}
-.init-cmd-prompt { color: #6b7077; font-weight: 600; }
-.init-cmd-text { flex: 1; min-width: 0; color: #e8e3d6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 html.light .init-cmd { background: #1c1916; color: #fbf8f1; }
 html.light .init-cmd .init-cmd-prompt { color: #d8a25a; }
 html.light .init-cmd-text { color: #fbf8f1; }
-.init-cmd-copy {
-  display: inline-flex; align-items: center; gap: 5px;
-  font-family: var(--font-mono); font-size: 11px;
-  padding: 4px 9px; border-radius: 5px;
-  color: var(--fg-mute);
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.08);
-  transition: background 120ms, color 120ms, border-color 120ms;
-}
-.init-cmd-copy:hover { background: rgba(255,255,255,0.08); color: var(--fg); }
+
 .init-cmd-copy.is-copied { color: var(--done); border-color: var(--done-soft); background: var(--done-soft); }
 
 .init-tree-wrap { padding: 14px 28px 18px; }
@@ -118,20 +83,8 @@ html.light .init-cmd-text { color: #fbf8f1; }
   border-top: 1px solid var(--line);
   background: var(--panel-2);
 }
-.init-foot-q { font-size: 12.5px; color: var(--fg-mute); }
-.init-foot-spacer { flex: 1; }
-.init-foot-link {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-size: 11.5px; color: var(--fg-mute);
-  text-decoration: none;
-}
-.init-foot-link:hover { color: var(--fg); }
 
-.init-hint {
-  position: absolute; bottom: 18px; left: 28px;
-  font-size: 11px; color: var(--fg-faint);
-  letter-spacing: 0.01em;
-}
+.init-foot-spacer { flex: 1; }
 
 .init-popup-overlay {
   position: fixed; inset: 0;
