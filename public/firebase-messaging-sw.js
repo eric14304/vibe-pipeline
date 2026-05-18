@@ -1,4 +1,4 @@
-// SW build marker v5 — change to trigger update banner
+// SW build marker v6 — change to trigger update banner
 import { precacheAndRoute, createHandlerBoundToURL } from "workbox-precaching";
 import { registerRoute, NavigationRoute } from "workbox-routing";
 import { StaleWhileRevalidate, CacheFirst, NetworkOnly } from "workbox-strategies";
@@ -18,13 +18,10 @@ registerRoute(
   new NetworkOnly()
 );
 
-// /api/* GET → SWR(reload 立刻顯舊 + 背景 refresh);非 GET 不快取
+// /api/* GET → NetworkOnly(避免 polling endpoint「先顯舊再閃新」flicker);非 GET 也直通網路
 registerRoute(
   ({ url, request }) => request.method === "GET" && url.pathname.startsWith("/api/"),
-  new StaleWhileRevalidate({
-    cacheName: "api-cache",
-    plugins: [new CacheableResponsePlugin({ statuses: [200] })],
-  })
+  new NetworkOnly()
 );
 
 // Google Fonts CSS
@@ -76,6 +73,12 @@ self.addEventListener("activate", (event) => {
         await ensureMessaging();
       } catch (e) {
         console.error("[sw] activate init failed", e);
+      }
+      // 清掉舊版 SW 留下的 api-cache(v6 起 /api/* 改 NetworkOnly,不再使用此 cache)
+      try {
+        await caches.delete("api-cache");
+      } catch (e) {
+        console.error("[sw] delete api-cache failed", e);
       }
       await self.clients.claim();
     })()

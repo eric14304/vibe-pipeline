@@ -28,9 +28,15 @@ dev mode `bun run dev`(5173)SW 不註冊(plugin 預設行為),改 SW 邏輯要 `
 1. 混合 `notification+data` payload **不會 auto-display**,push handler 必須自己 `event.waitUntil(showNotification(...))`
 2. 前景訊息用 `ServiceWorkerRegistration.showNotification()`,**不能**用 `new Notification()` page constructor(Android Chrome 不認)。`src/App.tsx` `useFcmBootstrap` 已先試 SW reg,desktop fallback 才用 page constructor
 
-## Workbox runtime cache `/api/*` 只 cache GET
+## Workbox runtime cache `/api/*` 已 NetworkOnly 完全不 cache
 
-`registerRoute` 的 filter 必含 `request.method === 'GET'`,POST/PUT/DELETE/PATCH(`/api/run` `/pause` `/merge` `/qa/turn` `/ticket update` 等 mutation)走網路直通,不然 mutation response 被 SWR cache 回讀就死了。SWR 策略本身對 read-only 有用(離線可顯舊 + 背景 refresh),寫操作絕對不能套。Google Fonts 那兩條 route(CacheFirst / SWR)同理只應命中 GET。
+`/api/*` GET 一律走 `NetworkOnly()`,**不 cache**。原因:VP polling endpoint(pipelines / notifs / runtime,3-5s 一次)套 SWR 會「先顯舊 cache(0ms)→ 背景 refresh → 下次 fetch 才看到新值」造成「慢一拍 / 先顯舊再閃新」flicker,對 online-first 場景(localhost / Tailscale)cache 價值小於 flicker 痛。
+
+離線時 `/api/*` fetch 會 fail,但 UI shell(precached `index.html` + JS bundle)仍能載入,只是資料區呈現 error / empty state。
+
+歷史:v5 之前用 `StaleWhileRevalidate({ cacheName: "api-cache" })`,v6 改 NetworkOnly 並在 activate handler `caches.delete("api-cache")` 清舊 cache。若未來要重啟 cache 策略,**只能對 read-only 且不會 polling 的 endpoint 套**,polling endpoint 永遠 NetworkOnly。
+
+非 GET(POST/PUT/DELETE/PATCH,`/api/run` `/pause` `/merge` `/qa/turn` `/ticket update` 等 mutation)本來就不在 GET filter 內,走網路直通。Google Fonts 兩條 route(CacheFirst / SWR)同理只應命中 GET。
 
 ## vite-plugin-pwa `registerType: 'autoUpdate'` 會 force full reload
 
