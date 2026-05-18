@@ -19,11 +19,21 @@ import type { ApiErrorCode, Project } from "../../shared/types";
 // validProjectPath 是 isExistingDirectory 在 routes 層的 alias,維持原本呼叫點不動。
 const validProjectPath = isExistingDirectory;
 
+// 從 Request UA header 判 trigger source。vbpl CLI 自帶 "vbpl-cli";browser 含 "Mozilla"。
+// 缺 req(內部 trigger / 老 caller 未傳)= undefined,audit 留空欄。
+export function detectVia(req?: Request): auditLog.ViaKind | undefined {
+  if (!req) return undefined;
+  const ua = req.headers.get("user-agent") || "";
+  if (ua.startsWith("vbpl-cli")) return "cli";
+  if (ua.includes("Mozilla")) return "browser";
+  return "other";
+}
+
 // 包 mutation handler:開頭寫 pending 一筆,Response 看 ok 寫 ok / 看 error envelope 寫 error。
 // caller 不必手動 finalize。throw 的話 catch 並重 throw 給上層 500。
 async function withUserAudit(
   projectPath: string,
-  meta: { action: string; pipelineId?: string; ticketId?: string },
+  meta: { action: string; pipelineId?: string; ticketId?: string; via?: auditLog.ViaKind },
   fn: () => Promise<Response>
 ): Promise<Response> {
   const handle = auditLog.beginUserAction({
@@ -31,6 +41,7 @@ async function withUserAudit(
     action: meta.action,
     pipelineId: meta.pipelineId,
     ticketId: meta.ticketId,
+    via: meta.via,
   });
   let res: Response;
   try {
@@ -458,10 +469,10 @@ export async function reveal(hash: string): Promise<Response> {
   return ok({ ok: true });
 }
 
-export async function runPipeline(hash: string, pipelineId: string): Promise<Response> {
+export async function runPipeline(hash: string, pipelineId: string, req?: Request): Promise<Response> {
   const project = await projectStore.findByHash(hash);
   if (!project) return err("not_found", `Project not found: ${hash}`, 404);
-  return withUserAudit(project.path, { action: "pipeline.run", pipelineId }, async () => {
+  return withUserAudit(project.path, { action: "pipeline.run", pipelineId, via: detectVia(req) }, async () => {
     if (!validProjectPath(project.path)) return err("invalid_path", `Path missing: ${project.path}`);
     if (!project.hasGit) return err("invalid_path", "Project 沒 .git/,先 git init 再跑 pipeline");
     // User 顯式按繼續 = 明確要重試:把所有 failed_transient ticket reset 成 paused,

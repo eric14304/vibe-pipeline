@@ -33,6 +33,10 @@ export type StateChangeEntry = {
 
 export type UserActionResult = "pending" | "ok" | "error";
 
+// via:HTTP trigger source — debug 「mystery run」用(撞過 user 沒按但 audit 有紀錄,後來定位是 CLI / browser 哪邊發的)。
+// "cli" = vbpl CLI 自帶 User-Agent: vbpl-cli;"browser" = UA 含 Mozilla;"other" = curl / 沒帶 UA
+export type ViaKind = "cli" | "browser" | "other";
+
 export type UserActionEntry = {
   ts: number;
   type: "user_action";
@@ -42,6 +46,7 @@ export type UserActionEntry = {
   result: UserActionResult;
   errorCode?: string;
   errorMessage?: string;
+  via?: ViaKind;
 };
 
 export type AuditEntry = StateChangeEntry | UserActionEntry;
@@ -136,6 +141,7 @@ export function appendUserAction(opts: {
   result: UserActionResult;
   errorCode?: string;
   errorMessage?: string;
+  via?: ViaKind;
 }): void {
   const entry: UserActionEntry = {
     ts: Date.now(),
@@ -146,6 +152,7 @@ export function appendUserAction(opts: {
     result: opts.result,
     ...(opts.errorCode ? { errorCode: opts.errorCode } : {}),
     ...(opts.errorMessage ? { errorMessage: truncate(opts.errorMessage, 200) } : {}),
+    ...(opts.via ? { via: opts.via } : {}),
   };
   appendRaw(opts.projectPath, entry);
 }
@@ -163,6 +170,7 @@ export function beginUserAction(opts: {
   action: string;
   pipelineId?: string;
   ticketId?: string;
+  via?: ViaKind;
 }): UserActionHandle {
   appendUserAction({
     projectPath: opts.projectPath,
@@ -170,6 +178,7 @@ export function beginUserAction(opts: {
     pipelineId: opts.pipelineId,
     ticketId: opts.ticketId,
     result: "pending",
+    via: opts.via,
   });
   let done = false;
   return {
@@ -182,6 +191,7 @@ export function beginUserAction(opts: {
         pipelineId: opts.pipelineId,
         ticketId: opts.ticketId,
         result: "ok",
+        via: opts.via,
       });
     },
     error(message: string, code?: string): void {
@@ -195,6 +205,7 @@ export function beginUserAction(opts: {
         result: "error",
         errorCode: code,
         errorMessage: message,
+        via: opts.via,
       });
     },
   };

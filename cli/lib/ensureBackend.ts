@@ -44,7 +44,7 @@ async function tryConnect(timeoutMs: number): Promise<boolean> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(`${apiBase()}/api/health`, { method: "GET", signal: controller.signal });
+    const res = await fetch(`${apiBase()}/api/health`, { method: "GET", signal: controller.signal, headers: { "user-agent": "vbpl-cli" } });
     return res.status === 200;
   } catch {
     return false;

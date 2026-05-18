@@ -24,7 +24,10 @@ export async function post<T = unknown>(path: string, body?: unknown): Promise<T
   try {
     res = await fetch(url, {
       method: "POST",
-      headers: body != null ? { "content-type": "application/json; charset=utf-8" } : {},
+      headers: {
+        "user-agent": "vbpl-cli",
+        ...(body != null ? { "content-type": "application/json; charset=utf-8" } : {}),
+      },
       body: body != null ? JSON.stringify(body) : undefined,
     });
   } catch (e) {

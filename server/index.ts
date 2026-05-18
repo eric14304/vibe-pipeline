@@ -173,7 +173,7 @@ async function handle(req: Request): Promise<Response> {
     if (pipelineRunMatch && method === "POST") {
       const id = pipelineRunMatch[1];
       const action = pipelineRunMatch[2];
-      if (action === "run") return projects.runPipeline(hash, id);
+      if (action === "run") return projects.runPipeline(hash, id, req);
       // pause 與 stop 共用 handler;固定立即停止
       if (action === "pause" || action === "stop") return projects.pausePipeline(hash, id, req);
       if (action === "merge") return projects.mergePipeline(hash, id);
