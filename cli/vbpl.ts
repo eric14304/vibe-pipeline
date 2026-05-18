@@ -20,7 +20,7 @@ Usage:
   vbpl pipeline sync <id> [--ai|--cancel|--dismiss]                base → worktree
   vbpl ticket   list|show|add|update|remove   --pipeline <id>    [--project <hash>]
   vbpl config   list|get|set                  [key] [value]
-  vbpl server   start|stop
+  vbpl server   start|stop|status|restart|logs [-f]
 
 Global flags:
   --json               Output strict JSON (stdout only). Exit 0=ok, 1=error.

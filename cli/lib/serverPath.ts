@@ -6,6 +6,10 @@ import { fail } from "./output";
 
 export type ServerInfo = {
   repo_path: string;
+  pid?: number;
+  port?: number;
+  log_path?: string;
+  started_at?: number;
 };
 
 const PACKAGE_NAME = "vibe-pipeline";
@@ -70,9 +74,8 @@ async function detectFromEnv(): Promise<string | null> {
 
 async function detectFromRemembered(): Promise<string | null> {
   try {
-    const raw = await readFile(serverJsonPath(), "utf8");
-    const parsed = JSON.parse(raw) as { repo_path?: unknown };
-    if (typeof parsed.repo_path !== "string" || parsed.repo_path.length === 0) return null;
+    const parsed = await readServerInfo();
+    if (!parsed) return null;
     return await resolveRepoPath(parsed.repo_path);
   } catch {
     return null;
@@ -96,8 +99,31 @@ export async function detectServerRepoPath(): Promise<string> {
   );
 }
 
-export async function rememberServerRepoPath(repoPath: string): Promise<void> {
+export async function readServerInfo(): Promise<ServerInfo | null> {
+  try {
+    const raw = await readFile(serverJsonPath(), "utf8");
+    const parsed = JSON.parse(raw) as {
+      repo_path?: unknown;
+      pid?: unknown;
+      port?: unknown;
+      log_path?: unknown;
+      started_at?: unknown;
+    };
+    if (typeof parsed.repo_path !== "string" || parsed.repo_path.length === 0) return null;
+    return {
+      repo_path: parsed.repo_path,
+      pid: typeof parsed.pid === "number" && Number.isInteger(parsed.pid) && parsed.pid > 0 ? parsed.pid : undefined,
+      port: typeof parsed.port === "number" && Number.isInteger(parsed.port) && parsed.port > 0 ? parsed.port : undefined,
+      log_path: typeof parsed.log_path === "string" && parsed.log_path.length > 0 ? parsed.log_path : undefined,
+      started_at: typeof parsed.started_at === "number" && Number.isFinite(parsed.started_at) ? parsed.started_at : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function rememberServerRepoPath(repoPath: string, info: Partial<Omit<ServerInfo, "repo_path">> = {}): Promise<void> {
   await mkdir(serverStateDir(), { recursive: true });
-  const info: ServerInfo = { repo_path: repoPath };
-  await writeFile(serverJsonPath(), JSON.stringify(info, null, 2) + "\n", "utf8");
+  const state: ServerInfo = { repo_path: repoPath, ...info };
+  await writeFile(serverJsonPath(), JSON.stringify(state, null, 2) + "\n", "utf8");
 }
