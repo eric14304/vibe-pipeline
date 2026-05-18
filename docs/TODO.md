@@ -46,9 +46,18 @@ Phase 8 候選清單。動工時搬進 pipeline ticket(`vbpl ticket add --pipeli
 - 動工:`cli/commands/pipeline.ts` delete handler 加 `worktree.removeQuiet` + `git branch -D pipeline/<name>`
 
 ### 9. Mockup-driven pixel polish 機制
-- 痛點:settings-pixel-polish + board-redesign 兩條 mockup-driven pipeline 都跑出低品質
+- 痛點:settings-pixel-polish + board-redesign + settings-full-redesign 三條 mockup-driven pipeline 都跑出低品質
+  - settings-full-redesign(2226):整 popover scale ~1.5x,input 62px / icon 24px / 字 1.0625-1.375rem,實用時「各種元素都好大」
+  - settings-pixel-polish(f1b1c19):雖對 mockup 但同放大問題,reverted(8bb47fb / 09af96d)
+  - board-redesign:跑歪未 merge,刪
+- 共通病:**AI 對 mockup 對齊時容易過度 scale + 失去既有 design language**;critic「對得到 mockup」但 critic 不看「跟其他 tab 是否一致」+「user 實用體感」,只看畫面像不像 PNG
 - 觀察:critic 跟 mockup 對照只靠 ticket prompt ad-hoc,沒標準流程
-- 候選方向:critic 強制 Read mockup PNG → 列偏差 N 條 / Vision provider routing(CC 對圖不行,該強制走 codex+playwright MCP 截圖) / iter 上限調高(目前 5)
+- 候選方向:
+  - critic 強制 Read mockup PNG → 列偏差 N 條
+  - **加 critic 約束「跟既有 design token / sibling 元件對齊」,不只看 mockup PNG**
+  - Vision provider routing(CC 對圖不行,該強制走 codex+playwright MCP 截圖)
+  - iter 上限調高(目前 5)
+  - **每 mockup pipeline merge 前要 enduser 手動驗收(不靠 critic PASS 直接 merge)**
 - 規格待寫:`refs/mockup-driven-ticket.md`
 
 ### 10. Worktree staleness 警告 / auto-sync
