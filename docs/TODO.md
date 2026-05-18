@@ -6,10 +6,6 @@ Phase 8 候選清單。動工時搬進 pipeline ticket(`vbpl ticket add --pipeli
 
 ## 已有規格(ref doc 完整,可直接拆 ticket)
 
-### 1. FCM push gateway
-- Ref:[`refs/fcm-push-gateway-2026-05-17.md`](refs/fcm-push-gateway-2026-05-17.md)
-- Maintainer host gateway,enduser 不開 Firebase。動工時機:enduser 抱怨 Firebase setup 麻煩 / 做 hosted VP service 時
-
 ### 2. iOS PWA push 實測
 - iOS 16.4+ 已支援 Web Push 但需先「加入主畫面」,目前只在 Android 驗過
 - 沒獨立 ref(<1 條 ticket),動工時直接拆
@@ -85,7 +81,7 @@ Phase 8 候選清單。動工時搬進 pipeline ticket(`vbpl ticket add --pipeli
 ## 工作流
 
 1. 想動哪項 → `vbpl ticket add --pipeline 019e36fbea63-phase8 --title "phase8: <X>" --mode iter --goal "..." --prompt "..."`
-2. 規格未寫的(5-11)先寫 ref → 落 ticket
+2. 規格未寫的(5-11,#1 已落地)先寫 ref → 落 ticket
 3. 完成搬掉本檔,合進 CHANGELOG / 雷區 / SKILL
 
 ---
@@ -96,3 +92,4 @@ Phase 8 候選清單。動工時搬進 pipeline ticket(`vbpl ticket add --pipeli
 - ~~vbpl pipeline delete cascade~~ — phase8 t6 落地(d1ec87c)
 - ~~RunHistory 加失敗原因 + ticket 進度 + codex 隱藏空欄~~ — phase8 t5 落地(d1ec87c)
 - ~~runner 主 agent 每輪重讀 pipeline.json~~ — b096cc8 落地
+- ~~FCM push gateway~~ — fcm-gateway pipeline t1-t5 落地(2026-05-19);Cloud Run asia-east1 / Firestore per-token registry / max-instances=1 / $1 budget alert / backend 拔 firebase-admin 改 POST gateway(hard cutover)。ref → [`refs/archive/fcm-push-gateway-2026-05-17.md`](refs/archive/fcm-push-gateway-2026-05-17.md)

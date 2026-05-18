@@ -15,7 +15,6 @@
 | 檔 | 用途 |
 |---|---|
 | [`worktree-env-2026-05-15.md`](worktree-env-2026-05-15.md) | `.worktreeinclude` 慣例 + merge 前 secret 洩漏偵測 |
-| [`fcm-push-gateway-2026-05-17.md`](fcm-push-gateway-2026-05-17.md) | FCM push 共用方案(maintainer host gateway) |
 
 ## Postmortem / 引用中
 
@@ -39,6 +38,7 @@
 - `board-redesign-2026-05-17.md` — board redesign mockup-driven pipeline 跑歪未 merge,放棄
 - `skill-injection-2026-05-14.md` — 「引用重點 SKILL」設計,廢案
 - `vbpl-server-cmd-2026-05-17.md` — `vbpl server start/stop/status/restart/logs` CLI 包裝,2026-05-19 phase8 落地
+- `fcm-push-gateway-2026-05-17.md` — FCM push 共用方案(maintainer host gateway),2026-05-19 fcm-gateway pipeline 落地(gateway 部署 Cloud Run asia-east1 + backend 拔 firebase-admin)
 - `merge-isolation-2026-05-11.md` — self-dogfood AI merge 撞 watch 研究,結論不投(等 VP fork 變多 + user 抱怨累積再回頭)
 - 競品對照合集(`composio-ao` / `symphony` / `torque` / `vibe-kanban`,設計初期一次性參考)
 
