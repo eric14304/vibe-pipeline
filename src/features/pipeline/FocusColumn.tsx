@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { CheckCircleIcon, CheckIconSm, CloseIcon, FolderIcon, HistoryIcon, MergeIcon, PlusIcon, ProhibitIcon, RefreshIcon, TrashIcon } from "../../ui/icons";
+import { CheckCircleIcon, CheckIconSm, CloseIcon, FolderIcon, HistoryIcon, MergeIcon, PlusIcon, RefreshIcon, TrashIcon } from "../../ui/icons";
 import { PipelineHistoryDrawer } from "./PipelineHistoryDrawer";
 import { STATE_COLOR, STATE_LABEL, TICKET_STATUS_LABEL, TICKET_STATUS_COLOR, fmtElapsed, fmtDuration, normalizeVerdict } from "../../data/pipelines";
 import { MODE_LABELS } from "../../api/qa";
@@ -151,9 +151,8 @@ export function FocusColumn({
   onStop,
   onDelete,
   onRename,
-  onResetAll,
+  onResetPipeline,
   onRevealWorktree,
-  onPruneWorktree,
   onMerge,
   onSync,
   onSyncConfirmAi,
@@ -176,9 +175,8 @@ export function FocusColumn({
   onStop?: (pipelineId: string) => void;
   onDelete?: (pipelineId: string) => void;
   onRename?: (pipelineId: string, newName: string) => void;
-  onResetAll?: (pipelineId: string) => void;
+  onResetPipeline?: (pipelineId: string) => void;
   onRevealWorktree?: (pipelineId: string) => void;
-  onPruneWorktree?: (pipelineId: string) => void;
   onMerge?: (pipelineId: string) => void;
   onSync?: (pipelineId: string) => void;
   onSyncConfirmAi?: (pipelineId: string) => void;
@@ -275,12 +273,6 @@ export function FocusColumn({
     (allDone && !noWorktreeDiff) ||
     pipeline.state === "merged" ||
     !!failedMergeTicket;
-  const hasResettable = pipeline.tickets.some((t) =>
-    t.status === "done" ||
-    t.status === "failed" ||
-    t.status === "failed_iter_limit" ||
-    t.status === "failed_transient"
-  );
   const syncActive =
     !!pipeline.syncJob &&
     (pipeline.syncJob.state === "merging" ||
@@ -427,11 +419,9 @@ export function FocusColumn({
             />
             <OverflowMenu
               pipeline={pipeline}
-              hasResettable={hasResettable}
               lockedByState={lockedByState}
-              onResetAll={onResetAll}
+              onResetPipeline={onResetPipeline}
               onRevealWorktree={onRevealWorktree}
-              onPruneWorktree={onPruneWorktree}
               onDelete={onDelete}
               onToggleAutoMerge={onToggleAutoMerge}
               onShowHistory={projectHash ? () => setHistoryOpen(true) : undefined}
@@ -743,21 +733,17 @@ function EmptyTickets({
 // 各 action 用 useConfirm() 二次確認(刪除 / 重跑全部);reveal 不需要。
 function OverflowMenu({
   pipeline,
-  hasResettable,
   lockedByState,
-  onResetAll,
+  onResetPipeline,
   onRevealWorktree,
-  onPruneWorktree,
   onDelete,
   onToggleAutoMerge,
   onShowHistory,
 }: {
   pipeline: Pipeline;
-  hasResettable: boolean;
   lockedByState: boolean;
-  onResetAll?: (id: string) => void;
+  onResetPipeline?: (id: string) => void;
   onRevealWorktree?: (id: string) => void;
-  onPruneWorktree?: (id: string) => void;
   onDelete?: (id: string) => void;
   onToggleAutoMerge?: (id: string, next: boolean) => void;
   onShowHistory?: () => void;
@@ -782,7 +768,7 @@ function OverflowMenu({
   }, [open]);
 
   // 沒任何 action 可做就不顯示
-  if (!onResetAll && !onRevealWorktree && !onPruneWorktree && !onDelete && !onToggleAutoMerge && !onShowHistory) return null;
+  if (!onResetPipeline && !onRevealWorktree && !onDelete && !onToggleAutoMerge && !onShowHistory) return null;
 
   return (
     <div ref={wrapRef} className="focus-overflow">
@@ -830,41 +816,16 @@ function OverflowMenu({
               }}
             />
           )}
-          {onPruneWorktree && (
+          {onResetPipeline && (
             <MenuItem
-              icon={<ProhibitIcon />}
-              label="清除 worktree"
+              icon={<RefreshIcon />}
+              label="重置 pipeline"
               hint={lockedByState ? "執行中無法操作" : ""}
               disabled={lockedByState}
+              danger
               onClick={async () => {
                 setOpen(false);
                 const isMerged = pipeline.state === "merged";
-                const ok = await confirm({
-                  title: `清除 worktree "${pipeline.name}"?`,
-                  warning: isMerged
-                    ? undefined
-                    : `此 pipeline 還沒 merge 進 base — 未 commit 的變動會永久丟失`,
-                  description: isMerged
-                    ? `已 merged,清 worktree 無風險(內容都在 base 上)。\n` +
-                      `會刪 ~/.vibe-pipeline/worktrees/<projHash>/${pipeline.id}/,git worktree 註冊也清。pipeline.json 留著。`
-                    : `已 commit 的 ticket commit 保留在 branch 內(下次 Run 重建 worktree 看得到);` +
-                      `未 commit 的變動沒救。\n` +
-                      `要保留請先進 worktree commit 或備份 → 再清。`,
-                  confirmLabel: isMerged ? "清除" : "強制清除",
-                  danger: true,
-                });
-                if (ok) onPruneWorktree(pipeline.id);
-              }}
-            />
-          )}
-          {onResetAll && hasResettable && (
-            <MenuItem
-              icon={<RefreshIcon />}
-              label="重跑全部"
-              hint={lockedByState ? "執行中無法操作" : ""}
-              disabled={lockedByState}
-              onClick={async () => {
-                setOpen(false);
                 const ndone = pipeline.tickets.filter((t) => t.status === "done").length;
                 const nfail = pipeline.tickets.filter((t) =>
                   t.status === "failed" ||
@@ -872,17 +833,22 @@ function OverflowMenu({
                   t.status === "failed_transient"
                 ).length;
                 const ok = await confirm({
-                  title: "重跑全部?",
+                  title: `重置 pipeline "${pipeline.name}"?`,
+                  warning: isMerged
+                    ? undefined
+                    : `未 merge 進 base 的 commit 會永久丟失(branch 會被刪)`,
                   description:
-                    `會把以下 ticket 狀態回到 draft:\n` +
-                    ` · ${ndone} done\n` +
-                    ` · ${nfail} failed\n\n` +
-                    `清掉 iter rounds / commits 紀錄;worktree 內已 commit 的程式碼留著。\n` +
-                    `下次按「開始運行」會把 draft 全跑一遍。`,
-                  confirmLabel: "重跑全部",
+                    `會做三件事:\n` +
+                    ` · 刪 worktree dir(~/.vibe-pipeline/worktrees/<projHash>/${pipeline.id}/)\n` +
+                    ` · 刪 branch(pipeline/${pipeline.name})— 下次 Run 從 base 重建,不會落後\n` +
+                    ` · tickets 狀態回 draft:${ndone} done + ${nfail} failed\n\n` +
+                    (isMerged
+                      ? `已 merged,branch 的內容都在 base 上,刪 branch 無風險。`
+                      : `要保留 branch 上的 commit 請先 merge 或 cherry-pick → 再重置。`),
+                  confirmLabel: "重置",
                   danger: true,
                 });
-                if (ok) onResetAll(pipeline.id);
+                if (ok) onResetPipeline(pipeline.id);
               }}
             />
           )}

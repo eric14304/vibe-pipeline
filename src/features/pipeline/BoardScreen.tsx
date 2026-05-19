@@ -768,32 +768,14 @@ export function BoardScreen({
                 });
               }
             }}
-            onResetAll={async (pid) => {
+            onResetPipeline={async (pid) => {
               if (!project) return;
-              const target = pipelines.find((p) => p.id === pid);
-              if (!target) return;
-              const next: Pipeline = {
-                ...target,
-                state: "planning",
-                tickets: target.tickets.map((t) => {
-                  const isTerminal =
-                    t.status === "done" ||
-                    t.status === "failed" ||
-                    t.status === "failed_iter_limit" ||
-                    t.status === "failed_transient";
-                  if (!isTerminal) return t;
-                  const { iter: _i, commits: _c, liveLog: _l, reason: _r, ...rest } = t;
-                  void _i; void _c; void _l; void _r;
-                  return { ...rest, status: "draft" };
-                }),
-              };
               try {
-                await api.savePipeline(project.hash, pid, next);
+                await api.resetPipeline(project.hash, pid);
                 setReloadKey((k) => k + 1);
-                const cnt = next.tickets.filter((t) => t.status === "draft").length;
-                notifyInfo(`✓ 已重置 ${cnt} 張 ticket 回 draft`, { pipelineId: pid });
+                notifyInfo("✓ pipeline 已重置(worktree + branch 全清,tickets 回 draft)", { pipelineId: pid });
               } catch (e) {
-                notifyError(`重跑全部失敗: ${e instanceof Error ? e.message : String(e)}`, {
+                notifyError(`重置失敗: ${e instanceof Error ? e.message : String(e)}`, {
                   pipelineId: pid,
                 });
               }
@@ -805,18 +787,6 @@ export function BoardScreen({
                 await api.revealWorktree(project.hash, pid);
               } catch (e) {
                 notifyError(`開啟 worktree 失敗: ${e instanceof Error ? e.message : String(e)}`, {
-                  pipelineId: pid,
-                });
-              }
-            }}
-            onPruneWorktree={async (pid) => {
-              if (!project) return;
-              try {
-                await api.pruneWorktree(project.hash, pid);
-                setReloadKey((k) => k + 1);
-                notifyInfo("✓ worktree 已清除", { pipelineId: pid });
-              } catch (e) {
-                notifyError(`清除 worktree 失敗: ${e instanceof Error ? e.message : String(e)}`, {
                   pipelineId: pid,
                 });
               }
