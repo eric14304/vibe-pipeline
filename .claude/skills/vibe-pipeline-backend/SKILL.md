@@ -104,15 +104,17 @@ description: vibe-pipeline 後端 / 執行層的職責邊界、約定與 invaria
 
 ### Push(`server/lib/push/` + `server/lib/fcm/`)
 
-**2026-05-19 後架構**:VP backend 拔 `firebase-admin`,push 走 maintainer host 的 gateway(Cloud Run asia-east1 `https://vp-gateway-...run.app`)。service account key 集中在 gateway 端,enduser 只持有 `PUSH_GATEWAY_TOKEN`(bearer)。
+**2026-05-19 後架構**:VP backend 拔 `firebase-admin`,push 走 maintainer host 的 gateway(Cloud Run asia-east1 `https://vp-gateway-...run.app`)。service account key 集中在 gateway 端;同日 lazy auto-issue 落地後,enduser 端 token 由 backend 在 register 觸發點自動跟 gateway 申請,無需任何手動設定。
 
-- `tokenStore`:register / unregister 直接轉發到 gateway `POST /push/register` / `DELETE /push/token`,本地不存 device tokens(舊 `~/.vibe-pipeline/device_tokens.json` 已不寫)
-- `fcm/index.ts`:`fanoutPush(payload)` = `fetch(PUSH_GATEWAY_URL + '/push/send', { Authorization: 'Bearer ' + PUSH_GATEWAY_TOKEN, body: payload })`;死 token 由 gateway 端 Firestore registry 偵測 + 清,不再 backend 本地處理
-- 環境變數沒填 → `fanoutPush` 直接 no-op return(backend 啟動正常);改 push code 不要假設 gateway 一定回 200,加 error log 但別 throw
+- **`gatewayToken.ts`** lazy module(SSOT `~/.vibe-pipeline/gateway-token`):`getToken()` 被動讀(沒檔回 null) / `ensureToken()` 沒檔則 POST `gateway/tokens/auto-issue`(無 auth,gateway 端 IP rate-limit 5/UTC day)拿 + 寫檔 / `clearToken()` 砍檔。寫入 atomic `.tmp → rename` + posix `chmod 0600`(Windows NTFS chmod 不生效照雷區 §Windows ACL);in-flight Promise 合併並發 register 避免雙申請。`PUSH_GATEWAY_TOKEN` env 是 read-only override(forker / CI),env 設了就跳過檔案
+- `DEFAULT_GATEWAY_URL = https://vp-gateway-799841449136.asia-east1.run.app` 在 `fcm/index.ts` hardcode;`PUSH_GATEWAY_URL` env 可 override。enduser `.env` 完全不必設 push 相關 var
+- `tokenStore`:`register` / `unregister` 進入點呼 `ensureToken` 確保 token 存在 → 轉發到 gateway `POST /push/register` / `DELETE /push/token`;`listTokens` 用被動 `getToken`(避免誤觸 auto-issue rate limit)。本地不存 device tokens(舊 `~/.vibe-pipeline/device_tokens.json` 已不寫)
+- `fcm/index.ts`:`fanoutPush(payload)` = `fetch(gatewayUrl + '/push/send', { Authorization: 'Bearer ' + getToken(), body: payload })`;沒 token → warn + return [](不 throw),死 token 由 gateway 端 Firestore registry 偵測 + 清
+- 改 push code 不要假設 gateway 一定回 200;加 error log 但別 throw,push 是 best-effort
 - `ticketWatcher.ts`:fs.watch pipeline.json + diff status → emit ticket_* notif + 呼叫 `fanoutPush`(行為不變,只是底下換 HTTP)
 - 前景 / 背景 push 行為差異雷見 [`.claude/rules/pwa-sw.md`](../../../.claude/rules/pwa-sw.md) §Android push 行為
-- gateway service code 在 repo 內 `gateway/`(Bun + Firestore,~500 行,multi-tenant per-token registry);admin CLI `vp-gw-admin` 發 token / revoke / list
-- 設計 spec → [`docs/refs/archive/fcm-push-gateway-2026-05-17.md`](../../../docs/refs/archive/fcm-push-gateway-2026-05-17.md);maintainer ops note:Cloud Run max-instances=1 + $1/mo budget alert hard cap abuse
+- gateway service code 在 repo 內 `gateway/`(Bun + Firestore,~500 行,multi-tenant per-token registry,含 `/tokens/auto-issue` 無 auth 端點 + `/tokens/*` admin 端點);admin CLI `vp-gw-admin` 發 token / revoke / list
+- 設計 spec → [`docs/refs/archive/fcm-push-gateway-2026-05-17.md`](../../../docs/refs/archive/fcm-push-gateway-2026-05-17.md);maintainer ops note:Cloud Run max-instances=1 + $1/mo budget alert hard cap abuse,auto-issue IP rate-limit 5/day 防 token farm
 
 ### CLI adapter(`server/lib/cli/`)
 

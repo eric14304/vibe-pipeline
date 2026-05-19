@@ -74,3 +74,14 @@
 - **FCM push gateway MVP 落地**(`019e3d04e68a-fcm-gateway` t1-t5):maintainer host 集中 service account key,enduser 不必開 Firebase。Cloud Run asia-east1(`https://vp-gateway-799841449136.asia-east1.run.app`)+ Firestore per-token registry(multi-tenant)+ max-instances=1 service-level cap + $1/mo budget alert(abuse / runaway 雙保險)。gateway source 在 `gateway/`(~500 行 Bun service),admin CLI `vp-gw-admin` 發 / revoke / list token。設計 ref → [`refs/archive/fcm-push-gateway-2026-05-17.md`](refs/archive/fcm-push-gateway-2026-05-17.md)
 - **Backend 拔 `firebase-admin`** 改 POST gateway(hard cutover,無 fallback):`server/lib/push/tokenStore.ts` 改成轉發 register / unregister;`server/lib/fcm/index.ts` `fanoutPush` 改 `fetch(gateway/push/send, Bearer token)`;沒填 `PUSH_GATEWAY_URL` / `PUSH_GATEWAY_TOKEN` 時 no-op(backend 啟動正常,只是不推)。enduser `.env.example` push 段精簡為 gateway URL + bearer token + 純 public Firebase Web SDK config
 - 文件 / SKILL / rule 收尾:README 加 §Push 通知 setup 段;install.md 補 push 段;TODO #1 搬「已落地」;refs/README 對應移動;`.claude/rules/remote-access.md` push 段更新;backend SKILL Push subsection 重寫
+
+---
+
+## 2026-05-19(續,FCM gateway lazy onboarding)
+
+**Push 通知 onboarding 從「3 step setup」拉到「零設定」**。enduser 不必跟 maintainer 拿 token、不必填任何 `.env` push var,開 PWA → Settings →「通知」啟用即用(pipeline `019e3f0fc842-fcm-gateway-lazy`,t1-t3)。
+
+- **t1 / `4093766` Gateway 加 `POST /tokens/auto-issue`**(無 Bearer):IP `sha256` 雜湊後落 Firestore `tokenIssueRateLimits`(doc id `<ipHash>_day_<YYYYMMDD>`,limit 5/UTC day,`expiresAt` 48h auto-purge)。token 複用既有 `enduserTokens` collection,response `{tokenId, token}` 同 admin schema。label optional + 用 IP 後 4 碼 fallback(`auto-<hash4>`)。`gateway/README.md` + `INFRA.md` 補 endpoint 說明
+- **t2 / `5357385` Backend lazy fetch**:新 `server/lib/push/gatewayToken.ts`(`getToken` / `ensureToken` / `clearToken`,SSOT `~/.vibe-pipeline/gateway-token`)。atomic `.tmp → rename` + posix `chmod 0600` + in-flight Promise 合併並發 register 避免雙申請;`PUSH_GATEWAY_TOKEN` env read-only override 給 forker / CI。`tokenStore.register/unregister` 進入點呼 `ensureToken`;`listTokens` 走被動 `getToken` 避免誤觸 issue。`fcm/index.ts` `fanoutPush` 改 `getToken`,沒 token → warn + return [] 不 throw。`.env.example` 刪 `PUSH_GATEWAY_TOKEN=`
+- **t3 / `dce03cb` Hardcode defaults**:`src/lib/fcm.ts` 加 `DEFAULT_FCM_CONFIG`(maintainer 公開 Firebase Web SDK config 7 欄),`resolveConfig` 改 `VITE_FCM_*` env override default + 移除 `fetchConfig`(純前端 resolve)。`server/lib/fcm/index.ts` 加 `DEFAULT_GATEWAY_URL = https://vp-gateway-799841449136.asia-east1.run.app`,`PUSH_GATEWAY_URL` env 仍可 override。`.env.example` push 段必填行全砍,只留 forker override 註解
+- 注意:backend `/api/push/config` route 失去前端 consumer 變 dead code(t3 範圍外不動),後續可清
