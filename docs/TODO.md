@@ -4,21 +4,15 @@ Phase 8 候選清單。動工時搬進 pipeline ticket(`vbpl ticket add --pipeli
 
 新項加底下,寫進對應 ref doc 後加 link。
 
-## 已有規格(ref doc 完整,可直接拆 ticket)
-
 ### 1. iOS PWA push 實測
 - iOS 16.4+ 已支援 Web Push 但需先「加入主畫面」,目前只在 Android 驗過
 - 沒獨立 ref(<1 條 ticket),動工時直接拆
-
-### 2. Merge 前 secret 洩漏偵測
-- Ref:[`refs/worktree-env-2026-05-15.md`](refs/worktree-env-2026-05-15.md)
-- `.worktreeinclude` 慣例已落,merge 前 secret 偵測還規劃中
 
 ---
 
 ## Session 新痛點(規格待寫)
 
-### 3. Runner process lifecycle ↔ pipeline state 整體 reconciliation
+### 2. Runner process lifecycle ↔ pipeline state 整體 reconciliation
 - 共同根因:VP backend 有 3 個 state source 不同步:
   - backend in-memory `running` Map
   - spawned codex / claude children(detached process tree,跨 backend restart)
@@ -37,7 +31,7 @@ Phase 8 候選清單。動工時搬進 pipeline ticket(`vbpl ticket add --pipeli
 - 規格待寫,動工前要決:設計化 ticketWatcher 還是砍 detached?(影響整體 architecture)
 - YAGNI 評估:目前 dogfood 偶踩,等再痛或 enduser 多了再動
 
-### 4. Web UI 不該自動 fire `pipeline.run`(monitor only)
+### 3. Web UI 不該自動 fire `pipeline.run`(monitor only)
 - 痛點:settings-pixel-polish audit log 記到兩次 `user_action pipeline.run`(00:21:58 + 01:23:41)而 user 確認沒按
 - **2026-05-19 調查結論**:src/ 全 grep + backend internal caller / SW POST cache / fetch retry middleware 全排查,**找不到 auto-fire code path**(唯一 caller 是 RunButton onClick)。最一致解釋:user 自己按了忘記,或 vbpl CLI 從別處呼(以前 audit 無法區分 cli vs browser)
 - **2026-05-19 已加 instrumentation**(`1526488`):audit user_action 加 `via` 欄(cli / browser / other),vbpl CLI 自帶 `User-Agent: vbpl-cli`,backend `detectVia(req)` 讀 UA 寫 audit
@@ -50,7 +44,7 @@ Phase 8 候選清單。動工時搬進 pipeline ticket(`vbpl ticket add --pipeli
 ## 工作流
 
 1. 想動哪項 → `vbpl ticket add --pipeline 019e36fbea63-phase8 --title "phase8: <X>" --mode iter --goal "..." --prompt "..."`
-2. 規格未寫的(3-4)先寫 ref → 落 ticket
+2. 規格未寫的(2-3)先寫 ref → 落 ticket
 3. 完成搬掉本檔,合進 CHANGELOG / 雷區 / SKILL
 
 ---
@@ -62,4 +56,5 @@ Phase 8 候選清單。動工時搬進 pipeline ticket(`vbpl ticket add --pipeli
 - ~~RunHistory 加失敗原因 + ticket 進度 + codex 隱藏空欄~~ — phase8 t5 落地(d1ec87c)
 - ~~runner 主 agent 每輪重讀 pipeline.json~~ — b096cc8 落地
 - ~~FCM push gateway~~ — fcm-gateway pipeline t1-t5 落地(2026-05-19);Cloud Run asia-east1 / Firestore per-token registry / max-instances=1 / $1 budget alert / backend 拔 firebase-admin 改 POST gateway(hard cutover)。ref → [`refs/archive/fcm-push-gateway-2026-05-17.md`](refs/archive/fcm-push-gateway-2026-05-17.md)
-- ~~pause-simplify 8 follow-up bug~~ — 2026-05-19 verify 後全 ship。B1 createPipeline 補預設 / B2 `vbpl ticket update --mode iter` 自動建 iter / B3 runnerPrompt iter undefined fallback / B4 strict 只動當前 ticket / B5 FocusColumn 看 rounds.length > 0 都已落地;B6/B7 pause-simplify 主軸已 ship;B8 codex log parser phase8 t5 加 failureReason 順手覆蓋;B9 runner exit 沒處理 = TODO #3 backend self-heal。ref → [`refs/pause-simplify-run-postmortem-2026-05-17.md`](refs/pause-simplify-run-postmortem-2026-05-17.md)
+- ~~pause-simplify 8 follow-up bug~~ — 2026-05-19 verify 後全 ship。B1-B5 已落地 / B6-B7 pause-simplify 主軸已 ship / B8 phase8 t5 順手覆蓋 / B9 = TODO #2 runner lifecycle。ref → [`refs/pause-simplify-run-postmortem-2026-05-17.md`](refs/pause-simplify-run-postmortem-2026-05-17.md)
+- ~~Merge 前 secret 洩漏偵測~~ — 2026-05-19 決定不做(scope creep)。`.worktreeinclude` 第一層已落地(消除 AI hardcode 誘因);plan B 自製 secret scanner 越界(VP 是 pipeline orchestrator,不該管 user repo 安全)。建議 user 自己裝 gitleaks pre-commit hook(廣 pattern + 業界標準)。ref → [`refs/archive/worktree-env-2026-05-15.md`](refs/archive/worktree-env-2026-05-15.md)

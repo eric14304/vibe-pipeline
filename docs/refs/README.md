@@ -10,17 +10,11 @@
 |---|---|
 | [`repo-structure.md`](repo-structure.md) | Repo 物理檔案 / 目錄結構 single source of truth |
 
-## 待動工規格(對應 TODO)
-
-| 檔 | 用途 |
-|---|---|
-| [`worktree-env-2026-05-15.md`](worktree-env-2026-05-15.md) | `.worktreeinclude` 慣例 + merge 前 secret 洩漏偵測 |
-
 ## Postmortem / 引用中
 
 | 檔 | 用途 |
 |---|---|
-| [`pause-simplify-run-postmortem-2026-05-17.md`](pause-simplify-run-postmortem-2026-05-17.md) | pause 簡化的 8 bug postmortem(TODO #6 仍引用,8 bug 未全拆 ticket) |
+| [`pause-simplify-run-postmortem-2026-05-17.md`](pause-simplify-run-postmortem-2026-05-17.md) | pause 簡化的 8 bug postmortem(已全 ship,TODO 已落地段引用) |
 
 ## Archive
 
@@ -40,6 +34,7 @@
 - `vbpl-server-cmd-2026-05-17.md` — `vbpl server start/stop/status/restart/logs` CLI 包裝,2026-05-19 phase8 落地
 - `fcm-push-gateway-2026-05-17.md` — FCM push 共用方案(maintainer host gateway),2026-05-19 fcm-gateway pipeline 落地(gateway 部署 Cloud Run asia-east1 + backend 拔 firebase-admin)
 - `merge-isolation-2026-05-11.md` — self-dogfood AI merge 撞 watch 研究,結論不投(等 VP fork 變多 + user 抱怨累積再回頭)
+- `worktree-env-2026-05-15.md` — `.worktreeinclude` 慣例(已落地)+ plan B merge 前 secret 偵測(2026-05-19 決定不做,scope creep)
 - 競品對照合集(`composio-ao` / `symphony` / `torque` / `vibe-kanban`,設計初期一次性參考)
 
 `competitor-refs.md` 在 `refs/`(非 archive)是上述四份競品的合集索引。
