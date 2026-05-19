@@ -1,16 +1,28 @@
 import { defineConfig } from "@playwright/test";
-import { resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 
-const ROOT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+// tab-flicker probe — 手動跑 / 不進 CI / 外部依賴 test
+// 依賴:user 真 backend (3001) + 真 vite (5173) + 真 active project (hash 1876248b)
+// 動機:驗 commit 974811f (useApi 300ms dedupe) + e73d772 (windowsHide) 真實生效
+// 跑法:bunx playwright test --config=tests/e2e/tab-flicker.config.ts
+// 預期:paused pipeline 場景下,tab 切回觸發 visibilitychange + focus 雙事件,
+//   diff-stat / sync-status 各 fire 1 次(不是 2 次);60s 內 gate=false 不再 fire
 
 export default defineConfig({
-  testDir: resolve(ROOT_DIR, "tests/e2e"),
-  testMatch: /tab-flicker-probe\.spec\.ts/,
-  timeout: 120_000,
+  testDir: "./",
+  testMatch: /tab-flicker-probe\.spec\.ts$/,
   fullyParallel: false,
   workers: 1,
-  reporter: "line",
-  use: { headless: true, baseURL: "http://localhost:4173" },
-  // 不啟 webServer,讓 probe 連 live backend (3001) + preview (4173)
+  timeout: 2 * 60 * 1000,
+  reporter: [["list"]],
+  use: {
+    baseURL: "http://127.0.0.1:5173",
+    trace: "off",
+  },
+  // 不 webServer — 故意用 user 已起的 backend + vite,驗真實環境
+  projects: [
+    {
+      name: "chromium",
+      use: { browserName: "chromium" },
+    },
+  ],
 });
