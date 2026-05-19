@@ -155,6 +155,26 @@ E2E 用 Playwright 跑真瀏覽器 + 真 backend,**不靠 unit test 取代**。p
 
 real 模式跑前 user 要確認 vp-autotest 是乾淨狀態(無進行中 pipeline);spec 末尾不負責清理(留現場給 debug)。
 
+### 外部依賴 probe(手動驗特定 fix,不進 CI)
+
+不屬上述兩模式的特殊 probe:**故意打 user 真 stack**(真 backend 3001 + 真 vite 5173 + 真 active project + 預先存在的 pipeline state),驗某個視覺 / 效能類 fix 是否真的解了。**不能自動跑、CI 不要 invoke**。配獨立 config(不開 `webServer`),user 手動觸發。
+
+|  probe | spec | config | 驗什麼 |
+|---|---|---|---|
+|  tab 切回 flicker | `tab-flicker-probe.spec.ts` | `tab-flicker.config.ts` | useApi 300ms dedupe(974811f)+ backend windowsHide(e73d772)真實生效 |
+
+跑法:
+```bash
+# 前置:user backend 3001 + vite 5173 都活著,active project=1876248b 並至少有一個 paused pipeline
+bunx playwright test --config=tests/e2e/tab-flicker.config.ts
+```
+
+寫新 probe 的約定:
+- spec 名 `*-probe.spec.ts`,config 名 `<topic>.config.ts`,跟 mock/real 區隔
+- config 不設 `webServer`(故意用 user 在跑的真 stack)
+- 程式碼裡寫死 project hash / pipeline id 是 OK 的 — probe 不追求可移植,要忠實重現 fix 場景
+- 留檔還是刪檔的判準:fix 的 repro 場景複雜到光看 commit message 重現會出錯 → 留;commit log 已說清楚 → 刪
+
 ## 寫 spec 的約定
 
 ### Selector 策略
