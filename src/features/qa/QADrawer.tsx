@@ -582,7 +582,7 @@ function SpecReview({
         <>
           <Field label="iter 上限輪數">
             <input
-              className="qadr-input"
+              className="qadr-input qadr-iter-limit-input"
               type="number"
               min={1}
               max={5}
@@ -591,7 +591,6 @@ function SpecReview({
                 const v = Math.max(1, Math.min(5, Number(e.target.value) || 5));
                 setEdited({ ...edited, iterLimit: v });
               }}
-              style={{ width: 80 }}
             />
           </Field>
           <Field label="達上限後">

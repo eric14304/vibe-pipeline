@@ -68,7 +68,7 @@ export function PickerSelect({
                 setOpen(false);
               }}
             >
-              {icon && <span style={{ width: 12, display: "inline-flex" }}>{icon}</span>}
+              {icon && <span className="picker-item-icon">{icon}</span>}
               <span className={o.mono ? "mono" : ""}>{o.label}</span>
               {o.hint && <span className="picker-item-hint mono">{o.hint}</span>}
               {o.id === value && (

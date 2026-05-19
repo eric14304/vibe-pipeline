@@ -206,7 +206,7 @@ function PushNotificationsSection({
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+      <div className="push-toggle-row">
         <label
           className={"toggle-pill mono" + (enabled ? " is-on" : "")}
           style={{ opacity: disabled ? 0.55 : 1, cursor: disabled ? "not-allowed" : "pointer" }}

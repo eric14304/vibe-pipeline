@@ -830,6 +830,7 @@ html.light .create-card { background: var(--bg-elevated); }
 }
 .picker-item:hover { background: var(--hover); }
 .picker-item.is-active { background: var(--selected); }
+.picker-item-icon { width: 0.75rem; display: inline-flex; }
 .picker-item-hint { font-size: 9.5px; color: var(--fg-faint); margin-left: auto; }
 .picker-item-check { color: var(--accent); display: inline-flex; margin-left: 4px; }
 .picker-item.is-active .picker-item-hint { margin-left: 4px; }
