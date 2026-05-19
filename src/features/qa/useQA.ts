@@ -57,7 +57,6 @@ export function useQA(projectHash: string | null) {
       intervalMs: 3000,
       gate: shouldPoll,
       refetchOnVisible: false,
-      refetchOnFocus: false,
       deps: [projectHash, draftId, lastRole, turnsLen],
     }
   );

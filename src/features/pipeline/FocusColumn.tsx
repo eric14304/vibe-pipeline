@@ -163,11 +163,13 @@ export function FocusColumn({
   existingNames = [],
   onTicketClick,
   projectHash,
+  reloadKey = 0,
   queuePosition,
   splittingTicketId,
 }: {
   pipeline: Pipeline;
   tick: number;
+  reloadKey?: number;
   onAddTicket?: (pipelineId: string) => void;
   hasActiveDraft?: boolean;
   onRun?: (pipelineId: string) => void;
@@ -216,9 +218,11 @@ export function FocusColumn({
   const { data: diffStat } = useApi<api.DiffStat | null>(
     () => (diffStatEnabled ? api.getDiffStat(projectHash!, pipeline.id) : Promise.resolve(null)),
     {
-      intervalMs: 3000,
+      // 10s — 1 次 git diff 在 Windows fork 5 個 helper subprocess(15 個視窗),3s 太貴
+      intervalMs: 10000,
       gate: diffLive,
-      deps: [projectHash, pipeline.id, pipeline.state],
+      // reloadKey:user 手動 trigger(prune worktree / run / stop 等)立刻 refetch,不等 polling
+      deps: [projectHash, pipeline.id, pipeline.state, reloadKey],
     }
   );
 
@@ -236,9 +240,10 @@ export function FocusColumn({
   const { data: syncStatus } = useApi<api.SyncStatus | null>(
     () => (syncEnabled ? api.getSyncStatus(projectHash!, pipeline.id) : Promise.resolve(null)),
     {
-      intervalMs: 5000,
+      // 30s — base branch 不會 30s 內推 N commit,5s 過頻;1 次 rev-list 在 Windows 12 個視窗
+      intervalMs: 30000,
       gate: syncLive,
-      deps: [projectHash, pipeline.id, pipeline.state, syncJobState],
+      deps: [projectHash, pipeline.id, pipeline.state, syncJobState, reloadKey],
     }
   );
   const behind = syncStatus?.behind ?? null;

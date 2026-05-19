@@ -49,8 +49,13 @@ export function registerSW(opts: RegisterOpts = {}) {
     }
   });
 
+  // controlling event fires on:
+  //   1. first install(沒前任 controller)— 不該 reload!整頁重 mount 觸發 N 個 endpoint 二度 fire
+  //   2. update + skipWaiting(user 點「更新」)— 該 reload 拿新 bundle
+  // 用 navigator.serviceWorker.controller(register 前快照)判斷:null = 沒前任 = first install
+  const hadController = !!navigator.serviceWorker.controller;
   wb.addEventListener("controlling", () => {
-    window.location.reload();
+    if (hadController) window.location.reload();
   });
 
   wb.register().catch((err) => {

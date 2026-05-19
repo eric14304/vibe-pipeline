@@ -130,10 +130,10 @@ export function BoardScreen({
     return () => clearTimeout(t);
   }, [highlightId]);
 
-  // Fetch notifs every 3s while project is open + visibility/focus refetch
+  // Notifs polling 10s — 通知不是即時訊息,過頻只是 backend 噪音
   const notifsResult = useApi(
     async () => (hash ? await api.listNotifs(hash) : null),
-    { intervalMs: 3000, gate: !!hash, deps: [hash] }
+    { intervalMs: 10000, gate: !!hash, deps: [hash] }
   );
   useEffect(() => {
     if (!hash) {
@@ -242,23 +242,24 @@ export function BoardScreen({
   // - 永遠跑 1.5s interval(原本 gate 在「有 running pipeline」會被 inactive tab 的 setInterval 節流卡死,
   //   切回 tab 時看到舊的 running 直到下一次 fire)
   // - 加 visibilitychange / focus refetch,tab 重新可見立刻 sync
-  // Fetch branch list once when project loads (for CreateCard base picker)
+  // Lazy fetch branches — 只在 CreateCard 開啟時打,mount 時不浪費 git spawn
+  // (`git for-each-ref` 在 Windows 還 spawn 3 個視窗,mount 時根本沒人看到)
   useEffect(() => {
-    if (!project?.hasGit) {
-      setBranches([]);
+    if (!creating || !project?.hasGit) {
       return;
     }
     api
       .listBranches(project.hash)
       .then((bs) => setBranches(bs))
       .catch(() => setBranches([]));
-  }, [project]);
+  }, [creating, project?.hash, project?.hasGit]);
 
   // max_parallel 只在 hash / hasInit 變動時抓一次。Settings 儲存完透過 onConfigSaved
   // 或 reloadKey 也會 trigger,不另開 polling(避免 1.5s 衝撞 listPipelines)
+  // deps 用 project?.hash(primitive)避免 project ref 變就 refire — config 幾乎不變,refire 浪費 git spawn(currentBranch)
   const configResult = useApi(
     async () => (project?.hasInit ? await api.getConfig(project.hash) : null),
-    { deps: [project, reloadKey] }
+    { deps: [project?.hash, project?.hasInit, reloadKey] }
   );
   useEffect(() => {
     if (!project?.hasInit) {
@@ -291,7 +292,8 @@ export function BoardScreen({
     {
       intervalMs: 5000,
       gate: !!project?.hasInit,
-      deps: [project, reloadKey],
+      // primitive deps,避免 api.status 拿到 project 新 ref 就 trigger 重 fire(本來預期 5s 才 fire)
+      deps: [project?.hash, project?.hasInit, reloadKey],
       // PWA reload 體感 — mount 立刻顯上次 pipelines 快照(不等 network);背景 fetch 更新。
       // 用 hash 不用 project.hash:hash 從 useActiveProjectHash lazy init 第一 frame 就有,
       // project.hash 要等 fetch 才填,會錯過 useState lazy init 的時機。
@@ -700,6 +702,7 @@ export function BoardScreen({
             pipeline={active}
             tick={tick}
             projectHash={project.hash}
+            reloadKey={reloadKey}
             queuePosition={queuePositionOf(active.id)}
             splittingTicketId={splittingTicketId}
             onAddTicket={(pid) => qa.open(pid)}

@@ -2,20 +2,25 @@
 //
 // 設計意圖:
 // BoardScreen / TicketDrawer / QADrawer / NotificationsScreen 等至少 6 處,
-// 各自手寫一份「mount fetch + setInterval + visibilitychange + focus + cancelled flag + cleanup」
-// 的 useEffect (參考 src/features/pipeline/BoardScreen.tsx 約 247-279 行)。
-// 邏輯幾乎一致但每處微差(interval ms / gate 條件 / 是否聽 focus),改一個地方常漏其他幾處,
-// 而且每個 call site 都要小心 setState-on-unmounted race。
-//
-// 本 hook 把這段樣板收斂成單一實作:
+// 各自手寫一份「mount fetch + setTimeout self-reschedule + visibilitychange + cancelled flag + cleanup」
+// 的 useEffect 樣板。本 hook 把這段收斂成單一實作:
 //   - mount 立即 fetch
 //   - intervalMs 設定後輪詢;gate=false 時可選降頻(idleMs)或完全暫停
-//   - refetchOnVisible / refetchOnFocus 預設開,document.visibilitychange + window.focus 觸發 refetch
+//   - refetchOnVisible 預設開,document.visibilitychange 觸發 refetch
+//   - Page Lifecycle freeze/resume 雙保險(防 Chrome tab 凍結後 catch-up burst)
 //   - unmount 自動 cancel + 清 timer + 移 listener
 //   - fetcher throw 不崩 UI,寫進 error state
 //   - deps 變動視同新 instance(重跑整段)
 //
-// 本 ticket 只新增 hook 本身,call site 替換另開 ticket 處理。
+// **deps 用 primitive(string / boolean / number),不要傳 object reference**:
+// 否則 parent setState 拿新 ref(內容相同)就會 trigger useEffect 重 fire,造成
+// 「mount 已 fetch 又再 fetch」連續重複 request(實證:BoardScreen 用 `[project]`
+// 當 deps 導致 mount 時 pipelines / config / branches 各打 2 次)。
+//
+// **不收 refetchOnFocus**:`window.focus` 在「DevTools 點回 page / 切視窗回來」等
+// 場景頻繁 fire,但這些不算「user 真的離開」,refetch 重複又無意義。
+// visibilitychange 已 cover 真正的 tab 切換,intervalMs polling cover 時間久的場景,
+// 兩者就夠。
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DependencyList } from "react";
@@ -53,7 +58,6 @@ export interface UseApiOptions {
   gate?: boolean;
   idleMs?: number;
   refetchOnVisible?: boolean;
-  refetchOnFocus?: boolean;
   deps?: DependencyList;
   // 設了 cacheKey → mount 立刻顯 cached(in-memory + localStorage),背景 fetch 更新
   // (stale-while-revalidate)。PWA reload 體感像沒 reload(立刻看到上次資料)
@@ -75,7 +79,6 @@ export function useApi<T>(
     gate = true,
     idleMs,
     refetchOnVisible = true,
-    refetchOnFocus = true,
     deps = [],
     cacheKey,
   } = opts;
@@ -107,7 +110,7 @@ export function useApi<T>(
     let cancelled = false;
     let lastRunAt = 0;
 
-    // dedupe 300ms 內重複觸發(瀏覽器 tab 切回會同時發 visibilitychange + focus → 雙 fire)
+    // dedupe 300ms 防 visibility + freeze/resume edge case 重複 fire
     const run = () => {
       const now = Date.now();
       if (now - lastRunAt < 300) return;
@@ -128,21 +131,32 @@ export function useApi<T>(
 
     run();
 
-    let timerId: ReturnType<typeof setInterval> | null = null;
+    // self-reschedule setTimeout(不用 setInterval):Chrome tab freeze(hidden > 5 分,
+    // Page Lifecycle API)會把 setInterval callback 排隊,resume 時 catch-up 一次全 fire
+    // (N 個積壓 → 爆量 request)。self-reschedule = frozen 期間沒 schedule 下一次 →
+    // 沒 queue → resume 不爆量。
+    let timerId: ReturnType<typeof setTimeout> | null = null;
 
     const stopTimer = () => {
       if (timerId !== null) {
-        clearInterval(timerId);
+        clearTimeout(timerId);
         timerId = null;
       }
     };
-    const startTimer = () => {
-      if (timerId !== null) return;
+    const scheduleNext = () => {
+      if (cancelled) return;
       if (typeof intervalMs !== "number" || intervalMs <= 0) return;
       const effective = gate ? intervalMs : typeof idleMs === "number" && idleMs > 0 ? idleMs : null;
-      if (effective !== null) {
-        timerId = setInterval(run, effective);
-      }
+      if (effective === null) return;
+      timerId = setTimeout(() => {
+        timerId = null;
+        run();
+        scheduleNext();
+      }, effective);
+    };
+    const startTimer = () => {
+      if (timerId !== null) return;
+      scheduleNext();
     };
 
     // hidden 完全暫停 polling(0 network),visible 立刻 refetch + 恢復 interval
@@ -156,19 +170,28 @@ export function useApi<T>(
         startTimer();
       }
     };
-    const onFocus = () => {
-      run();
+    // Chrome Page Lifecycle freeze/resume:visibilitychange 通常先 fire,但某些 edge
+    // case(瀏覽器 background tab 直接 freeze 沒 fire visibility)靠這對兜底。
+    // 雙保險:stopTimer 冪等,重複呼 OK
+    const onFreeze = () => stopTimer();
+    const onResume = () => {
+      if (!document.hidden) {
+        run();
+        startTimer();
+      }
     };
     if (refetchOnVisible) document.addEventListener("visibilitychange", onVisible);
-    if (refetchOnFocus) window.addEventListener("focus", onFocus);
+    document.addEventListener("freeze", onFreeze);
+    document.addEventListener("resume", onResume);
 
     return () => {
       cancelled = true;
       stopTimer();
       if (refetchOnVisible) document.removeEventListener("visibilitychange", onVisible);
-      if (refetchOnFocus) window.removeEventListener("focus", onFocus);
+      document.removeEventListener("freeze", onFreeze);
+      document.removeEventListener("resume", onResume);
     };
-  }, [intervalMs, gate, idleMs, refetchOnVisible, refetchOnFocus, reloadKey, cacheKey, ...deps]);
+  }, [intervalMs, gate, idleMs, refetchOnVisible, reloadKey, cacheKey, ...deps]);
 
   return { data, error, refetch };
 }
