@@ -242,13 +242,13 @@ export function TopBar({
 
         {active && (
           <div className="topbar-active-meta">
-            {active.hasGit && (
+            {active.hasGit && active.currentBranch && (
               <span
                 className="chip mono topbar-current-branch"
-                title={active.currentBranch ? `當前 branch: ${active.currentBranch}` : "detached HEAD"}
+                title={`當前 branch: ${active.currentBranch}`}
               >
                 <span className="topbar-branch-icon">⎇</span>{" "}
-                {active.currentBranch ?? "(detached)"}
+                {active.currentBranch}
               </span>
             )}
             <button type="button"
@@ -280,13 +280,13 @@ export function TopBar({
           <div className={"topbar-overflow-menu" + (overflowOpen ? " is-open" : "")}>
             {active && (
               <div className="topbar-overflow-mobile-items">
-                {active.hasGit && (
+                {active.hasGit && active.currentBranch && (
                   <span
                     className="chip mono topbar-overflow-chip"
-                    title={active.currentBranch ? `當前 branch: ${active.currentBranch}` : "detached HEAD"}
+                    title={`當前 branch: ${active.currentBranch}`}
                   >
                     <span className="topbar-branch-icon">⎇</span>{" "}
-                    {active.currentBranch ?? "(detached)"}
+                    {active.currentBranch}
                   </span>
                 )}
                 <button

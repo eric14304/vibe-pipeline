@@ -22,7 +22,6 @@ async function spawnGit(args: string[], cwd?: string): Promise<{ ok: boolean; ou
     cwd,
     stdout: "pipe",
     stderr: "pipe",
-    windowsHide: true,
   });
   const [out, err] = await Promise.all([
     new Response(proc.stdout).text(),

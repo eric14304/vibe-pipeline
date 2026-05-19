@@ -135,7 +135,7 @@ export type AutoMergeResult =
   | { ok: false; reason: "git_error"; error: string };
 
 async function spawnGit(args: string[], cwd: string): Promise<{ ok: boolean; out: string; err: string }> {
-  const proc = Bun.spawn(["git", ...args], { cwd, stdout: "pipe", stderr: "pipe", windowsHide: true });
+  const proc = Bun.spawn(["git", ...args], { cwd, stdout: "pipe", stderr: "pipe" });
   const [out, err] = await Promise.all([
     new Response(proc.stdout).text(),
     new Response(proc.stderr).text(),

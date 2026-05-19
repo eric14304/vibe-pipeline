@@ -46,6 +46,8 @@ description: vibe-pipeline 後端 / 執行層的職責邊界、約定與 invaria
 **Response envelope**:統一 `{ ok: true, data }` 或 `{ ok: false, error: { code, message } }`。
 常見 error code:`not_found` / `permission_denied` / `dialog_cancelled` / `invalid_path` / `not_initialized` / `already_initialized` / `state_guard` / `working_tree_dirty` / `internal_error`。
 
+**Metadata endpoint 別塞 git**(2026-05-20 踩過):列表 / status / config 等高頻 endpoint,handler 走純 fs 拿 metadata 就好,**不要順手呼 git**(`currentBranch` / `workingTreeStatus` 等)。每個 endpoint「順便」一次 git 看似無害,但 page mount 觸發 N 個 endpoint 同時打 git,Windows 上 git.exe 每次 fork 多個 helper,瞬間炸幾十個視窗(無 windowsHide 場景)+ backend 卡 ~500ms。git 結果該獨立 endpoint(lazy fetch when UI needs it),或 backend cache TTL。`projectStore.toProject` 已示範:純 fs,**不**呼 currentBranch。
+
 **Project hash**:`sha256(absolute_path).slice(0, 8)`。Pipeline id:`<12-hex-ms-ts>-<slug>`(本機時間序,但**排序靠 `Pipeline.createdAt` 不靠 id**,id 可能是 fixture 假造)。
 
 ## 子系統設計重點

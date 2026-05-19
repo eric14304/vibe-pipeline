@@ -1,7 +1,6 @@
 import { join, basename, resolve } from "node:path";
 import { existsSync, mkdirSync, statSync } from "node:fs";
 import { projectHash } from "./hash";
-import { currentBranch } from "./git";
 import { vibeHome } from "./paths";
 import type { Project } from "../../shared/types";
 
@@ -42,12 +41,13 @@ async function writeState(state: State): Promise<void> {
   await Bun.$`mv ${tmp} ${stateFile()}`.quiet();
 }
 
-async function toProject(path: string, lastOpenedAt: number): Promise<Project> {
+// 純 fs metadata,**不**呼 git。currentBranch 是裝飾用(TopBar 顯 chip),
+// 每次 list / status 都 spawn git 不划算。要顯示就走另一 endpoint lazy fetch。
+function toProject(path: string, lastOpenedAt: number): Project {
   const absolute = resolve(path);
   const dirPath = join(absolute, ".vibe-pipeline");
   const hasInit = existsSync(dirPath) && statSync(dirPath).isDirectory();
   const hasGit = existsSync(join(absolute, ".git"));
-  const branch = hasGit ? await currentBranch(absolute) : null;
   return {
     path: absolute,
     hash: projectHash(absolute),
@@ -55,7 +55,6 @@ async function toProject(path: string, lastOpenedAt: number): Promise<Project> {
     hasInit,
     hasGit,
     lastOpenedAt,
-    currentBranch: branch ?? undefined,
   };
 }
 

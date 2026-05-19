@@ -26,7 +26,7 @@ export class ClaudeAdapter implements CliAdapter {
 
   async checkAvailable(): Promise<boolean> {
     try {
-      const proc = Bun.spawn(["claude", "--version"], { stdout: "pipe", stderr: "pipe" });
+      const proc = Bun.spawn(["claude", "--version"], { stdout: "pipe", stderr: "pipe", windowsHide: true });
       await proc.exited;
       return proc.exitCode === 0;
     } catch {
@@ -80,7 +80,7 @@ function spawnQA(opts: QASpawnOpts): SpawnedProcess {
     }
   }
   args.push(userMessage);
-  return Bun.spawn(args, { cwd, stdout: "pipe", stderr: "pipe" });
+  return Bun.spawn(args, { cwd, stdout: "pipe", stderr: "pipe", windowsHide: true });
 }
 
 function spawnRunner(opts: RunnerSpawnOpts): SpawnedProcess {
@@ -112,7 +112,7 @@ function spawnRunner(opts: RunnerSpawnOpts): SpawnedProcess {
   }
   args.push("--system-prompt", systemPrompt);
   args.push(initialMessage);
-  return Bun.spawn(args, { cwd, stdout: "pipe", stderr: "pipe" });
+  return Bun.spawn(args, { cwd, stdout: "pipe", stderr: "pipe", windowsHide: true });
 }
 
 function spawnSplit(opts: SplitSpawnOpts): SpawnedProcess {
@@ -138,7 +138,7 @@ function spawnSplit(opts: SplitSpawnOpts): SpawnedProcess {
     "--disallowedTools",
     "Edit Write Task",
   ];
-  const proc = Bun.spawn(args, { cwd, stdout: "pipe", stderr: "pipe", stdin: "pipe" });
+  const proc = Bun.spawn(args, { cwd, stdout: "pipe", stderr: "pipe", stdin: "pipe", windowsHide: true });
   // userMessage 走 stdin(沿用既有行為);呼叫端不再自己寫 stdin
   proc.stdin.write(userMessage);
   proc.stdin.end();

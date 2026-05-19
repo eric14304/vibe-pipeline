@@ -67,7 +67,7 @@ export class CodexAdapter implements CliAdapter {
 
   async checkAvailable(): Promise<boolean> {
     try {
-      const proc = Bun.spawn(["codex", "--version"], { stdout: "pipe", stderr: "pipe" });
+      const proc = Bun.spawn(["codex", "--version"], { stdout: "pipe", stderr: "pipe", windowsHide: true });
       await proc.exited;
       return proc.exitCode === 0;
     } catch {
@@ -126,7 +126,7 @@ export class CodexAdapter implements CliAdapter {
 
 // 用 stdin 模式 spawn codex,把 prompt 寫進 stdin。args 最後一個必為 "-"。
 function spawnCodexWithStdinPrompt(args: string[], cwd: string, prompt: string): SpawnedProcess {
-  const proc = Bun.spawn(args, { cwd, stdin: "pipe", stdout: "pipe", stderr: "pipe" });
+  const proc = Bun.spawn(args, { cwd, stdin: "pipe", stdout: "pipe", stderr: "pipe", windowsHide: true });
   // Bun.spawn stdin 是 FileSink,write + end。
   proc.stdin.write(prompt);
   proc.stdin.end();
