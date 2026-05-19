@@ -1,3 +1,5 @@
+import { getToken } from "../push/gatewayToken";
+
 export type FcmPayload = {
   notification?: { title?: string; body?: string };
   data?: Record<string, string>;
@@ -9,28 +11,26 @@ function isMockMode(): boolean {
   return process.env.VP_TEST_MODE === "mock";
 }
 
+// Push gateway URL default:maintainer host 的 Cloud Run gateway。
+// forker 自架 gateway → 用 `PUSH_GATEWAY_URL` env override。
+const DEFAULT_GATEWAY_URL = "https://vp-gateway-799841449136.asia-east1.run.app";
+
 function gatewayUrl(): string | null {
   const v = process.env.PUSH_GATEWAY_URL?.trim();
-  return v && v.length > 0 ? v.replace(/\/+$/, "") : null;
+  const raw = v && v.length > 0 ? v : DEFAULT_GATEWAY_URL;
+  return raw.replace(/\/+$/, "");
 }
 
-function gatewayToken(): string | null {
-  const v = process.env.PUSH_GATEWAY_TOKEN?.trim();
-  return v && v.length > 0 ? v : null;
-}
-
+// initFCM / isFCMReady:gateway url 有設就視為「結構上可用」;
+// token 本身 lazy 管理,send 時被動 getToken,沒有 → soft fail。
 export function initFCM(): Promise<boolean> {
   if (isMockMode()) return Promise.resolve(true);
-  const ready = !!(gatewayUrl() && gatewayToken());
-  if (!ready) {
-    console.warn("[FCM] PUSH_GATEWAY_URL / PUSH_GATEWAY_TOKEN 未設定,push 功能停用");
-  }
-  return Promise.resolve(ready);
+  return Promise.resolve(!!gatewayUrl());
 }
 
 export function isFCMReady(): boolean {
   if (isMockMode()) return true;
-  return !!(gatewayUrl() && gatewayToken());
+  return !!gatewayUrl();
 }
 
 type SendResponse = {
@@ -53,9 +53,15 @@ export async function fanoutPush(tokens: string[], payload: FcmPayload): Promise
   }
 
   const url = gatewayUrl();
-  const tok = gatewayToken();
-  if (!url || !tok) {
-    console.warn("[FCM] gateway 未設定,跳過 fanout");
+  if (!url) {
+    console.warn("[FCM] PUSH_GATEWAY_URL 未設定,跳過 fanout");
+    return [];
+  }
+
+  // send 是被動觸發,不該 auto-issue token;沒 token = 此 backend 從沒 register 過,正常,soft fail。
+  const tok = await getToken();
+  if (!tok) {
+    console.warn("[FCM] gateway token 尚未取得(未 register 過),跳過 fanout");
     return [];
   }
 

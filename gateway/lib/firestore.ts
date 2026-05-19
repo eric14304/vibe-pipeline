@@ -26,4 +26,5 @@ export const COLLECTIONS = {
   enduserTokens: "enduserTokens",
   tokens: "tokens",
   rateLimits: "rateLimits",
+  tokenIssueRateLimits: "tokenIssueRateLimits",
 } as const;

@@ -93,10 +93,27 @@ openssl rand -hex 24
 - **Identity**:`vp-gateway-runner@vibe-pipeline.iam.gserviceaccount.com`
 - **Scaling**:max-instances=1 / min-instances=0(scale-to-zero)
 - **Resources**:512 MiB / 1 vCPU
-- **Auth**:`/health` 公開;`/push/*` enduser bearer;`/admin/*` `MASTER_TOKEN`(Secret Manager `master-token:latest` 注入)
+- **Auth**:`/health` 公開;`/tokens/auto-issue` 公開(per-IP 每 UTC 日 5 token,Firestore counter `tokenIssueRateLimits/{sha256(ip)}_day_{YYYYMMDD}`);`/push/*` enduser bearer;`/admin/*` `MASTER_TOKEN`(Secret Manager `master-token:latest` 注入)
 - **Env**:`FCM_PROJECT_ID=vibe-pipeline`
 
 完整 deploy / 更新 / rollback / troubleshooting 流程見 [`deploy.md`](deploy.md)。
+
+## 自動發 token endpoint(`POST /tokens/auto-issue`)
+
+公開 endpoint,enduser 不必透過 maintainer 後台拿 token,可在自己手機 / 瀏覽器自助。Body `{label?: string}` 全可選,空就 fallback `auto-<ipHashSuffix4>`(`sha256(ip)` 後 4 碼)。回應跟 `/admin/issue-token` 同 schema `{tokenId, token}`,明文 token 只回一次。
+
+防腳本 mass issue:每 IP 每 UTC 日最多 5 個 token,counter 落 `tokenIssueRateLimits/{sha256(ip)}_day_{YYYYMMDD}`(raw IP 不存)。超過回 `429 {error:"rate_limited",limit:5,count,resetAt}`,`resetAt` 為下次 UTC 00:00 epoch ms。
+
+Cloud Run 場景 client IP 從 `X-Forwarded-For` 第一段取(GFE / load balancer 注入);本機開發走 Bun `server.requestIP()`。
+
+```bash
+curl -s -X POST https://vp-gateway-799841449136.asia-east1.run.app/tokens/auto-issue \
+  -H "content-type: application/json" \
+  -d '{"label":"eric-iphone"}'
+# {"tokenId":"...","token":"..."}
+```
+
+`tokenIssueRateLimits` collection 同 `rateLimits` 一樣寫 `expiresAt` 欄(48h),Firestore TTL policy 可掛上去自動清(t1 infra 未配 TTL 也不會 break,doc 累積緩慢)。
 
 ## 下一步(t5 起跑點)
 

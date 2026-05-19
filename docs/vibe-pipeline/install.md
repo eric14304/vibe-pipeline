@@ -74,18 +74,11 @@ bun run cli:build                                         # 出 dist-cli/vbpl.ex
 cp dist-cli/vbpl.exe ~/.vibe-pipeline/bin/vbpl.exe        # 蓋掉舊版,PATH 不必動
 ```
 
-## Push 通知 setup(optional,要手機收推播才需要)
+## Push 通知 setup(零設定)
 
-VP 用 maintainer host 的 push gateway,**enduser 不必開 Firebase**。在 vibe-pipeline repo root 的 `.env`(沒有就 `cp .env.example .env`)填:
+手機 PWA Settings →「通知」開 toggle 即可,**沒有任何 env 要設**。Firebase Web SDK config + gateway URL hardcode 進 build,backend 首次 register 時自動向 gateway 申請 token 並存 `~/.vibe-pipeline/gateway-token`。
 
-```bash
-PUSH_GATEWAY_URL=https://vp-gateway-799841449136.asia-east1.run.app
-PUSH_GATEWAY_TOKEN=<maintainer 發給你的 bearer token>
-```
-
-填完重啟 backend(`vbpl server restart`),手機 PWA Settings →「通知」開 toggle 即可。沒填只是 push 不送,VP 其他功能不受影響。
-
-完整背景 / 自架 gateway 在 [`docs/refs/archive/fcm-push-gateway-2026-05-17.md`](../refs/archive/fcm-push-gateway-2026-05-17.md)。
+要自架 gateway / override 預設 → 設 `PUSH_GATEWAY_URL` / `PUSH_GATEWAY_TOKEN`(backend)、`VITE_FCM_*`(frontend build 時)。背景跟自架說明見 [`gateway/README.md`](../../gateway/README.md) 與 [`docs/refs/archive/fcm-push-gateway-2026-05-17.md`](../refs/archive/fcm-push-gateway-2026-05-17.md)。
 
 ## Trouble
 

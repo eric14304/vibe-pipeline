@@ -1,10 +1,13 @@
+import { createHash } from "node:crypto";
+import type { Server } from "bun";
 import { authenticateEnduser, authenticateMaster, getMasterToken } from "./lib/auth";
-import { rateLimitCheck } from "./lib/rateLimit";
+import { rateLimitCheck, tokenIssueRateLimitCheck } from "./lib/rateLimit";
 import { registerDevice, sendToEnduser, unregisterDevice } from "./lib/fcm";
 import { createEnduserToken, listTokens, revokeToken } from "./lib/tokens";
 import type {
   AuthContext,
   AuthContextEnduser,
+  AutoIssueTokenRequest,
   ErrorResponse,
   IssueTokenRequest,
   RegisterRequest,
@@ -65,12 +68,56 @@ async function requireEnduser(req: Request): Promise<AuthContextEnduser | Respon
   return ctx;
 }
 
-async function handle(req: Request): Promise<Response> {
+function clientIp(req: Request, server: Server<unknown> | null): string {
+  const xff = req.headers.get("x-forwarded-for");
+  if (xff) {
+    const first = xff.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  const real = req.headers.get("x-real-ip");
+  if (real) return real.trim();
+  if (server) {
+    const addr = server.requestIP(req);
+    if (addr && addr.address) return addr.address;
+  }
+  return "unknown";
+}
+
+function sha256Hex(input: string): string {
+  return createHash("sha256").update(input).digest("hex");
+}
+
+async function handle(req: Request, server: Server<unknown> | null): Promise<Response> {
   const url = new URL(req.url);
   const path = url.pathname;
   const method = req.method.toUpperCase();
 
   if (method === "GET" && path === "/health") return json({ ok: true });
+
+  if (method === "POST" && path === "/tokens/auto-issue") {
+    const ip = clientIp(req, server);
+    const ipHash = sha256Hex(ip);
+    const rl = await tokenIssueRateLimitCheck(ipHash);
+    if (!rl.ok) {
+      return json(
+        { error: "rate_limited", limit: rl.limit, count: rl.count, resetAt: rl.resetAt },
+        {
+          status: 429,
+          headers: {
+            "x-ratelimit-limit": String(rl.limit),
+            "x-ratelimit-remaining": "0",
+            "x-ratelimit-reset": String(rl.resetAt),
+          },
+        },
+      );
+    }
+    const body = (await readJson<AutoIssueTokenRequest>(req)) ?? {};
+    const rawLabel = isNonEmptyStr(body.label) ? body.label.trim() : "";
+    const ipSuffix = ipHash.slice(-4);
+    const label = rawLabel || `auto-${ipSuffix}`;
+    const issued = await createEnduserToken(label);
+    return json(issued);
+  }
 
   if (method === "POST" && path === "/push/register") {
     const auth = await requireEnduser(req);
@@ -137,9 +184,9 @@ async function handle(req: Request): Promise<Response> {
 
 const server = Bun.serve({
   port: PORT,
-  fetch: async (req) => {
+  fetch: async (req, srv) => {
     try {
-      return await handle(req);
+      return await handle(req, srv);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       console.error("[gateway] handler error:", message);

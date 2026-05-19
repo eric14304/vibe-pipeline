@@ -181,22 +181,15 @@ vbpl pipeline merge <id>                                        # 合併回 base
 
 ---
 
-## Push 通知 setup(走 maintainer gateway)
+## Push 通知 setup(零設定)
 
-**Enduser 不需要開 Firebase 帳號 / 建 project / 拿 service account key**。VP maintainer host 一個 push gateway(`https://vp-gateway-...run.app`),enduser VP backend 把 ticket / pipeline 事件 POST 到 gateway,gateway 用 maintainer 的 Firebase service account 推 FCM 到手機。
+**開 PWA → Settings →「通知」啟用推播 → 即用**。enduser 不必開 Firebase、不必跟 maintainer 拿 token、不必填任何 `.env` push 變數。
 
-設定:在 repo root `.env`(或 `~/.vibe-pipeline/.env`)填兩行:
+第一次 Settings 開啟通知時,backend 會自動向 maintainer host 的 gateway(`https://vp-gateway-799841449136.asia-east1.run.app`)申請 token(IP rate-limit 5/day),拿到後存 `~/.vibe-pipeline/gateway-token`(0600),後續所有 push 自動帶這個 token。Firebase Web SDK config + gateway URL 已 hardcode 進 build,不必設。
 
-```bash
-PUSH_GATEWAY_URL=https://vp-gateway-799841449136.asia-east1.run.app
-PUSH_GATEWAY_TOKEN=<maintainer 發給你的 bearer token>
-```
+要自架一份 gateway / fork 後指到自己 endpoint?設 `PUSH_GATEWAY_URL` / `PUSH_GATEWAY_TOKEN` env var 即可 override 內建預設(`VITE_FCM_*` 同理 override Firebase config)。完整自架說明見 [`gateway/README.md`](gateway/README.md) 跟 [`docs/refs/archive/fcm-push-gateway-2026-05-17.md`](docs/refs/archive/fcm-push-gateway-2026-05-17.md)。
 
-沒填的話 backend 啟動正常,只是 push 不會送出(Settings →「通知」開 toggle 仍可,但實際 ticket 事件不會推到手機)。token 是 per-enduser 發放,maintainer 端可 revoke。
-
-Maintainer 負責 Firebase project / service account key / Cloud Run 配置 / cost 監控($1/mo budget alert + Cloud Run max-instances=1 hard cap)/ abuse 管控(per-token rate limit + 日誌)。Gateway source 在 `gateway/` dir,設計見 [`docs/refs/archive/fcm-push-gateway-2026-05-17.md`](docs/refs/archive/fcm-push-gateway-2026-05-17.md)。
-
-> 沒拿到 token / 想自己 host 一份 gateway?gateway 是 stateless Bun service + Firestore token registry,~500 行,部署 Cloud Run asia-east1 就行(`gateway/` 內含 admin CLI `vp-gw-admin` 發 token / revoke / list)。要走「自己開 Firebase」的舊 path 已 deprecated,不再支援。
+Maintainer ops:Firebase project / service account key / Cloud Run 配置 / cost 監控($1/mo budget alert + Cloud Run max-instances=1 hard cap)/ abuse 管控(per-IP auto-issue rate limit + per-token send 日誌)。
 
 ---
 

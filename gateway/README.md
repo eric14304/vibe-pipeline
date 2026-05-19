@@ -1,6 +1,6 @@
 # vp-fcm-gateway
 
-vibe-pipeline FCM Gateway — Multi-tenant Cloud Run service。對外暴露 7 條 endpoint:enduser 用 Bearer token 註冊裝置 / 發送 push,master 用 `MASTER_TOKEN` 簽發 / 撤銷 / 列出 enduser tokens。Firestore 存 token (sha256) + device + per-minute rate limit counter,FCM HTTP v1 fan out 給該 enduser 所有 device。
+vibe-pipeline FCM Gateway — Multi-tenant Cloud Run service。對外暴露 8 條 endpoint:enduser 用 Bearer token 註冊裝置 / 發送 push,master 用 `MASTER_TOKEN` 簽發 / 撤銷 / 列出 enduser tokens,另一條公開 `POST /tokens/auto-issue` 給 enduser 自助拿 token(per-IP daily limit)。Firestore 存 token (sha256) + device + per-minute rate limit counter,FCM HTTP v1 fan out 給該 enduser 所有 device。
 
 對應的 GCP infra(project / SA / Firestore / IAM role)在 `INFRA.md`,本檔只談 service code 本身。
 
@@ -27,6 +27,7 @@ gateway/
 - `enduserTokens/{tokenId}` — `{sha256, label, createdAt, lastUsedAt, revoked}`(明文 token 不存,只存 sha256)
 - `tokens/{enduserId}/devices/{deviceId}` — `{deviceToken, label, createdAt, lastSentAt}`
 - `rateLimits/{tokenSha}_{epochMinute}` — `{count, keyId, minute, expiresAt}`(`expiresAt` 給 Firestore TTL policy 用,t1 infra 未設 TTL 也不會 break,counter doc 自然滾)
+- `tokenIssueRateLimits/{ipHash}_day_{YYYYMMDD}` — `{count, ipHash, ymd, expiresAt}`(`POST /tokens/auto-issue` per-IP daily counter,`ipHash = sha256(ip)`,UTC day key,`expiresAt` 設 48h 後給 TTL policy 自然清)
 
 ## Local dev
 
@@ -129,7 +130,23 @@ curl -s -X POST http://localhost:8080/push/unregister \
 # {"ok":true,"removed":1}
 ```
 
-### 7. `POST /admin/revoke-token/:tokenId`(master)
+### 7. `POST /tokens/auto-issue`(公開,per-IP daily limit)
+
+無 Bearer 需求,讓 enduser 在自己手機 / 瀏覽器自助拿一支 token,不必跑 maintainer 後台。
+
+```bash
+curl -s -X POST http://localhost:8080/tokens/auto-issue \
+  -H "content-type: application/json" \
+  -d '{"label":"my-phone"}'
+# {"tokenId":"a1b2c3...","token":"<32-char base64url 明文>"}
+```
+
+- Body `label`(可選,字串非空才認):給 maintainer 後台辨識用;沒填 / 空字串 → fallback 為 `auto-<ipHashSuffix4>`(`sha256(ip)` 最後 4 字)。raw IP 不落 Firestore。
+- 回應跟 `/admin/issue-token` 同 schema:`{tokenId, token}`,**`token` 明文只回一次**,當場拿去 `POST /push/register`。
+- 限流:每 IP 每 UTC 日最多 5 個 token(Firestore `tokenIssueRateLimits/{sha256(ip)}_day_{YYYYMMDD}` counter)。超過回 `429 {error:"rate_limited",limit:5,count,resetAt}`(`resetAt` 為下次 UTC 00:00 epoch ms)。
+- IP 來源:優先 `X-Forwarded-For` 第一段(Cloud Run / proxy 必填),再退 `X-Real-IP`,最後 `server.requestIP()`。
+
+### 8. `POST /admin/revoke-token/:tokenId`(master)
 
 ```bash
 curl -s -X POST http://localhost:8080/admin/revoke-token/<tokenId> \
@@ -144,6 +161,7 @@ curl -s -X POST http://localhost:8080/admin/revoke-token/<tokenId> \
 | 路徑 | 需要 |
 |---|---|
 | `GET /health` | — |
+| `POST /tokens/auto-issue` | — (per-IP 每 UTC 日 5 個 token) |
 | `POST /push/register` `POST /push/send` `POST /push/unregister` | Enduser Bearer(Firestore 查 sha256,未 revoked) |
 | `POST /admin/issue-token` `POST /admin/revoke-token/:id` `GET /admin/tokens` | `MASTER_TOKEN` Bearer(env var 比對,timing-safe) |
 
@@ -152,8 +170,9 @@ Token 比對 timing-safe(`auth.ts` 的 `timingSafeEqualStr`),enduser 路徑驗 t
 ## Rate limit
 
 - 60 req/min per enduser token(`rateLimits/{sha32}_{epochMin}` Firestore counter,`FieldValue.increment(1)`)
+- 5 issues/day per IP for `POST /tokens/auto-issue`(`tokenIssueRateLimits/{sha256(ip)}_day_{YYYYMMDD}`,UTC day key,`resetAt` 為下次 UTC 00:00)
 - 超過回 `429 {error:"rate_limited",limit,count,resetAt}` + headers `x-ratelimit-limit / -remaining / -reset`
-- counter 不主動 GC;每分鐘 doc id 不同自然滾,要清理掛 Firestore TTL 在 `expiresAt` 欄(已寫入,t1 infra 未配 TTL policy 也 OK,doc 累積緩慢)
+- counter 不主動 GC;doc id 隨時間滾,要清理掛 Firestore TTL 在 `expiresAt` 欄(per-minute 寫 2 分後,per-day 寫 48 小時後)
 
 ## Docker
 
