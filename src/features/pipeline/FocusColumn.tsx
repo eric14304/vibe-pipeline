@@ -229,7 +229,9 @@ export function FocusColumn({
   // syncJob.state 也當 deps:user 點 ✕ 關掉 done/failed chip → syncJob undefined → 觸發 refetch
   // 否則 chip 消失但「落後 N · 同步」按鈕要等下次 polling 才出現
   const syncJobState = pipeline.syncJob?.state;
-  const syncEnabled = !!projectHash && pipeline.state !== "planning";
+  // merged 排除 — 已合進 base 沒「落後」概念,sync chip 無意義;打了也只是浪費 git spawn
+  // (pipelinesResult 每 5s refetch → pipeline reference 變 → deps trigger → 持續 fire)
+  const syncEnabled = !!projectHash && pipeline.state !== "planning" && pipeline.state !== "merged";
   const syncLive = pipeline.state === "running";
   const { data: syncStatus } = useApi<api.SyncStatus | null>(
     () => (syncEnabled ? api.getSyncStatus(projectHash!, pipeline.id) : Promise.resolve(null)),
