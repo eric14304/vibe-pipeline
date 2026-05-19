@@ -33,7 +33,7 @@ export async function tokens(): Promise<Response> {
 // Smoke test:對所有 registered tokens fan-out 一發測試 push,驗證鏈路
 export async function test(): Promise<Response> {
   if (!isFCMReady()) {
-    return err("not_initialized", "FCM Admin SDK 未初始化(檢查 FCM_SERVICE_ACCOUNT_PATH)", 500);
+    return err("not_initialized", "FCM gateway 未配置(檢查 PUSH_GATEWAY_URL,或 hardcode default 是否被 env override)", 500);
   }
   const records = await tokenStore.listTokens();
   if (records.length === 0) {
