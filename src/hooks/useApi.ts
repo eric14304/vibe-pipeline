@@ -105,8 +105,13 @@ export function useApi<T>(
   // biome-ignore lint/correctness/useExhaustiveDependencies: deps 由 caller 控制
   useEffect(() => {
     let cancelled = false;
+    let lastRunAt = 0;
 
+    // dedupe 300ms 內重複觸發(瀏覽器 tab 切回會同時發 visibilitychange + focus → 雙 fire)
     const run = () => {
+      const now = Date.now();
+      if (now - lastRunAt < 300) return;
+      lastRunAt = now;
       Promise.resolve()
         .then(() => fetcherRef.current())
         .then((v) => {
