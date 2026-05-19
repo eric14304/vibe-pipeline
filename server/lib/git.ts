@@ -10,6 +10,7 @@ export async function gitInit(projectPath: string): Promise<void> {
   const proc = Bun.spawn(["git", "-C", projectPath, "init", "-b", "main"], {
     stdout: "pipe",
     stderr: "pipe",
+    windowsHide: true,
   });
   await proc.exited;
   if (proc.exitCode !== 0) {
@@ -23,7 +24,7 @@ export async function currentBranch(projectPath: string): Promise<string | null>
   if (!hasGit(projectPath)) return null;
   const proc = Bun.spawn(
     ["git", "-C", projectPath, "symbolic-ref", "--short", "-q", "HEAD"],
-    { stdout: "pipe", stderr: "pipe" }
+    { stdout: "pipe", stderr: "pipe", windowsHide: true }
   );
   await proc.exited;
   if (proc.exitCode !== 0) return null;
@@ -43,6 +44,7 @@ export async function workingTreeStatus(projectPath: string): Promise<WorkingTre
   const proc = Bun.spawn(["git", "-C", projectPath, "status", "--porcelain"], {
     stdout: "pipe",
     stderr: "pipe",
+    windowsHide: true,
   });
   const out = (await new Response(proc.stdout).text()).trim();
   await proc.exited;
@@ -76,13 +78,14 @@ export async function deleteBranchForce(
   // 先確認 branch 存在 — 不存在 = 已沒事可做,當成功(冪等,allow re-run)
   const check = Bun.spawn(
     ["git", "-C", projectPath, "rev-parse", "--verify", "--quiet", `refs/heads/${branchName}`],
-    { stdout: "pipe", stderr: "pipe" }
+    { stdout: "pipe", stderr: "pipe", windowsHide: true }
   );
   await check.exited;
   if (check.exitCode !== 0) return { ok: true };
   const proc = Bun.spawn(["git", "-C", projectPath, "branch", "-D", branchName], {
     stdout: "pipe",
     stderr: "pipe",
+    windowsHide: true,
   });
   const [, errText] = await Promise.all([
     new Response(proc.stdout).text(),
@@ -101,7 +104,7 @@ export async function listBranches(projectPath: string): Promise<string[]> {
   if (!hasGit(projectPath)) return [];
   const proc = Bun.spawn(
     ["git", "-C", projectPath, "for-each-ref", "--format=%(refname:short)", "refs/heads/"],
-    { stdout: "pipe", stderr: "pipe" }
+    { stdout: "pipe", stderr: "pipe", windowsHide: true }
   );
   await proc.exited;
   if (proc.exitCode !== 0) return [];

@@ -13,7 +13,7 @@ export type DepInstallResult =
 const DEP_KEYS = ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"] as const;
 
 async function spawnText(cmd: string[], cwd: string): Promise<{ ok: boolean; out: string; err: string }> {
-  const proc = Bun.spawn(cmd, { cwd, stdout: "pipe", stderr: "pipe" });
+  const proc = Bun.spawn(cmd, { cwd, stdout: "pipe", stderr: "pipe", windowsHide: true });
   const [out, err] = await Promise.all([
     new Response(proc.stdout).text(),
     new Response(proc.stderr).text(),

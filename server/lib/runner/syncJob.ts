@@ -396,7 +396,7 @@ async function waitAndFinish(opts: {
   const wtPath = worktree.worktreePath(projectPath, pipelineId);
   const gitOk = async (args: string[]): Promise<{ ok: boolean; out: string }> => {
     try {
-      const proc2 = Bun.spawn(["git", ...args], { cwd: wtPath, stdout: "pipe", stderr: "pipe" });
+      const proc2 = Bun.spawn(["git", ...args], { cwd: wtPath, stdout: "pipe", stderr: "pipe", windowsHide: true });
       const out = await new Response(proc2.stdout).text();
       const code = await proc2.exited;
       return { ok: code === 0, out: out.trim() };
@@ -430,7 +430,7 @@ async function waitAndFinish(opts: {
       try {
         const proc2 = Bun.spawn(
           ["git", "rev-parse", "HEAD"],
-          { cwd: worktree.worktreePath(projectPath, pipelineId), stdout: "pipe", stderr: "pipe" }
+          { cwd: worktree.worktreePath(projectPath, pipelineId), stdout: "pipe", stderr: "pipe", windowsHide: true }
         );
         const out = await new Response(proc2.stdout).text();
         await proc2.exited;
@@ -443,7 +443,7 @@ async function waitAndFinish(opts: {
       try {
         const proc3 = Bun.spawn(
           ["git", "log", "-1", "--format=%s"],
-          { cwd: worktree.worktreePath(projectPath, pipelineId), stdout: "pipe", stderr: "pipe" }
+          { cwd: worktree.worktreePath(projectPath, pipelineId), stdout: "pipe", stderr: "pipe", windowsHide: true }
         );
         const out = await new Response(proc3.stdout).text();
         await proc3.exited;
