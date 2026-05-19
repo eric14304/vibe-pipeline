@@ -48,7 +48,6 @@ vibe-pipeline/
 │   │   ├── qa/                QADrawer + useQA (真接 backend)
 │   │   ├── auth/              SetupScreen + LoginScreen + SecurityTab + AddDeviceDialog + useAuthStatus + authApi + types
 │   │   ├── settings/          SettingsPopover + SettingsPopover.css(tab UI:Project / AI 任務 / 通知 / 安全)
-│   │   └── dev/               StatesGallery (狀態 gallery /dev/states)
 │   ├── lib/
 │   │   └── fcm.ts             Firebase 前端 SDK init + getToken + register + foreground handler
 │   ├── styles/                CSS(tokens / board / notif / init / drawer / qa)

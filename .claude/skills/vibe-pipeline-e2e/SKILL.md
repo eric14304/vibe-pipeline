@@ -142,7 +142,6 @@ E2E 用 Playwright 跑真瀏覽器 + 真 backend,**不靠 unit test 取代**。p
 | **Empty states** | EmptyProject 箭頭指 TopBar + CTA | `empty.spec.ts` |
 |  | empty pipeline 空狀態 CTA |  |
 |  | actionError 右下 toast 顯示 + 自動消失 |  |
-| **/dev/states gallery** | 路由可達 + RunButton/ReadyBanner 各狀態 render | `dev-states.spec.ts` |
 
 ### Real 模式(手動,釋出前)
 
