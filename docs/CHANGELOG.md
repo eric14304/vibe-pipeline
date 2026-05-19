@@ -85,3 +85,10 @@
 - **t2 / `5357385` Backend lazy fetch**:新 `server/lib/push/gatewayToken.ts`(`getToken` / `ensureToken` / `clearToken`,SSOT `~/.vibe-pipeline/gateway-token`)。atomic `.tmp → rename` + posix `chmod 0600` + in-flight Promise 合併並發 register 避免雙申請;`PUSH_GATEWAY_TOKEN` env read-only override 給 forker / CI。`tokenStore.register/unregister` 進入點呼 `ensureToken`;`listTokens` 走被動 `getToken` 避免誤觸 issue。`fcm/index.ts` `fanoutPush` 改 `getToken`,沒 token → warn + return [] 不 throw。`.env.example` 刪 `PUSH_GATEWAY_TOKEN=`
 - **t3 / `dce03cb` Hardcode defaults**:`src/lib/fcm.ts` 加 `DEFAULT_FCM_CONFIG`(maintainer 公開 Firebase Web SDK config 7 欄),`resolveConfig` 改 `VITE_FCM_*` env override default + 移除 `fetchConfig`(純前端 resolve)。`server/lib/fcm/index.ts` 加 `DEFAULT_GATEWAY_URL = https://vp-gateway-799841449136.asia-east1.run.app`,`PUSH_GATEWAY_URL` env 仍可 override。`.env.example` push 段必填行全砍,只留 forker override 註解
 - 注意:backend `/api/push/config` route 失去前端 consumer 變 dead code(t3 範圍外不動),後續可清
+
+## 2026-05-19(續,DX 收尾)
+
+- **`vbpl ticket add` `--goal` / `--prompt` / `--acceptance` 全列必填**(`f5a5170`):之前只 `--title` 必填,user 手 craft ticket 容易漏 `--goal` 導致 web UI card 空一段 + commit log 少 context。改成 3 個都必填,沒帶 → INVALID_ARGS 友善報原因。QA drawer 流程不走 CLI 不受影響
+- **`/dev/states` 視覺驗證頁全砍**(`be98ca4`):dev-only StatesGallery + e2e `dev-states.spec.ts` 共 -206 行。改 button 邏輯靠 TS exhaustive switch + 真實 board 驗即可,不必另開 fixture gallery
+- **Production inline magic px → 0**(`8dad22e`):SettingsPopover `push-toggle-row` / QADrawer `qadr-iter-limit-input` / PickerSelect `picker-item-icon` 3 處改 CSS class,對齊 frontend SKILL inline policy
+- **`/api/push/test` error 訊息對齊 gateway**(`653eeab`):從「檢查 FCM_SERVICE_ACCOUNT_PATH」(已廢 env)改「檢查 PUSH_GATEWAY_URL」

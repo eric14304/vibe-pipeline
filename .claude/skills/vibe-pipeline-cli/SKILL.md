@@ -93,7 +93,7 @@ cli/
 |---|---|
 | `project` | list / show / add `<path>` / remove `<hash>` |
 | `pipeline` | list / create / show / **delete** / **run** / **stop** / **merge** / **sync** / **sync --ai** / **sync --cancel** / sync --dismiss / status / log |
-| `ticket` | list / show `<id>` / add / update / remove,**全部要 `--pipeline <id>`** |
+| `ticket` | list / show `<id>` / add / update / remove,**全部要 `--pipeline <id>`**;`add` 額外必填 `--title --goal --prompt --acceptance`(沒帶 → INVALID_ARGS) |
 | `config` | list / get `<key>` / set `<key> <value>`(user-level `~/.vibe-pipeline/config.json`) |
 | `server` | **start** / **stop** / **status** / **restart** / **logs [-f]**(全 fs + spawn,管 backend daemon 自己,不走 HTTP) |
 

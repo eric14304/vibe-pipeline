@@ -86,6 +86,15 @@ vibe-pipeline/
 ├── shared/
 │   └── types.ts               跨 backend/frontend 持久化型別
 │
+├── gateway/                   FCM push gateway(Cloud Run service,2026-05-19 落地)
+│   ├── index.ts               Bun.serve entry,7 endpoint(/health + push/{register,send,unregister} + admin/{issue,revoke,tokens} + tokens/auto-issue)
+│   ├── admin.ts               vp-gw-admin CLI(maintainer issue/revoke/list token,master Bearer)
+│   ├── Dockerfile             oven/bun:1 base,Cloud Run 用
+│   ├── INFRA.md               GCP infra setup 紀錄(project / SA / Firestore / Cloud Run URL)
+│   ├── deploy.md              gcloud run deploy 指令 + rollback / troubleshoot
+│   ├── README.md              service 結構 + local dev + curl 範例 + admin CLI 用法
+│   └── lib/                   firestore / fcm / auth / tokens / rateLimit 拆分
+│
 ├── design/                    Claude Design handoff bundle(歷史紀錄,real code 已不引用)
 │
 ├── docs/
