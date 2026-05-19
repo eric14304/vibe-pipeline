@@ -107,6 +107,30 @@ function isPidAlive(pid: number | undefined): boolean {
   }
 }
 
+// 跨平台殺整棵 process tree。Windows 殺父不殺孫,單 SIGKILL 會留 orphan(codex
+// sub-agent 常踩),所以 stop / restart 都得呼這個。Windows 走 taskkill /T /F,
+// POSIX 試 process group(-pid)失敗 fallback 單 pid。失敗吞掉,呼叫端用 fs 善後判
+// ground truth。
+async function killProcessTree(pid: number | undefined): Promise<void> {
+  if (!pid) return;
+  if (process.platform === "win32") {
+    try {
+      const proc = Bun.spawn(["taskkill", "/T", "/F", "/PID", String(pid)], {
+        stdout: "pipe",
+        stderr: "pipe",
+        windowsHide: true,
+      });
+      await proc.exited;
+    } catch {
+      try { process.kill(pid, "SIGKILL"); } catch {}
+    }
+  } else {
+    try { process.kill(-pid, "SIGKILL"); } catch {
+      try { process.kill(pid, "SIGKILL"); } catch {}
+    }
+  }
+}
+
 async function watchdogTick(): Promise<void> {
   for (const [k, entry] of running.entries()) {
     if (!entry.proc) continue; // mock 模式
@@ -949,15 +973,15 @@ export async function stopImmediate(opts: {
     };
   }
 
-  // 砍 child process(若還在)。Bun.Subprocess.kill() 在 Windows 等同 terminate,
-  // POSIX 預設 SIGTERM;這裡傳 "SIGKILL" 強制不可捕捉。kill 失敗 / 沒 handle 都吞掉,
-  // 改用後段 fs 善後當 ground truth。
+  // 砍整棵 process tree(main agent + sub-agent + sub-agent 子孫)。Windows 單殺
+  // 父不殺孫,SIGKILL main agent 會留 codex/claude sub-agent orphan(用 fs 看到 ticket
+  // 被改但不知誰幹的)。改走 killProcessTree:Windows taskkill /T,POSIX process group。
   const entry = running.get(k);
   if (entry?.proc) {
     try {
-      entry.proc.kill("SIGKILL");
+      await killProcessTree(entry.proc.pid);
     } catch (e) {
-      console.warn(`[runner ${pipelineId}] SIGKILL failed (likely already exited):`, e);
+      console.warn(`[runner ${pipelineId}] killProcessTree failed (likely already exited):`, e);
     }
     // 等 exit 確認 — proc.exited 在已死的 process 上會立刻 resolve
     try {
