@@ -40,6 +40,10 @@ export interface IssueTokenRequest {
   label: string;
 }
 
+export interface AutoIssueTokenRequest {
+  label?: string;
+}
+
 export interface IssueTokenResponse {
   tokenId: string;
   token: string;
