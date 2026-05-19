@@ -11,20 +11,21 @@ function isMockMode(): boolean {
   return process.env.VP_TEST_MODE === "mock";
 }
 
+// Push gateway URL default:maintainer host 的 Cloud Run gateway。
+// forker 自架 gateway → 用 `PUSH_GATEWAY_URL` env override。
+const DEFAULT_GATEWAY_URL = "https://vp-gateway-799841449136.asia-east1.run.app";
+
 function gatewayUrl(): string | null {
   const v = process.env.PUSH_GATEWAY_URL?.trim();
-  return v && v.length > 0 ? v.replace(/\/+$/, "") : null;
+  const raw = v && v.length > 0 ? v : DEFAULT_GATEWAY_URL;
+  return raw.replace(/\/+$/, "");
 }
 
 // initFCM / isFCMReady:gateway url 有設就視為「結構上可用」;
 // token 本身 lazy 管理,send 時被動 getToken,沒有 → soft fail。
 export function initFCM(): Promise<boolean> {
   if (isMockMode()) return Promise.resolve(true);
-  const ready = !!gatewayUrl();
-  if (!ready) {
-    console.warn("[FCM] PUSH_GATEWAY_URL 未設定,push 功能停用");
-  }
-  return Promise.resolve(ready);
+  return Promise.resolve(!!gatewayUrl());
 }
 
 export function isFCMReady(): boolean {

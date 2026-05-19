@@ -23,16 +23,36 @@ type FcmConfig = {
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 const TOKEN_KEY = "fcm_token";
 
+// Firebase Web SDK config default:maintainer host(專案 `vibe-pipeline`)的公開 config。
+// forker 自架 Firebase → 用 VITE_FCM_* env vars override(build time 注入)。
+const DEFAULT_FCM_CONFIG: FcmConfig = {
+  apiKey: "AIzaSyAQX2L-rsCaUeNnNOXPIhzXH3kShJR0wTw",
+  authDomain: "vibe-pipeline.firebaseapp.com",
+  projectId: "vibe-pipeline",
+  storageBucket: "vibe-pipeline.firebasestorage.app",
+  messagingSenderId: "799841449136",
+  appId: "1:799841449136:web:b7d6c6eb44a162feacf775",
+  vapidKey:
+    "BInL1w91RmBaVvdvQhZt0NnehW0RUeHnDI1dSEx20WUOxPMXVZ2yP-iL4SjROzz531Dl4i_7v5wnzwY9J_GeOd4",
+};
+
+function resolveConfig(): FcmConfig {
+  return {
+    apiKey: import.meta.env.VITE_FCM_API_KEY ?? DEFAULT_FCM_CONFIG.apiKey,
+    authDomain: import.meta.env.VITE_FCM_AUTH_DOMAIN ?? DEFAULT_FCM_CONFIG.authDomain,
+    projectId: import.meta.env.VITE_FCM_PROJECT_ID ?? DEFAULT_FCM_CONFIG.projectId,
+    storageBucket: import.meta.env.VITE_FCM_STORAGE_BUCKET ?? DEFAULT_FCM_CONFIG.storageBucket,
+    messagingSenderId:
+      import.meta.env.VITE_FCM_MESSAGING_SENDER_ID ?? DEFAULT_FCM_CONFIG.messagingSenderId,
+    appId: import.meta.env.VITE_FCM_APP_ID ?? DEFAULT_FCM_CONFIG.appId,
+    vapidKey: import.meta.env.VITE_FCM_VAPID_KEY ?? DEFAULT_FCM_CONFIG.vapidKey,
+  };
+}
+
 let app: FirebaseApp | null = null;
 let messaging: Messaging | null = null;
 let config: FcmConfig | null = null;
 let initPromise: Promise<Messaging | null> | null = null;
-
-async function fetchConfig(): Promise<FcmConfig> {
-  const res = await authedFetch(`${API_BASE_URL}/api/push/config`);
-  if (!res.ok) throw new Error("無法取得 push config");
-  return (await res.json()) as FcmConfig;
-}
 
 export function getStoredToken(): string | null {
   try {
@@ -61,7 +81,7 @@ export async function initFCM(): Promise<Messaging | null> {
     try {
       const supported = await isFcmSupported();
       if (!supported) return null;
-      const cfg = await fetchConfig();
+      const cfg = resolveConfig();
       if (!cfg.apiKey || !cfg.projectId || !cfg.appId) {
         console.warn("[fcm] config 缺欄位,跳過初始化");
         return null;
