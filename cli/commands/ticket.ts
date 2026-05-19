@@ -8,7 +8,7 @@ const TICKET_USAGE = `vbpl ticket — manage tickets within a pipeline
 
   vbpl ticket list   --pipeline <id>
   vbpl ticket show   --pipeline <id> --ticket <n|id>
-  vbpl ticket add    --pipeline <id> --title <t> [--goal ...] [--acceptance "a;b"] [--prompt ...] [--mode step|iter] [--iter-limit <n>]
+  vbpl ticket add    --pipeline <id> --title <t> --goal ... --prompt ... --acceptance "a;b" [--mode step|iter] [--iter-limit <n>]
   vbpl ticket update --pipeline <id> --ticket <n|id> [--title ...] [--goal ...] [--prompt ...] [--acceptance "a;b"] [--mode step|iter] [--status ...] [--iter-limit <n>]
   vbpl ticket remove --pipeline <id> --ticket <n|id>
 
@@ -106,14 +106,19 @@ async function ticketAdd(args: ParsedArgs): Promise<void> {
 
   // Pipeline id: --pipeline flag or first positional
   const pipelineId = typeof args.flags["pipeline"] === "string" ? args.flags["pipeline"] : args.positional[0];
-  if (!pipelineId) fail("INVALID_ARGS", "Usage: vbpl ticket add --pipeline <id> --title <title> [--goal ...] [--acceptance ...] [--prompt ...] [--mode step|iter]");
+  if (!pipelineId) fail("INVALID_ARGS", "Usage: vbpl ticket add --pipeline <id> --title <title> --goal <goal> --prompt <prompt> --acceptance \"a;b\" [--mode step|iter]");
 
   const title = typeof args.flags["title"] === "string" ? args.flags["title"] : undefined;
   if (!title) fail("INVALID_ARGS", "--title is required");
 
   const goal = typeof args.flags["goal"] === "string" ? args.flags["goal"] : "";
-  const acceptance = typeof args.flags["acceptance"] === "string" ? args.flags["acceptance"].split(";").map((s) => s.trim()).filter(Boolean) : [];
+  if (!goal.trim()) fail("INVALID_ARGS", "--goal is required (一句話描述這 ticket 做什麼;runner 不用但給人 review)");
+
   const prompt = typeof args.flags["prompt"] === "string" ? args.flags["prompt"] : "";
+  if (!prompt.trim()) fail("INVALID_ARGS", "--prompt is required (給 executor 的完整任務指示)");
+
+  const acceptance = typeof args.flags["acceptance"] === "string" ? args.flags["acceptance"].split(";").map((s) => s.trim()).filter(Boolean) : [];
+  if (acceptance.length === 0) fail("INVALID_ARGS", "--acceptance is required (用分號分隔 N 條驗收標準;critic 拿來判 PASS/FAIL)");
   const rawMode = typeof args.flags["mode"] === "string" ? args.flags["mode"] : "step";
   const mode: TicketMode = (rawMode === "iter" ? "iter" : "step");
   const iterLimit = typeof args.flags["iter-limit"] === "string" ? Number(args.flags["iter-limit"]) : undefined;

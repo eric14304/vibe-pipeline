@@ -31,7 +31,7 @@ Examples:
   vbpl project list
   vbpl pipeline list --json
   vbpl pipeline run <pipelineId>
-  vbpl ticket add --pipeline <id> --title "Fix bug" --mode step
+  vbpl ticket add --pipeline <id> --title "Fix bug" --goal "..." --prompt "..." --acceptance "a;b" --mode step
   vbpl config set runner.model claude-opus-4-7
 `;
 
